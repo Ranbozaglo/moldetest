@@ -39,21 +39,21 @@ export default function Layout({ children, currentPageName }) {
             <nav className="hidden md:flex items-center gap-6">
               {user && (
                 <>
-                  <Link 
-                    to={createPageUrl("MyInspections")} 
-                    className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
-                  >
-                    <FileText className="w-4 h-4 inline mr-2" />
-                    My Inspections
-                  </Link>
+                <Link 
+                  to={createPageUrl("MyInspections")} 
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
+                >
+                  <FileText className="w-4 h-4 inline mr-2" />
+                  My Inspections
+                </Link>
                   {user.role === 'admin' && (
-                    <Link 
-                      to={createPageUrl("AdminDashboard")} 
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
-                    >
-                      <ShieldCheck className="w-4 h-4 inline mr-2" />
-                      Admin
-                    </Link>
+                <Link 
+                  to={createPageUrl("AdminDashboard")} 
+                  className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
+                >
+                  <ShieldCheck className="w-4 h-4 inline mr-2" />
+                  Admin
+                </Link>
                   )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-600">

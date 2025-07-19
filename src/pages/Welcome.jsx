@@ -77,14 +77,14 @@ export default function Welcome() {
               transition={{ duration: 0.8, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4 justify-center"
             >
-              <Button 
+                <Button 
                 onClick={handleStartInspection}
-                size="lg" 
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
-              >
-                <Shield className="w-6 h-6 mr-3" />
-                Start NEW Mold Inspection & Testing
-              </Button>
+                  size="lg" 
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                >
+                  <Shield className="w-6 h-6 mr-3" />
+                  Start NEW Mold Inspection & Testing
+                </Button>
             </motion.div>
             
             <p className="text-slate-500 mt-6 text-sm">
@@ -153,13 +153,13 @@ export default function Welcome() {
             <p className="text-xl text-blue-100 mb-10">
               Join thousands of homeowners who trust Mold Testing Houston.
             </p>
-            <Button 
+              <Button 
               onClick={handleStartInspection}
-              size="lg" 
-              className="bg-white text-blue-900 hover:bg-blue-50 px-12 py-6 text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
-            >
-              Begin NEW Inspection Process
-            </Button>
+                size="lg" 
+                className="bg-white text-blue-900 hover:bg-blue-50 px-12 py-6 text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
+              >
+                Begin NEW Inspection Process
+              </Button>
           </motion.div>
         </div>
       </section>

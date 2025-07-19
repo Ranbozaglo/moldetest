@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '@/api/entities';
 
 const AuthContext = createContext();
 
@@ -19,7 +20,16 @@ export const AuthProvider = ({ children }) => {
     const savedUser = localStorage.getItem('mth_user');
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const userData = JSON.parse(savedUser);
+        
+        // Update admin role for specific emails if needed
+        const adminEmails = ['rotemiluz53@gmail.com'];
+        if (adminEmails.includes(userData.email) && userData.role !== 'admin') {
+          userData.role = 'admin';
+          localStorage.setItem('mth_user', JSON.stringify(userData));
+        }
+        
+        setUser(userData);
       } catch (error) {
         console.error('Error parsing saved user:', error);
         localStorage.removeItem('mth_user');
@@ -30,42 +40,50 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
-      // Simulate API call - in a real app, this would be an actual API endpoint
-      // For demo purposes, we'll accept any email/password combination
-      const mockUser = {
-        id: '1',
-        email: email,
-        name: email.split('@')[0],
-        role: email.includes('admin') ? 'admin' : 'user',
+      // Call backend API for authentication
+      const response = await User.login(email, password);
+      
+      // Create user object with token from Flask backend
+      const user = {
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.full_name || email.split('@')[0], // Use full_name from user_profiles
+        is_admin: response.user.is_admin || response.user.role === 'admin',
+        role: response.user.role || 'user',
+        access_token: response.access_token,
         createdAt: new Date().toISOString()
       };
       
-      setUser(mockUser);
-      localStorage.setItem('mth_user', JSON.stringify(mockUser));
-      return { success: true, user: mockUser };
+      setUser(user);
+      localStorage.setItem('mth_user', JSON.stringify(user));
+      return { success: true, user: user };
     } catch (error) {
       console.error('Sign in error:', error);
-      return { success: false, error: 'Sign in failed' };
+      return { success: false, error: error.message || 'Sign in failed' };
     }
   };
 
   const signUp = async (email, password, name) => {
     try {
-      // Simulate API call - in a real app, this would be an actual API endpoint
-      const mockUser = {
-        id: Date.now().toString(),
+      // Call backend API for registration
+      const response = await User.register(email, password);
+      
+      // Create user object
+      const user = {
+        id: response.user_id,
         email: email,
-        name: name,
-        role: 'user',
+        name: name || email.split('@')[0],
+        is_admin: email.includes('rotemiluz53@gmail.com'),
+        role: email.includes('rotemiluz53@gmail.com') ? 'admin' : 'user',
         createdAt: new Date().toISOString()
       };
       
-      setUser(mockUser);
-      localStorage.setItem('mth_user', JSON.stringify(mockUser));
-      return { success: true, user: mockUser };
+      setUser(user);
+      localStorage.setItem('mth_user', JSON.stringify(user));
+      return { success: true, user: user };
     } catch (error) {
       console.error('Sign up error:', error);
-      return { success: false, error: 'Sign up failed' };
+      return { success: false, error: error.message || 'Sign up failed' };
     }
   };
 

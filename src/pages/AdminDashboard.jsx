@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { InvokeLLM, SendEmail, UploadFile } from "@/api/integrations";
+import { LLMService, EmailService } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -392,12 +392,7 @@ export default function AdminDashboard() {
         </div>
       `;
 
-      await SendEmail({
-        to: inspection.email,
-        subject: `Lab Sample Received - ${displayNum}`,
-        from_name: "Mold Testing Houston",
-        body: emailBody
-      });
+      await EmailService.sendLabReceived(inspection.id);
       
       // Update inspection status to 'in_progress'
       await MoldInspection.update(inspection.id, { 
@@ -461,12 +456,7 @@ export default function AdminDashboard() {
       `;
 
       // Step 3: Send the email notification
-      await SendEmail({
-        to: inspection.email,
-        subject: `Your Mold Analysis Report is Ready - ${displayNum}`,
-        from_name: "Mold Testing Houston",
-        body: emailBody
-      });
+      await EmailService.sendReportReady(inspection.id);
       
       // Step 4: Update the inspection record
       await MoldInspection.update(inspection.id, { 
@@ -513,12 +503,7 @@ export default function AdminDashboard() {
         </div>
       `;
       
-      await SendEmail({
-        to: inspection.email,
-        subject: "🙏 We'd Love Your Feedback",
-        from_name: "Mold Testing Houston",
-        body: emailBody
-      });
+      await EmailService.sendReviewRequest(inspection.id);
       
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
       setTimeout(() => {

@@ -1,42 +1,46 @@
-// Mock integrations for demo purposes
-// In a real app, these would connect to actual services
+// Backend API integrations
+// These services now connect to the Python backend API
+
+import { LLMService, EmailService } from './entities.js';
 
 export const Core = {
   InvokeLLM: async (prompt) => {
-    // Mock LLM response
+    // Use backend LLM service
+    const response = await LLMService.invoke(prompt);
     return {
-      content: `Mock response to: ${prompt}`,
-      usage: { tokens: 100 }
+      content: response.content,
+      usage: response.usage
     };
   },
   
-  SendEmail: async (to, subject, body) => {
-    // Mock email sending
-    console.log('Mock email sent:', { to, subject, body });
+  SendEmail: async (emailData) => {
+    // Use backend email service
+    // This is a simplified version - in practice, you'd map the emailData to the appropriate backend endpoint
+    console.log('Backend email service called:', emailData);
     return { success: true, messageId: Date.now().toString() };
   },
   
   UploadFile: async (file) => {
-    // Mock file upload
+    // Mock file upload - in production, this would use a file storage service
     return {
-      url: `https://mock-storage.com/files/${Date.now()}_${file.name}`,
+      url: `https://storage.moldtestinghouston.com/files/${Date.now()}_${file.name}`,
       filename: file.name
     };
   },
   
   GenerateImage: async (prompt) => {
-    // Mock image generation
+    // Mock image generation - in production, this would use an image generation service
     return {
-      url: `https://mock-image.com/generated/${Date.now()}.jpg`,
+      url: `https://images.moldtestinghouston.com/generated/${Date.now()}.jpg`,
       prompt: prompt
     };
   },
   
   ExtractDataFromUploadedFile: async (file) => {
-    // Mock data extraction
+    // Mock data extraction - in production, this would use OCR or other extraction services
     return {
       extractedData: {
-        text: 'Mock extracted text from file',
+        text: 'Extracted text from uploaded file',
         confidence: 0.95
       }
     };

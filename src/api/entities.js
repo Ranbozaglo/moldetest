@@ -1,10 +1,44 @@
-// Simple data storage for demo purposes
-// In a real app, this would connect to a backend API
+// API client for Flask backend communication
+import { getApiConfig } from '@/config/api.js';
 
-// Mock data storage
-let inspections = [];
-let samples = [];
-let users = [];
+const API_CONFIG = getApiConfig();
+const API_BASE_URL = API_CONFIG.BASE_URL;
+
+// Helper function for API calls
+const apiCall = async (endpoint, options = {}) => {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    },
+    ...options
+  };
+
+  try {
+    const response = await fetch(url, config);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`API call failed for ${endpoint}:`, error);
+    throw error;
+  } 
+};
+
+// Helper function to get auth token
+const getAuthToken = () => {
+  const user = localStorage.getItem('mth_user');
+  if (user) {
+    const userData = JSON.parse(user);
+    return userData.access_token; // Flask backend uses access_token
+  }
+  return null;
+};
 
 // Mold Inspection entity
 export const MoldInspection = {
@@ -14,32 +48,64 @@ export const MoldInspection = {
     console.log("🔍 DEBUG: MoldInspection methods:", Object.keys(MoldInspection));
     return true;
   },
+
   create: async (data) => {
-    const inspection = {
-      id: Date.now().toString(),
-      ...data,
-      created_date: new Date().toISOString(),
-      status: 'pending'
-    };
-    inspections.push(inspection);
-    return inspection;
+    const token = getAuthToken();
+    const response = await apiCall('/inspection', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        full_name: data.full_name,
+        street_address: data.street_address,
+        city: data.city,
+        state: data.state,
+        zip_code: data.zip_code,
+        property_type: data.property_type,
+        client_type: data.client_type,
+        square_footage: data.square_footage,
+        has_visible_mold: data.has_visible_mold,
+        mold_locations: data.mold_locations,
+        has_water_damage: data.has_water_damage,
+        water_damage_locations: data.water_damage_locations,
+        status: data.status || 'pending',
+        email: data.email,
+        is_sample: data.is_sample || false
+      })
+    });
+    return response;
   },
   
   findMany: async (filters = {}) => {
-    let filtered = [...inspections];
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams();
     
     if (filters.user_id) {
-      filtered = filtered.filter(i => i.user_id === filters.user_id);
+      queryParams.append('created_by_id', filters.user_id);
     }
     
-    return filtered;
+    const response = await apiCall(`/inspection?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
   },
   
   findUnique: async (filters) => {
-    return inspections.find(i => i.id === filters.id);
+    const token = getAuthToken();
+    const response = await apiCall(`/inspection/${filters.id}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
   },
   
   update: async (idOrFilters, data) => {
+    const token = getAuthToken();
     let id;
     if (typeof idOrFilters === 'string') {
       id = idOrFilters;
@@ -47,162 +113,205 @@ export const MoldInspection = {
       id = idOrFilters.id;
     }
     
-    const index = inspections.findIndex(i => i.id === id);
-    if (index !== -1) {
-      inspections[index] = { ...inspections[index], ...data };
-      return inspections[index];
-    }
-    throw new Error('Inspection not found');
+    const response = await apiCall(`/inspection/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response;
   },
   
-  list: async (sortBy = '-created_date', limit = 10) => {
+  list: async (sortBy = '-created_at', limit = 10) => {
     console.log("🔍 DEBUG: MoldInspection.list called with:", { sortBy, limit });
-    let sorted = [...inspections];
     
-    // Sort by the specified field
-    if (sortBy && sortBy.startsWith('-')) {
-      const field = sortBy.substring(1);
-      sorted.sort((a, b) => {
-        if (a[field] && b[field]) {
-          // Handle numeric fields
-          if (typeof a[field] === 'number' && typeof b[field] === 'number') {
-            return b[field] - a[field]; // Descending
-          }
-          // Handle string fields
-          if (typeof a[field] === 'string' && typeof b[field] === 'string') {
-            return b[field].localeCompare(a[field]); // Descending
-          }
-          // Handle date fields
-          if (a[field] instanceof Date && b[field] instanceof Date) {
-            return b[field] - a[field]; // Descending
-          }
-          // Handle ISO date strings
-          if (typeof a[field] === 'string' && typeof b[field] === 'string' && 
-              a[field].includes('-') && b[field].includes('-')) {
-            return new Date(b[field]) - new Date(a[field]); // Descending
-          }
-        }
-        return 0;
-      });
-    } else if (sortBy) {
-      sorted.sort((a, b) => {
-        if (a[sortBy] && b[sortBy]) {
-          // Handle numeric fields
-          if (typeof a[sortBy] === 'number' && typeof b[sortBy] === 'number') {
-            return a[sortBy] - b[sortBy]; // Ascending
-          }
-          // Handle string fields
-          if (typeof a[sortBy] === 'string' && typeof b[sortBy] === 'string') {
-            return a[sortBy].localeCompare(b[sortBy]); // Ascending
-          }
-          // Handle date fields
-          if (a[sortBy] instanceof Date && b[sortBy] instanceof Date) {
-            return a[sortBy] - b[sortBy]; // Ascending
-          }
-          // Handle ISO date strings
-          if (typeof a[sortBy] === 'string' && typeof b[sortBy] === 'string' && 
-              a[sortBy].includes('-') && b[sortBy].includes('-')) {
-            return new Date(a[sortBy]) - new Date(b[sortBy]); // Ascending
-          }
-        }
-        return 0;
-      });
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams();
+    
+    if (sortBy) {
+      queryParams.append('sort', sortBy);
+    }
+    if (limit) {
+      queryParams.append('limit', limit.toString());
     }
     
-    // Apply limit
-    const result = sorted.slice(0, limit);
-    console.log("🔍 DEBUG: MoldInspection.list returning:", result);
-    return result;
+    const response = await apiCall(`/inspection?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    console.log("🔍 DEBUG: MoldInspection.list returning:", response);
+    return response;
   },
   
-  filter: async (filters = {}, sortBy = '-created_date', limit = 10) => {
-    let filtered = [...inspections];
+  filter: async (filters = {}, sortBy = '-created_at', limit = 10) => {
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams();
     
-    // Apply filters
+    // Add filters to query params
     Object.keys(filters).forEach(key => {
       if (filters[key] !== undefined && filters[key] !== null) {
         if (Array.isArray(filters[key])) {
-          // Handle array filters (like status: ['pending', 'in_progress'])
-          filtered = filtered.filter(item => 
-            filters[key].includes(item[key])
-          );
+          filters[key].forEach(value => queryParams.append(key, value));
         } else {
-          // Handle single value filters
-          filtered = filtered.filter(item => 
-            item[key] === filters[key]
-          );
+          queryParams.append(key, filters[key]);
         }
       }
     });
     
-    // Sort by the specified field
-    if (sortBy.startsWith('-')) {
-      const field = sortBy.substring(1);
-      filtered.sort((a, b) => {
-        if (a[field] && b[field]) {
-          return b[field] - a[field]; // Descending
-        }
-        return 0;
-      });
-    } else {
-      filtered.sort((a, b) => {
-        if (a[sortBy] && b[sortBy]) {
-          return a[sortBy] - b[sortBy]; // Ascending
-        }
-        return 0;
-      });
+    if (sortBy) {
+      queryParams.append('sort', sortBy);
+    }
+    if (limit) {
+      queryParams.append('limit', limit.toString());
     }
     
-    // Apply limit
-    return filtered.slice(0, limit);
+    const response = await apiCall(`/inspection?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    return response;
+  },
+
+  delete: async (id) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/inspection/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
   }
 };
 
 // Sample entity
 export const Sample = {
   create: async (data) => {
-    const sample = {
-      id: Date.now().toString(),
-      ...data,
-      created_date: new Date().toISOString()
-    };
-    samples.push(sample);
-    return sample;
+    const token = getAuthToken();
+    const response = await apiCall('/samples', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inspection_id: data.inspection_id,
+        location: data.location,
+        description: data.description || data.sample_type,
+        sample_image: data.sample_image
+      })
+    });
+    return response;
   },
   
   findMany: async (filters = {}) => {
-    let filtered = [...samples];
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams();
     
     if (filters.inspection_id) {
-      filtered = filtered.filter(s => s.inspection_id === filters.inspection_id);
+      queryParams.append('inspection_id', filters.inspection_id);
     }
     
-    return filtered;
+    const response = await apiCall(`/samples?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
   },
   
   bulkCreate: async (dataArray) => {
-    const createdSamples = [];
-    for (const data of dataArray) {
-      const sample = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        ...data,
-        created_date: new Date().toISOString()
-      };
-      samples.push(sample);
-      createdSamples.push(sample);
-    }
-    return createdSamples;
+    const token = getAuthToken();
+    const promises = dataArray.map(data => 
+      apiCall('/samples', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inspection_id: data.inspection_id,
+          location: data.location,
+          description: data.description || data.sample_type,
+          sample_image: data.sample_image
+        })
+      })
+    );
+    
+    const results = await Promise.all(promises);
+    return results;
   }
 };
 
 // User entity for authentication
 export const User = {
-  me: async () => {
+  login: async (email, password) => {
+    const response = await apiCall('/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+    return response;
+  },
+
+  register: async (email, password) => {
+    const response = await apiCall('/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
+    return response;
+  },
+
+  isAdmin: () => {
     const savedUser = localStorage.getItem('mth_user');
     if (savedUser) {
-      return JSON.parse(savedUser);
+      const userData = JSON.parse(savedUser);
+      return userData.is_admin === true || userData.role === 'admin';
     }
-    throw new Error('No user found');
+    return false;
+  }
+};
+
+// LLM service
+export const LLMService = {
+  summarize: async (text) => {
+    const token = getAuthToken();
+    const response = await apiCall('/llm/summarize', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ text })
+    });
+    return response;
+  }
+};
+
+// Email service
+export const EmailService = {
+  send: async (to, subject, content) => {
+    const token = getAuthToken();
+    const response = await apiCall('/email/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ to, subject, content })
+    });
+    return response;
   }
 };
 
@@ -210,5 +319,7 @@ export const User = {
 export default {
   MoldInspection,
   Sample,
-  User
+  User,
+  LLMService,
+  EmailService
 };
