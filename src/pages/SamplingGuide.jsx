@@ -19,7 +19,10 @@ export default function SamplingGuide() {
         const params = new URLSearchParams(location.search);
         const id = params.get("inspectionId");
         
-        if (id) {
+        console.log("🔍 DEBUG: URL search params:", location.search);
+        console.log("🔍 DEBUG: Inspection ID from params:", id);
+        
+        if (id && id.trim() !== '') {
             setInspectionId(id);
             loadInspectionData(id);
         } else {
@@ -31,11 +34,19 @@ export default function SamplingGuide() {
 
     const loadInspectionData = async (id) => {
         try {
+            console.log("🔍 DEBUG: Loading inspection data for ID:", id);
             const data = await MoldInspection.findUnique({ id });
-            setInspectionData(data);
+            console.log("🔍 DEBUG: Loaded inspection data:", data);
+            
+            if (data && data.id) {
+                setInspectionData(data);
+            } else {
+                console.error("🔍 DEBUG: No inspection data found for ID:", id);
+                setInspectionData(null);
+            }
         } catch (error) {
             console.error("Failed to load inspection data for guide:", error);
-            alert("Failed to load inspection data. Please try again.");
+            setInspectionData(null);
         } finally {
             setLoading(false);
         }
@@ -53,13 +64,23 @@ export default function SamplingGuide() {
             </h2>
             <p className="text-slate-600 mb-6">
               {!inspectionId 
-                ? "This page requires a valid inspection ID. Please start a new inspection from the home page."
+                ? "This page requires a valid inspection ID. However, you can still view the sampling guide for reference."
                 : "We couldn't load the necessary inspection data to display this guide. Please return home and try starting the inspection again."
               }
             </p>
-            <Link to={createPageUrl("Welcome")}>
-                <Button>Back to Home</Button>
-            </Link>
+            <div className="flex gap-4 justify-center">
+              <Link to={createPageUrl("Welcome")}>
+                  <Button variant="outline">Back to Home</Button>
+              </Link>
+              {!inspectionId && (
+                <Button 
+                  onClick={() => setInspectionData({})} // Set empty object to show guide
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  View Guide Anyway
+                </Button>
+              )}
+            </div>
           </div>
         );
     }
@@ -126,7 +147,7 @@ export default function SamplingGuide() {
         { title: "Repeat for Each Location", description: "Crucially, you must use a new Q-tip and a new, separately labeled Ziploc bag for each different area you sample. Never reuse materials.", icon: Repeat }
     ];
 
-    const hasVisibleMold = inspectionData.has_visible_mold && inspectionData.visible_mold_details && inspectionData.visible_mold_details.length > 0;
+    const hasVisibleMold = inspectionData && inspectionData.has_visible_mold && inspectionData.visible_mold_details && inspectionData.visible_mold_details.length > 0;
 
     return (
         <div className="max-w-4xl mx-auto py-12 px-6">
@@ -217,7 +238,7 @@ export default function SamplingGuide() {
                         <h2 className="text-2xl font-bold text-slate-900 mb-6">Your Identified Mold Locations to Sample</h2>
                         <p className="text-slate-600 mb-4">You will need to collect one sample from each of the following locations you identified earlier:</p>
                         <ul className="space-y-3">
-                            {inspectionData.visible_mold_details.map((detail, index) => (
+                            {inspectionData && inspectionData.visible_mold_details && inspectionData.visible_mold_details.map((detail, index) => (
                                 <li key={index} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
                                     <MapPin className="w-5 h-5 text-red-500 flex-shrink-0" />
                                     <span className="font-medium text-slate-700">{detail.location}</span>

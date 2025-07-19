@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from "react";
-import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
@@ -23,20 +22,20 @@ import {
   Loader2
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function MyInspections() {
-  const [user, setUser] = useState(null);
   const [inspections, setInspections] = useState([]);
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState({});
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const currentUser = await User.me();
-        console.log("🔍 DEBUG: Current user:", currentUser);
         setUser(currentUser);
         
         if (currentUser && currentUser.email) {
@@ -80,7 +79,7 @@ export default function MyInspections() {
     };
 
     fetchUserData();
-  }, [navigate]);
+  }, [navigate, currentUser]);
 
   const getDisplayNumber = (inspection) => {
     return inspection?.inspection_number ? `MTH #${inspection.inspection_number}` : `MTH #${inspection?.id.substring(0, 8)}`;

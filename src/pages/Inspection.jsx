@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
 import { User } from "@/api/entities";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Debug: Check if MoldInspection is properly imported
 console.log("🔍 DEBUG: MoldInspection import check:", {
@@ -43,7 +44,7 @@ export default function Inspection() {
   }
   
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user: currentUser } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     full_name: "",
@@ -73,35 +74,42 @@ export default function Inspection() {
   useEffect(() => {
     const checkUserAndPreloadData = async () => {
       try {
-        const currentUser = await User.me();
-        setUser(currentUser);
-        
+        // Use the current user from AuthContext
         if (currentUser && currentUser.email) {
-          // Pre-fill form data with authenticated user's email ONLY
-          updateFormData({
-            email: currentUser.email
-          });
-
-          // Check if user has a pending or in_progress inspection
-          const activeInspections = await MoldInspection.filter({ 
-            email: currentUser.email,
-            status: ['pending', 'in_progress']
-          }, '-created_date', 1);
+          console.log("🔍 DEBUG: User authenticated:", currentUser.email);
           
-          if (activeInspections && activeInspections.length > 0) {
-            navigate(createPageUrl("MyInspections"));
-            return;
+          // Pre-fill the form with user data
+          setFormData(prev => ({
+            ...prev,
+            email: currentUser.email,
+            full_name: currentUser.name || currentUser.email.split('@')[0]
+          }));
+          
+          // Check for existing inspections
+          try {
+            const existingInspections = await MoldInspection.findMany({ user_id: currentUser.id });
+            if (existingInspections && existingInspections.length > 0) {
+              console.log("🔍 DEBUG: Found existing inspections:", existingInspections.length);
+              // You could show a message or handle existing inspections here
+            }
+          } catch (error) {
+            console.log("🔍 DEBUG: No existing inspections or error checking:", error);
           }
+        } else {
+          console.log("🔍 DEBUG: No authenticated user found");
+          navigate(createPageUrl('SignIn'));
+          return;
         }
       } catch (error) {
-        console.log("User not logged in or no active inspection:", error);
+        console.error("🔍 DEBUG: Error checking user:", error);
+        navigate(createPageUrl('SignIn'));
       } finally {
         setCheckingExisting(false);
       }
     };
 
     checkUserAndPreloadData();
-  }, [navigate]);
+  }, [navigate, currentUser]); // Added currentUser to dependency array
 
   const updateFormData = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -169,8 +177,7 @@ export default function Inspection() {
       }
 
       // Forcefully get the logged-in user's email to ensure it's correct
-      const currentUser = await User.me();
-      console.log("🔍 DEBUG: Current user from User.me():", currentUser);
+      console.log("🔍 DEBUG: Current user from AuthContext:", currentUser);
       
       if (!currentUser || !currentUser.email) {
         throw new Error("Could not verify user. Please log in again.");
@@ -199,16 +206,21 @@ export default function Inspection() {
 
       const newInspection = await MoldInspection.create(submissionData);
       console.log("🔍 DEBUG: Created inspection object:", newInspection);
+      console.log("🔍 DEBUG: Inspection ID:", newInspection?.id);
+      console.log("🔍 DEBUG: Inspection type:", typeof newInspection);
+      console.log("🔍 DEBUG: Inspection keys:", newInspection ? Object.keys(newInspection) : 'null');
       
       if (newInspection && newInspection.id) {
           console.log(`🔍 DEBUG: Successfully created inspection #${nextInspectionNumber} with ID:`, newInspection.id);
           // Store the new inspection result
           setNewInspection(newInspection);
+          console.log("🔍 DEBUG: Set newInspection state to:", newInspection);
           // Move to the next step (step 7) instead of navigating directly
           setCurrentStep(7);
       } else {
           // This case handles if creation fails to return a valid object with an ID
-          throw new Error("Failed to create inspection or retrieve a valid ID.");
+          console.error("🔍 DEBUG: Invalid inspection response:", newInspection);
+          throw new Error(`Failed to create inspection or retrieve a valid ID. Response: ${JSON.stringify(newInspection)}`);
       }
 
     } catch (error) {
@@ -305,7 +317,7 @@ export default function Inspection() {
               isLastStep={currentStep === steps.length}
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
-              user={user}
+              user={currentUser}
             />
           ) : (
             <div className="text-center py-10">
@@ -318,7 +330,17 @@ export default function Inspection() {
                 Please proceed to the Sample Collection guide.
               </p>
               <Button 
-                onClick={() => navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection?.id || ''}`))} 
+                onClick={() => {
+                  console.log("🔍 DEBUG: Button clicked, newInspection state:", newInspection);
+                  console.log("🔍 DEBUG: newInspection?.id:", newInspection?.id);
+                  if (newInspection?.id) {
+                    console.log("🔍 DEBUG: Navigating to SamplingGuide with ID:", newInspection.id);
+                    navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection.id}`));
+                  } else {
+                    console.error("🔍 DEBUG: No inspection ID available for navigation");
+                    alert("Error: Inspection ID not found. Please try submitting the inspection again.");
+                  }
+                }} 
                 disabled={!newInspection?.id} 
                 className="mt-6 px-8 py-3 text-lg"
               >

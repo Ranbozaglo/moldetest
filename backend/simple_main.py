@@ -203,47 +203,126 @@ def register():
 
 @app.route('/api/inspection', methods=['GET'])
 def get_inspections():
-    """Get all inspections"""
+    """Get all inspections with complete data"""
     try:
-        result = supabase.table('inspection').select('*, user_profiles(email, full_name)').execute()
-        inspections = result.data
+        # Get query parameters
+        sort_by = request.args.get('sort', '-created_at')
+        limit = request.args.get('limit', 10)
         
-        # Convert to expected format
+        print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}")
+        
+        # Build the query - select ALL fields from inspection table
+        query = supabase.table('inspection').select('*')
+        
+        # Apply sorting - handle different sort fields
+        if sort_by:
+            if sort_by == '-created_date':
+                query = query.order('created_date', desc=True)
+            elif sort_by == '-created_at':
+                query = query.order('created_at', desc=True)
+            elif sort_by.startswith('-'):
+                # Handle other descending sorts
+                field = sort_by[1:]
+                query = query.order(field, desc=True)
+            else:
+                query = query.order(sort_by)
+        
+        # Apply limit
+        if limit:
+            query = query.limit(int(limit))
+        
+        print(f"🔍 DEBUG: Executing query...")
+        result = query.execute()
+        inspections = result.data
+        print(f"🔍 DEBUG: Found {len(inspections)} inspections")
+        
+        # Convert to expected format with ALL available fields
         result_list = []
         for inspection in inspections:
             result_list.append({
+                # Basic identification
                 "id": inspection['id'],
-                "user_id": inspection.get('created_by_id'),
-                "property_address": inspection.get('street_address', ''),
-                "inspection_date": inspection.get('created_date'),
-                "status": inspection.get('status', 'pending'),
-                "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
+                "inspection_number": inspection.get('id'),
                 "created_at": inspection['created_at'],
-                "user_email": inspection.get('user_profiles', {}).get('email') if inspection.get('user_profiles') else None,
+                "created_date": inspection.get('created_date'),
+                "updated_date": inspection.get('updated_date'),
+                "created_by_id": inspection.get('created_by_id'),
+                
+                # Client information
                 "full_name": inspection.get('full_name'),
+                "email": inspection.get('email'),
+                "client_type": inspection.get('client_type'),
+                
+                # Property information
                 "street_address": inspection.get('street_address'),
                 "city": inspection.get('city'),
                 "state": inspection.get('state'),
                 "zip_code": inspection.get('zip_code'),
                 "property_type": inspection.get('property_type'),
-                "client_type": inspection.get('client_type'),
                 "square_footage": inspection.get('square_footage'),
+                
+                # Mold assessment
                 "has_visible_mold": inspection.get('has_visible_mold'),
                 "mold_locations": inspection.get('mold_locations'),
+                "mold_images": inspection.get('mold_images'),
+                
+                # Water damage assessment
                 "has_water_damage": inspection.get('has_water_damage'),
                 "water_damage_locations": inspection.get('water_damage_locations'),
-                "is_sample": inspection.get('is_sample')
+                "water_damage_images": inspection.get('water_damage_images'),
+                
+                # Environmental data
+                "thermostat_image": inspection.get('thermostat_image'),
+                
+                # Status and metadata
+                "status": inspection.get('status', 'pending'),
+                "is_sample": inspection.get('is_sample'),
+                
+                # Legacy fields for compatibility
+                "user_id": inspection.get('created_by_id'),
+                "property_address": inspection.get('street_address', ''),
+                "inspection_date": inspection.get('created_date'),
+                "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
+                "user_email": inspection.get('email'),
             })
         
+        print(f"🔍 DEBUG: Returning {len(result_list)} inspections with complete data")
         return jsonify(result_list)
     except Exception as e:
         print(f"🔍 DEBUG: Get inspections error: {e}")
-        return jsonify({"error": "Failed to fetch inspections"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch inspections: {str(e)}"}), 500
+
+@app.route('/api/inspection/<int:inspection_id>', methods=['GET'])
+def get_inspection_by_id(inspection_id):
+    """Get a single inspection by ID"""
+    try:
+        print(f"🔍 DEBUG: Getting inspection with ID: {inspection_id}")
+        
+        result = supabase.table('inspection').select('*').eq('id', inspection_id).execute()
+        inspections = result.data
+        
+        if inspections and len(inspections) > 0:
+            inspection = inspections[0]
+            print(f"🔍 DEBUG: Found inspection: {inspection}")
+            return jsonify(inspection)
+        else:
+            print(f"🔍 DEBUG: No inspection found with ID: {inspection_id}")
+            return jsonify({"error": "Inspection not found"}), 404
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Get inspection by ID error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch inspection: {str(e)}"}), 500
 
 @app.route('/api/inspection', methods=['POST'])
 def create_inspection():
     """Create new inspection"""
     data = request.get_json()
+    
+    print(f"🔍 DEBUG: Creating inspection with data:", data)
     
     try:
         result = supabase.table('inspection').insert({
@@ -265,30 +344,56 @@ def create_inspection():
             'is_sample': data.get('is_sample', False)
         }).execute()
         
-        inspection = result.data[0] if result.data else None
+        print(f"🔍 DEBUG: Supabase result:", result)
+        print(f"🔍 DEBUG: Result data:", result.data)
         
-        return jsonify({
+        inspection = result.data[0] if result.data else None
+        print(f"🔍 DEBUG: Extracted inspection:", inspection)
+        
+        response_data = {
             "message": "Inspection created successfully",
             "inspection": inspection
-        })
+        }
+        print(f"🔍 DEBUG: Returning response:", response_data)
+        
+        return jsonify(response_data)
     except Exception as e:
         print(f"🔍 DEBUG: Create inspection error: {e}")
-        return jsonify({"error": "Failed to create inspection"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to create inspection: {str(e)}"}), 500
 
-@app.route('/api/inspections/<int:inspection_id>', methods=['PUT'])
+@app.route('/api/inspection/<int:inspection_id>', methods=['PUT'])
 def update_inspection(inspection_id):
     """Update inspection"""
     data = request.get_json()
     
+    print(f"🔍 DEBUG: Updating inspection {inspection_id} with data:", data)
+    
     try:
-        result = supabase.table('inspection').update({
-            'property_address': data.get('property_address'),
-            'inspection_date': data.get('inspection_date'),
-            'status': data.get('status'),
-            'summary': data.get('summary')
-        }).eq('id', inspection_id).execute()
+        # Build update data dynamically based on what's provided
+        update_data = {}
+        if 'status' in data:
+            update_data['status'] = data['status']
+        if 'property_address' in data:
+            update_data['property_address'] = data['property_address']
+        if 'inspection_date' in data:
+            update_data['inspection_date'] = data['inspection_date']
+        if 'summary' in data:
+            update_data['summary'] = data['summary']
+        if 'has_visible_mold' in data:
+            update_data['has_visible_mold'] = data['has_visible_mold']
+        if 'has_water_damage' in data:
+            update_data['has_water_damage'] = data['has_water_damage']
+        if 'is_sample' in data:
+            update_data['is_sample'] = data['is_sample']
+        
+        print(f"🔍 DEBUG: Update data to apply:", update_data)
+        
+        result = supabase.table('inspection').update(update_data).eq('id', inspection_id).execute()
         
         updated_inspection = result.data[0] if result.data else None
+        print(f"🔍 DEBUG: Updated inspection:", updated_inspection)
         
         return jsonify({
             "message": "Inspection updated successfully",
@@ -296,7 +401,28 @@ def update_inspection(inspection_id):
         })
     except Exception as e:
         print(f"🔍 DEBUG: Update inspection error: {e}")
-        return jsonify({"error": "Failed to update inspection"}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to update inspection: {str(e)}"}), 500
+
+@app.route('/api/inspection/<int:inspection_id>', methods=['DELETE'])
+def delete_inspection(inspection_id):
+    """Delete inspection"""
+    try:
+        print(f"🔍 DEBUG: Deleting inspection with ID: {inspection_id}")
+        
+        result = supabase.table('inspection').delete().eq('id', inspection_id).execute()
+        
+        print(f"🔍 DEBUG: Delete result:", result)
+        
+        return jsonify({
+            "message": "Inspection deleted successfully"
+        })
+    except Exception as e:
+        print(f"🔍 DEBUG: Delete inspection error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to delete inspection: {str(e)}"}), 500
 
 @app.route('/api/samples', methods=['GET'])
 def get_samples():
@@ -388,6 +514,9 @@ if __name__ == '__main__':
     print("   - POST /api/auth/register")
     print("   - GET  /api/inspection")
     print("   - POST /api/inspection")
+    print("   - GET  /api/inspection/<int:inspection_id>")
+    print("   - PUT  /api/inspection/<int:inspection_id>")
+    print("   - DELETE /api/inspection/<int:inspection_id>")
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
     print("   - POST /api/llm/summarize")

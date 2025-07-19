@@ -9,10 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useNavigate, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
-import { Download, Eye, ShieldCheck, FileText, Trash2, Mail, Star, FlaskConical, Search } from "lucide-react";
+import { 
+  Download, Eye, ShieldCheck, FileText, Trash2, Mail, Star, FlaskConical, Search,
+  BarChart3, PieChart, TrendingUp, Users, MapPin, Calendar, AlertTriangle, CheckCircle,
+  Clock, Filter, RefreshCw, Database, Image, File, MoreHorizontal, Edit, Send, 
+  CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminDashboard() {
@@ -25,6 +34,11 @@ export default function AdminDashboard() {
   const [emailStatus, setEmailStatus] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
+  const [clientTypeFilter, setClientTypeFilter] = useState("all");
+  const [moldFilter, setMoldFilter] = useState("all");
+  const [waterDamageFilter, setWaterDamageFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("overview");
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
 
@@ -57,10 +71,10 @@ export default function AdminDashboard() {
 
   const loadInspections = async () => {
     try {
-      // Reduced the number of inspections loaded to prevent rate limiting
-      const allInspections = await MoldInspection.list('-created_date', 50);
+      console.log("🔍 Loading all inspections...");
+      const allInspections = await MoldInspection.list('-created_date', 1000); // Load more inspections
+      console.log("🔍 Loaded inspections:", allInspections);
       setInspections(allInspections);
-      // Clear selection when reloading
       setSelectedInspections(new Set());
     } catch (error) {
       console.error("Error loading inspections:", error);
@@ -73,21 +87,69 @@ export default function AdminDashboard() {
     return `MTH #${number}`;
   };
 
-  // Filter inspections based on search term and status filter
+  // Calculate dashboard statistics
+  const getDashboardStats = () => {
+    const total = inspections.length;
+    const withMold = inspections.filter(i => i.has_visible_mold).length;
+    const withWaterDamage = inspections.filter(i => i.has_water_damage).length;
+    const samples = inspections.filter(i => i.is_sample).length;
+    const pending = inspections.filter(i => i.status === 'pending').length;
+    const completed = inspections.filter(i => i.status === 'completed').length;
+    
+    const propertyTypes = {};
+    const clientTypes = {};
+    const cities = {};
+    
+    inspections.forEach(inspection => {
+      if (inspection.property_type) {
+        propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
+      }
+      if (inspection.client_type) {
+        clientTypes[inspection.client_type] = (clientTypes[inspection.client_type] || 0) + 1;
+      }
+      if (inspection.city) {
+        cities[inspection.city] = (cities[inspection.city] || 0) + 1;
+      }
+    });
+
+    return {
+      total,
+      withMold,
+      withWaterDamage,
+      samples,
+      pending,
+      completed,
+      propertyTypes,
+      clientTypes,
+      cities
+    };
+  };
+
+  // Filter inspections based on all filters
   const filteredInspections = inspections.filter(inspection => {
     const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
+    const propertyTypeMatch = propertyTypeFilter === 'all' || inspection.property_type === propertyTypeFilter;
+    const clientTypeMatch = clientTypeFilter === 'all' || inspection.client_type === clientTypeFilter;
+    const moldMatch = moldFilter === 'all' || 
+      (moldFilter === 'yes' && inspection.has_visible_mold) || 
+      (moldFilter === 'no' && !inspection.has_visible_mold);
+    const waterDamageMatch = waterDamageFilter === 'all' || 
+      (waterDamageFilter === 'yes' && inspection.has_water_damage) || 
+      (waterDamageFilter === 'no' && !inspection.has_water_damage);
 
     const term = searchTerm.toLowerCase();
-    // Add checks for potentially missing data to prevent crash
     const searchMatch = !term ||
       (getDisplayNumber(inspection) || '').toLowerCase().includes(term) ||
       (inspection.full_name || '').toLowerCase().includes(term) ||
       (inspection.street_address || '').toLowerCase().includes(term) ||
       (inspection.email || '').toLowerCase().includes(term) ||
-      (inspection.client_status_detail || '').toLowerCase().includes(term);
+      (inspection.city || '').toLowerCase().includes(term) ||
+      (inspection.state || '').toLowerCase().includes(term);
 
-    return statusMatch && searchMatch;
+    return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
   });
+
+  const stats = getDashboardStats();
 
   const handleSelectAll = (checked) => {
     // Select/deselect all currently filtered inspections
@@ -109,16 +171,17 @@ export default function AdminDashboard() {
     setSelectedInspections(newSelected);
   };
 
-  const handleDeleteSelected = async () => {
-    if (selectedInspections.size === 0) return;
+  const handleDeleteSelected = async (idsToDelete = null) => {
+    const ids = idsToDelete || Array.from(selectedInspections);
+    if (ids.length === 0) return;
     
-    const confirmMessage = `Are you sure you want to delete ${selectedInspections.size} inspection(s)? This action cannot be undone.`;
+    const confirmMessage = `Are you sure you want to delete ${ids.length} inspection(s)? This action cannot be undone.`;
     if (!confirm(confirmMessage)) return;
 
     setIsDeleting(true);
     try {
       // Delete inspections one by one with a small delay to avoid rate limiting
-      for (const id of selectedInspections) {
+      for (const id of ids) {
         await MoldInspection.delete(id);
         // Small delay to prevent rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -127,7 +190,7 @@ export default function AdminDashboard() {
       // Reload the inspections list
       await loadInspections();
       
-      alert(`Successfully deleted ${selectedInspections.size} inspection(s).`);
+      alert(`Successfully deleted ${ids.length} inspection(s).`);
     } catch (error) {
       console.error("Error deleting inspections:", error);
       alert("Failed to delete some inspections. Please try again.");
@@ -440,7 +503,7 @@ export default function AdminDashboard() {
       const samples = await Sample.filter({ inspection_id: inspection.id });
       const reportHtml = await generateReportHtmlContent(inspection, samples);
       const reportFile = new File([reportHtml], `report-${inspection.id}.html`, { type: 'text/html' });
-      const { file_url: reportUrl } = await UploadFile({ file: reportFile });
+      const { file_url: reportUrl } = await LLMService.uploadFile({ file: reportFile }); // Changed to LLMService.uploadFile
       setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
       setTimeout(() => setDownloadStatus(null), 3000);
 
@@ -530,198 +593,711 @@ export default function AdminDashboard() {
   };
 
   const getEmailButtonStatus = (emailKey) => {
-    const status = emailStatus[emailKey];
-    if (status === 'sending') return { text: 'Sending...', disabled: true, variant: 'secondary' };
-    if (status === 'sent') return { text: 'Sent ✓', disabled: true, variant: 'default' };
-    if (status === 'error') return { text: 'Failed', disabled: false, variant: 'destructive' };
-    return { text: null, disabled: false, variant: 'outline' };
+    return emailStatus[emailKey] || 'idle';
+  };
+
+  // Status switching functionality
+  const updateInspectionStatus = async (inspectionId, newStatus) => {
+    try {
+      console.log(`🔍 DEBUG: Updating inspection ${inspectionId} status to ${newStatus}`);
+      
+      const updatedInspection = await MoldInspection.update(inspectionId, { status: newStatus });
+      console.log("🔍 DEBUG: Status updated successfully:", updatedInspection);
+      
+      // Update the local state
+      setInspections(prevInspections => 
+        prevInspections.map(inspection => 
+          inspection.id === inspectionId 
+            ? { ...inspection, status: newStatus }
+            : inspection
+        )
+      );
+      
+      alert(`Status updated to ${newStatus}`);
+    } catch (error) {
+      console.error("Error updating inspection status:", error);
+      alert("Failed to update status. Please try again.");
+    }
+  };
+
+  // Get status badge variant and icon
+  const getStatusDisplay = (status) => {
+    const statusConfig = {
+      pending: {
+        variant: "secondary",
+        icon: Clock,
+        label: "Pending",
+        color: "text-yellow-600"
+      },
+      in_progress: {
+        variant: "default",
+        icon: PlayCircle,
+        label: "In Progress",
+        color: "text-blue-600"
+      },
+      completed: {
+        variant: "default",
+        icon: CheckCircle2,
+        label: "Completed",
+        color: "text-green-600"
+      },
+      cancelled: {
+        variant: "destructive",
+        icon: XCircle,
+        label: "Cancelled",
+        color: "text-red-600"
+      },
+      on_hold: {
+        variant: "outline",
+        icon: PauseCircle,
+        label: "On Hold",
+        color: "text-orange-600"
+      }
+    };
+    
+    return statusConfig[status] || statusConfig.pending;
+  };
+
+  // Get available status options for switching
+  const getAvailableStatuses = (currentStatus) => {
+    const allStatuses = ['pending', 'in_progress', 'completed', 'cancelled', 'on_hold'];
+    return allStatuses.filter(status => status !== currentStatus);
   };
 
   if (loading) {
-    return <div className="text-center p-12">Loading Admin Portal...</div>;
-  }
-  
-  if (!user) {
-     return <div className="text-center p-12 text-red-600">Access Denied. You must be an administrator to view this page.</div>;
-  }
-
-  const allSelected = filteredInspections.length > 0 && selectedInspections.size === filteredInspections.length;
-  const someSelected = selectedInspections.size > 0;
-
-  return (
-    <div className="max-w-7xl mx-auto py-12 px-6">
-      {/* Success/Error/Info Notification */}
-      {downloadStatus && (
-        <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
-          downloadStatus.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' :
-          downloadStatus.type === 'error' ? 'bg-red-100 text-red-800 border border-red-200' :
-          'bg-blue-100 text-blue-800 border border-blue-200'
-        }`}>
-          {downloadStatus.message}
-        </div>
-      )}
-
-      <div className="flex justify-between items-center mb-8">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>
-        </div>
-        <div className="flex gap-3">
-          {someSelected && (
-            <Button 
-              onClick={handleDeleteSelected}
-              disabled={isDeleting}
-              variant="destructive"
-              className="bg-red-600 hover:bg-red-700"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              {isDeleting ? "Deleting..." : `Delete Selected (${selectedInspections.size})`}
-            </Button>
-          )}
-          <Button onClick={exportToCSV} className="bg-blue-600 hover:bg-blue-700">
-            <Download className="w-4 h-4 mr-2" />
-            Export to CSV
-          </Button>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-slate-600">Loading admin dashboard...</p>
+            </div>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h2 className="text-xl font-semibold text-slate-800 mb-4">All Inspections ({filteredInspections.length} found)</h2>
-        
-        {/* Search and Filter Controls */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-grow">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder="Search by ID, name, email or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-11"
-            />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+              <ShieldCheck className="w-8 h-8 text-blue-600" />
+              Admin Dashboard
+            </h1>
+            <p className="text-slate-600 mt-2">
+              Manage all inspections and generate comprehensive reports
+            </p>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full md:w-52 h-11">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="report_ready">Report Ready</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-3">
+            <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
+            <Button onClick={exportToCSV} className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Export CSV
+            </Button>
+          </div>
         </div>
-        
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={handleSelectAll}
-                    disabled={filteredInspections.length === 0}
-                  />
-                </TableHead>
-                <TableHead>Inspection #</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-80">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInspections.map((inspection, index) => {
-                const displayNum = getDisplayNumber(inspection);
-                const isSelected = selectedInspections.has(inspection.id);
-                
-                return (
-                  <TableRow key={inspection.id} className={isSelected ? "bg-blue-50" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelectInspection(inspection.id, checked)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono font-medium">
-                      {displayNum}
-                    </TableCell>
-                    <TableCell>{format(new Date(inspection.created_date), "MMM d, yyyy")}</TableCell>
-                    <TableCell className="font-medium">{inspection.full_name}</TableCell>
-                    <TableCell>{inspection.street_address}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        inspection.status === 'report_ready' || inspection.status === 'completed' ? 'bg-indigo-100 text-indigo-800' :
-                        inspection.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-slate-100 text-slate-800'
-                      }`}>
-                        {inspection.status.replace('_', ' ')}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <Link to={createPageUrl(`InspectionDetails?id=${inspection.id}`)}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="w-4 h-4 mr-1" />
-                            View
-                          </Button>
-                        </Link>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => downloadPDF(inspection)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <FileText className="w-4 h-4 mr-1" />
-                          Download Report
-                        </Button>
-                        
-                        {/* Email Action Buttons */}
-                        <Button 
-                          variant={getEmailButtonStatus(`lab_${inspection.id}`).variant}
-                          size="sm"
-                          onClick={() => sendLabReceivedEmail(inspection)}
-                          disabled={getEmailButtonStatus(`lab_${inspection.id}`).disabled}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                        >
-                          <FlaskConical className="w-4 h-4 mr-1" />
-                          {getEmailButtonStatus(`lab_${inspection.id}`).text || 'Lab Received'}
-                        </Button>
-                        
-                        <Button 
-                          variant={getEmailButtonStatus(`report_${inspection.id}`).variant}
-                          size="sm"
-                          onClick={() => sendReportReadyEmail(inspection)}
-                          disabled={getEmailButtonStatus(`report_${inspection.id}`).disabled}
-                          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200"
-                        >
-                          <Mail className="w-4 h-4 mr-1" />
-                          {getEmailButtonStatus(`report_${inspection.id}`).text || 'Report Ready'}
-                        </Button>
-                        
-                        <Button 
-                          variant={getEmailButtonStatus(`review_${inspection.id}`).variant}
-                          size="sm"
-                          onClick={() => sendReviewRequestEmail(inspection)}
-                          disabled={getEmailButtonStatus(`review_${inspection.id}`).disabled}
-                          className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200"
-                        >
-                          <Star className="w-4 h-4 mr-1" />
-                          {getEmailButtonStatus(`review_${inspection.id}`).text || 'Request Review'}
-                        </Button>
+
+        {/* Dashboard Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="inspections" className="flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              All Inspections
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-2">
+              <File className="w-4 h-4" />
+              Reports
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Inspections</CardTitle>
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <p className="text-xs text-muted-foreground">All time inspections</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">With Visible Mold</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.withMold}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.total > 0 ? `${((stats.withMold / stats.total) * 100).toFixed(1)}%` : '0%'} of total
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">With Water Damage</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.withWaterDamage}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.total > 0 ? `${((stats.withWaterDamage / stats.total) * 100).toFixed(1)}%` : '0%'} of total
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Sample Requests</CardTitle>
+                  <FlaskConical className="h-4 w-4 text-blue-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.samples}</div>
+                  <p className="text-xs text-muted-foreground">Lab analysis requested</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Status Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Status Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Pending</span>
+                    <Badge variant="secondary">{stats.pending}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Completed</span>
+                    <Badge variant="default">{stats.completed}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    Top Cities
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {Object.entries(stats.cities)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 5)
+                    .map(([city, count]) => (
+                      <div key={city} className="flex justify-between items-center">
+                        <span className="text-sm">{city}</span>
+                        <Badge variant="outline">{count}</Badge>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-        {filteredInspections.length === 0 && (
-            <p className="text-center text-slate-500 py-8">No inspections match your search criteria.</p>
-        )}
+                    ))}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="w-5 h-5" />
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>
+                  Common admin tasks and shortcuts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Button 
+                    onClick={exportToCSV} 
+                    variant="outline" 
+                    className="h-20 flex flex-col gap-2"
+                  >
+                    <FileText className="w-6 h-6" />
+                    <span className="text-sm">Export All Data</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setActiveTab("inspections")} 
+                    variant="outline" 
+                    className="h-20 flex flex-col gap-2"
+                  >
+                    <Database className="w-6 h-6" />
+                    <span className="text-sm">Manage Inspections</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setActiveTab("reports")} 
+                    variant="outline" 
+                    className="h-20 flex flex-col gap-2"
+                  >
+                    <File className="w-6 h-6" />
+                    <span className="text-sm">Generate Reports</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => setActiveTab("analytics")} 
+                    variant="outline" 
+                    className="h-20 flex flex-col gap-2"
+                  >
+                    <BarChart3 className="w-6 h-6" />
+                    <span className="text-sm">View Analytics</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inspections Tab */}
+          <TabsContent value="inspections" className="space-y-6">
+            {/* Enhanced Filters */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Filter className="w-5 h-5" />
+                  Advanced Filters
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Search</label>
+                    <Input
+                      placeholder="Search inspections..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Property Type</label>
+                    <Select value={propertyTypeFilter} onValueChange={setPropertyTypeFilter}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Property type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="house">House</SelectItem>
+                        <SelectItem value="apartment">Apartment</SelectItem>
+                        <SelectItem value="condo">Condo</SelectItem>
+                        <SelectItem value="office">Office</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Client Type</label>
+                    <Select value={clientTypeFilter} onValueChange={setClientTypeFilter}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Client type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="individual">Individual</SelectItem>
+                        <SelectItem value="real_estate">Real Estate</SelectItem>
+                        <SelectItem value="property_management">Property Management</SelectItem>
+                        <SelectItem value="home_inspector">Home Inspector</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Visible Mold</label>
+                    <Select value={moldFilter} onValueChange={setMoldFilter}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Mold status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Water Damage</label>
+                    <Select value={waterDamageFilter} onValueChange={setWaterDamageFilter}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Water damage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Inspections Table */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>All Inspections ({filteredInspections.length})</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleSelectAll(true)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      onClick={() => handleSelectAll(false)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Clear
+                    </Button>
+                    {selectedInspections.size > 0 && (
+                      <Button
+                        onClick={handleDeleteSelected}
+                        variant="destructive"
+                        size="sm"
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? 'Deleting...' : `Delete ${selectedInspections.size}`}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={selectedInspections.size === filteredInspections.length && filteredInspections.length > 0}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead>Inspection #</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Property</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Mold</TableHead>
+                        <TableHead>Water Damage</TableHead>
+                        <TableHead>Sample</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInspections.map((inspection) => (
+                        <TableRow key={inspection.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedInspections.has(inspection.id)}
+                              onCheckedChange={(checked) => handleSelectInspection(inspection.id, checked)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {getDisplayNumber(inspection)}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{inspection.full_name}</div>
+                              <div className="text-sm text-muted-foreground">{inspection.email}</div>
+                              <div className="text-xs text-muted-foreground">{inspection.client_type}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{inspection.street_address}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {inspection.city}, {inspection.state} {inspection.zip_code}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {inspection.property_type} • {inspection.square_footage} sq ft
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={getStatusDisplay(inspection.status).variant}>
+                                {React.createElement(getStatusDisplay(inspection.status).icon, { className: "w-3 h-3 mr-1" })}
+                                {getStatusDisplay(inspection.status).label}
+                              </Badge>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <RotateCcw className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {getAvailableStatuses(inspection.status).map((status) => (
+                                    <DropdownMenuItem 
+                                      key={status}
+                                      onClick={() => updateInspectionStatus(inspection.id, status)}
+                                      className="flex items-center gap-2"
+                                    >
+                                      {React.createElement(getStatusDisplay(status).icon, { className: "w-4 h-4" })}
+                                      {getStatusDisplay(status).label}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {inspection.has_visible_mold ? (
+                              <Badge variant="destructive">Yes</Badge>
+                            ) : (
+                              <Badge variant="outline">No</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {inspection.has_water_damage ? (
+                              <Badge variant="destructive">Yes</Badge>
+                            ) : (
+                              <Badge variant="outline">No</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {inspection.is_sample ? (
+                              <Badge variant="default">Yes</Badge>
+                            ) : (
+                              <Badge variant="outline">No</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                
+                                {/* View and Download Actions */}
+                                <DropdownMenuItem 
+                                  onClick={() => window.open(createPageUrl('InspectionDetails', { id: inspection.id }), '_blank')}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View Details
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => downloadPDF(inspection)}
+                                  className="flex items-center gap-2"
+                                >
+                                  <File className="w-4 h-4" />
+                                  Download Report
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={async () => {
+                                    try {
+                                      const samples = await Sample.findMany({ inspection_id: inspection.id });
+                                      const reportHtml = await generateReportHtmlContent(inspection, samples);
+                                      const newWindow = window.open('', '_blank');
+                                      newWindow.document.write(reportHtml);
+                                      newWindow.document.close();
+                                    } catch (error) {
+                                      console.error("Error generating report:", error);
+                                      alert("Failed to generate report. Please try again.");
+                                    }
+                                  }}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View Report
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator />
+                                
+                                {/* Email Actions */}
+                                <DropdownMenuItem 
+                                  onClick={() => sendLabReceivedEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`lab_received_${inspection.id}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                  {getEmailButtonStatus(`lab_received_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => sendReportReadyEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`report_ready_${inspection.id}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                  {getEmailButtonStatus(`report_ready_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Report Ready Email'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => sendReviewRequestEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`review_request_${inspection.id}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Star className="w-4 h-4" />
+                                  {getEmailButtonStatus(`review_request_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Review Request'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator />
+                                
+                                {/* Edit Action */}
+                                <DropdownMenuItem 
+                                  onClick={() => window.open(createPageUrl('InspectionDetails', { id: inspection.id, edit: true }), '_blank')}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                  Edit Inspection
+                                </DropdownMenuItem>
+                                
+                                {/* Delete Action */}
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to delete inspection ${getDisplayNumber(inspection)}?`)) {
+                                      handleDeleteSelected([inspection.id]);
+                                    }
+                                  }}
+                                  className="flex items-center gap-2 text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete Inspection
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reports Tab */}
+          <TabsContent value="reports" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <File className="w-5 h-5" />
+                  Report Generation
+                </CardTitle>
+                <CardDescription>
+                  Generate comprehensive reports for inspections and analytics
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <Button onClick={exportToCSV} className="h-20 flex flex-col gap-2">
+                    <FileText className="w-6 h-6" />
+                    <span>Export All Data (CSV)</span>
+                  </Button>
+                  
+                  <Button onClick={() => {}} className="h-20 flex flex-col gap-2">
+                    <File className="w-6 h-6" />
+                    <span>Generate Summary Report</span>
+                  </Button>
+                  
+                  <Button onClick={() => {}} className="h-20 flex flex-col gap-2">
+                    <BarChart3 className="w-6 h-6" />
+                    <span>Analytics Report</span>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Property Type Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Object.entries(stats.propertyTypes).map(([type, count]) => (
+                      <div key={type} className="flex justify-between items-center">
+                        <span className="capitalize">{type}</span>
+                        <Badge variant="outline">{count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Client Type Distribution</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Object.entries(stats.clientTypes).map(([type, count]) => (
+                      <div key={type} className="flex justify-between items-center">
+                        <span className="capitalize">{type.replace('_', ' ')}</span>
+                        <Badge variant="outline">{count}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

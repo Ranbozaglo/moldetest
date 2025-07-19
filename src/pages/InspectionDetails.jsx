@@ -26,6 +26,7 @@ import {
   Camera,
   CheckCircle
 } from "lucide-react";
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -39,17 +40,15 @@ export default function InspectionDetails() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generatingAnalysis, setGeneratingAnalysis] = useState(false);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     const checkUserAndLoadData = async () => {
       try {
-        const currentUser = await User.me();
-        if (currentUser.role !== 'admin') {
+        if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
           setError("Access denied. Admin privileges required.");
           return;
         }
-        setUser(currentUser);
         await loadInspectionData();
       } catch (error) {
         setError("Failed to verify admin access.");
@@ -64,7 +63,7 @@ export default function InspectionDetails() {
       setError("No inspection ID provided");
       setLoading(false);
     }
-  }, [inspectionId]);
+  }, [inspectionId, currentUser]);
 
   const loadInspectionData = async () => {
     try {

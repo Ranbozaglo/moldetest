@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Mail, Package, Clock, Home } from "lucide-react";
 import { motion } from "framer-motion";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ThankYou() {
   const [userInspection, setUserInspection] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     const loadUserInspection = async () => {
       try {
-        const currentUser = await User.me();
         if (currentUser && currentUser.email) {
           // Find the most recent inspection by this user
           const inspections = await MoldInspection.filter({ email: currentUser.email }, '-created_date', 1);
@@ -30,7 +31,7 @@ export default function ThankYou() {
     };
 
     loadUserInspection();
-  }, []);
+  }, [currentUser]);
 
   const getDisplayNumber = (inspection) => {
     return inspection?.inspection_number ? `MTH #${inspection.inspection_number}` : `MTH #${inspection?.id}`;

@@ -75,7 +75,11 @@ export const MoldInspection = {
         is_sample: data.is_sample || false
       })
     });
-    return response;
+    
+    // Extract the inspection data from the response
+    // Backend returns: {"message": "...", "inspection": {...}}
+    // Frontend expects: {...} (just the inspection data)
+    return response.inspection || response;
   },
   
   findMany: async (filters = {}) => {
