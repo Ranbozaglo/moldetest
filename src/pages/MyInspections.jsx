@@ -1,0 +1,487 @@
+
+import React, { useState, useEffect } from "react";
+import { User } from "@/api/entities";
+import { MoldInspection } from "@/api/entities";
+import { Sample } from "@/api/entities";
+import { InvokeLLM } from "@/api/integrations";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate, Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { format } from "date-fns";
+import { 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  AlertCircle, 
+  Download, 
+  Plus,
+  FlaskConical,
+  Calendar,
+  MapPin,
+  Loader2
+} from "lucide-react";
+import { motion } from "framer-motion";
+
+export default function MyInspections() {
+  const [user, setUser] = useState(null);
+  const [inspections, setInspections] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [downloading, setDownloading] = useState({});
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const currentUser = await User.me();
+        console.log("🔍 DEBUG: Current user:", currentUser);
+        setUser(currentUser);
+        
+        if (currentUser && currentUser.email) {
+          console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
+          
+          // Try multiple approaches to find inspections
+          try {
+            // First, try the filter method
+            const userInspections = await MoldInspection.filter({ email: currentUser.email }, "-created_date");
+            console.log("🔍 DEBUG: Found inspections with filter:", userInspections);
+            
+            if (userInspections && userInspections.length > 0) {
+              setInspections(userInspections);
+            } else {
+              // Fallback: Get all inspections and filter manually
+              console.log("🔍 DEBUG: No inspections found with filter, trying manual search...");
+              const allInspections = await MoldInspection.list("-created_date", 100);
+              console.log("🔍 DEBUG: All inspections:", allInspections);
+              
+              const matchingInspections = allInspections.filter(inspection => 
+                inspection.email && inspection.email.toLowerCase() === currentUser.email.toLowerCase()
+              );
+              console.log("🔍 DEBUG: Matching inspections after manual filter:", matchingInspections);
+              setInspections(matchingInspections);
+            }
+          } catch (inspectionError) {
+            console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
+            setError("Failed to load inspections. Please try refreshing the page.");
+          }
+        } else {
+          console.log("🔍 DEBUG: No current user email found, redirecting to Welcome");
+          navigate(createPageUrl("Welcome"));
+        }
+      } catch (err) {
+        console.error("🔍 DEBUG: Error loading user:", err);
+        setError("Failed to load user information. Please try logging in again.");
+        navigate(createPageUrl("Welcome"));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [navigate]);
+
+  const getDisplayNumber = (inspection) => {
+    return inspection?.inspection_number ? `MTH #${inspection.inspection_number}` : `MTH #${inspection?.id.substring(0, 8)}`;
+  };
+
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case "pending":
+        return { icon: <Clock className="w-4 h-4" />, color: "bg-yellow-100 text-yellow-800", text: "Pending" };
+      case "in_progress":
+        return { icon: <Loader2 className="w-4 h-4 animate-spin" />, color: "bg-blue-100 text-blue-800", text: "In Progress" };
+      case "completed":
+        return { icon: <CheckCircle className="w-4 h-4" />, color: "bg-green-100 text-green-800", text: "Completed" };
+      case "report_ready":
+        return { icon: <FileText className="w-4 h-4" />, color: "bg-indigo-100 text-indigo-800", text: "Report Ready" };
+      default:
+        return { icon: <Clock className="w-4 h-4" />, color: "bg-slate-100 text-slate-800", text: "Unknown" };
+    }
+  };
+  
+  const generateAndDownloadReport = async (inspection) => {
+    try {
+      const samples = await Sample.filter({ inspection_id: inspection.id });
+      const displayNum = getDisplayNumber(inspection);
+      
+      const disclaimerText = "The Mold Testing Houston DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Mold Testing Houston, LLC is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
+      const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
+
+      const css = `
+          body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
+          .page-break { page-break-after: always; }
+          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 40px; }
+          .cover-title { font-size: 48px; font-weight: bold; color: #004aac; margin-bottom: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+          .cover-image { max-width: 450px; height: auto; border-radius: 15px; margin: 40px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
+          .cover-details { background: rgba(255,255,255,0.9); padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; }
+          .cover-detail-item { margin: 15px 0; font-size: 18px; }
+          .cover-detail-label { font-weight: bold; color: #004aac; }
+          .report-container { max-width: 800px; margin: 0 auto; background-color: #fff; padding: 40px; }
+          .section { margin-bottom: 35px; }
+          .section h2 { font-size: 22px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
+          .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 25px; margin: 30px 0; }
+          .disclaimer-title { color: #004aac; font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; }
+          .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 25px; margin: 20px 0; }
+          .limitations-title { color: #004aac; font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; }
+          .client-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+          .client-info-item { padding: 10px; background: #f8f9fa; border-radius: 5px; }
+          .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
+          .client-info-value { margin-top: 5px; font-size: 16px; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
+          img { max-width: 250px; height: auto; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
+      `;
+
+      const createImageList = (images) => {
+          if (!images || images.length === 0) return '<p>No photos provided.</p>';
+          return images.map(img => `<img src="${img}" alt="Evidence" style="width: 150px; height: 150px; object-fit: cover; margin: 5px; border-radius: 4px;" />`).join('');
+      };
+
+      const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
+        ? inspection.visible_mold_details.map((d, i) => `<h4>Location #${i + 1}: ${d.location}</h4><div>${createImageList(d.images)}</div>`).join('')
+        : '<p>No visible mold reported.</p>';
+
+      const waterDamageHtml = inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0
+        ? inspection.water_damage_details.map((d, i) => `<h4>Location #${i + 1}: ${d.location}</h4><div>${createImageList(d.images)}</div>`).join('')
+        : '<p>No recent water damage reported.</p>';
+      
+      let environmentalHtml = '';
+      if (inspection.environmental_data_method === 'photo' && inspection.thermostat_image) {
+          environmentalHtml = `<h4>Thermostat Photo:</h4><div><img src="${inspection.thermostat_image}" alt="Thermostat" /></div>`;
+      } else if (inspection.environmental_data_method === 'manual') {
+          environmentalHtml = `<p>Temperature: ${inspection.temperature || 'N/A'}°F</p><p>Humidity: ${inspection.humidity || 'N/A'}%</p>`;
+      } else {
+          environmentalHtml = '<p>Environmental data not provided.</p>';
+      }
+      if (inspection.humidity && parseFloat(inspection.humidity) > 60) {
+          environmentalHtml += `<p style="color: red; font-weight: bold;">⚠️ HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth inside buildings. Based on the temperature and humidity readings, the HVAC system appears to NOT be operating properly.</p>`;
+      }
+      
+      const samplesHtml = samples.length > 0
+        ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location}</h4><p>${s.description || 'No description provided.'}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
+        : '<p>No samples were documented for this inspection.</p>';
+
+      const labAnalysisHtml = inspection.lab_analysis_image_url
+          ? `<img src="${inspection.lab_analysis_image_url}" alt="Lab Analysis Results" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; margin: 10px 0;" />`
+          : '<p>Lab analysis results have not been uploaded yet.</p>';
+
+      const reportHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Mold Inspection Report</title>
+          <style>${css}</style>
+      </head>
+      <body>
+          <div class="cover-page">
+              <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
+              <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/0e72c4dcb_Untitleddesign5.png" alt="MTH Logo" class="cover-image" />
+              <div class="cover-details">
+                  <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
+              </div>
+              <p style="margin-top: 50px; font-size: 16px; color: #555;">Mold Testing Houston, LLC</p>
+          </div>
+          <div class="page-break"></div>
+
+          <div class="report-container">
+              <div class="disclaimer-box">
+                  <h3 class="disclaimer-title">Disclaimer</h3>
+                  <p class="disclaimer-text">${disclaimerText}</p>
+              </div>
+
+              <div class="section">
+                  <h2>Client Information</h2>
+                  <div class="client-info-grid">
+                      <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${inspection.full_name}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${inspection.email}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${inspection.client_type}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${inspection.property_type}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage} sq ft</div></div>
+                  </div>
+              </div>
+              
+              <div class="section">
+                  <h2>Findings</h2>
+                  <h3>Visible Mold</h3>
+                  ${visibleMoldHtml}
+                  <h3>Water Damage</h3>
+                  ${waterDamageHtml}
+                  <h3>Environmental Conditions</h3>
+                  ${environmentalHtml}
+              </div>
+              
+              <div class="section">
+                  <h2>Samples Collected</h2>
+                  ${samplesHtml}
+              </div>
+
+              <div class="section">
+                  <h2>Lab Analysis</h2>
+                  ${labAnalysisHtml}
+              </div>
+
+              <div class="section">
+                  <h2>Conclusion</h2>
+                  <p>${inspection.conclusion || 'Pending conclusion.'}</p>
+              </div>
+
+              <div class="section">
+                  <h2>Recommendations</h2>
+                  <p>${inspection.recommendations || 'Pending recommendations.'}</p>
+              </div>
+
+              <div class="limitations-section">
+                  <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
+                  <p class="limitations-text">${limitationsText}</p>
+              </div>
+
+              <div class="footer">
+                  <p>Mold Testing Houston, LLC</p>
+                  <p>Report generated on ${format(new Date(), "MMMM d, yyyy")}</p>
+              </div>
+          </div>
+      </body>
+      </html>
+      `;
+
+      const blob = new Blob([reportHtml], { type: 'text/html' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${inspection.full_name.replace(/\s+/g, '_')}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      alert(`Failed to generate report: ${error.message}`);
+    }
+  };
+
+  const handleDownloadReport = async (inspection) => {
+    setDownloading(prev => ({ ...prev, [inspection.id]: true }));
+    
+    try {
+      if (inspection.report_html_url) {
+        // Instead of opening the URL directly, trigger a proper download
+        const displayNum = getDisplayNumber(inspection);
+        const fileName = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${inspection.full_name.replace(/\s+/g, '_')}.html`;
+        
+        // Fetch the file content and trigger download
+        const response = await fetch(inspection.report_html_url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Fallback to on-demand generation for older reports
+        await generateAndDownloadReport(inspection);
+      }
+    } catch (error) {
+      console.error("Error downloading report:", error);
+      alert("Could not download the report. Please try again.");
+    } finally {
+      setDownloading(prev => ({ ...prev, [inspection.id]: false }));
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6">
+        <div className="text-center">
+          <div className="text-lg text-slate-600">Loading your inspections...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <div className="text-lg text-red-600 mb-4">{error}</div>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6">
+        <div className="text-center">
+          <div className="text-lg text-red-600">Please log in to view your inspections.</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto py-12 px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">My Inspections</h1>
+            <p className="text-slate-600 mt-2">Welcome back, {user.full_name || user.email}</p>
+            {/* Debug info - remove this after testing */}
+            <p className="text-xs text-slate-400 mt-1">Debug: Found {inspections.length} inspections for {user.email}</p>
+          </div>
+          
+          <Button 
+            onClick={() => window.open('https://buy.stripe.com/YOUR_STRIPE_PAYMENT_LINK', '_blank')}
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Start New Testing
+          </Button>
+        </div>
+
+        {/* Inspections List */}
+        {inspections.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FlaskConical className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Inspections Yet</h3>
+            <p className="text-slate-600 mb-6">You haven't submitted any mold inspections yet.</p>
+            <Button 
+              onClick={() => window.open('https://buy.stripe.com/YOUR_STRIPE_PAYMENT_LINK', '_blank')}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Start Your First Testing
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {inspections.map((inspection) => {
+              const statusInfo = getStatusInfo(inspection.status);
+              const displayNum = getDisplayNumber(inspection);
+              const isReportReady = inspection.status === 'completed' || inspection.status === 'report_ready';
+              
+              return (
+                <motion.div
+                  key={inspection.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Card className="overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <CardHeader className="flex flex-row items-center justify-between bg-slate-50 p-4 border-b">
+                      <CardTitle className="text-lg font-semibold text-slate-800">{displayNum}</CardTitle>
+                      <Badge className={`flex items-center gap-2 text-sm ${statusInfo.color}`}>
+                        {statusInfo.icon}
+                        {statusInfo.text}
+                      </Badge>
+                    </CardHeader>
+                    
+                    <CardContent className="p-4">
+                      <div className="space-y-4">
+                        {/* Status Detail */}
+                        <div className="bg-slate-100 rounded-lg p-3">
+                          <p className="text-sm font-medium text-slate-700">Current Status:</p>
+                          <p className="text-sm text-slate-600">{inspection.client_status_detail || 
+                             (inspection.status === 'completed' ? 'Inspection completed - samples documented' :
+                              inspection.status === 'report_ready' ? 'Your detailed report is ready for download' :
+                              'Inspection submitted - awaiting sample collection')}
+                          </p>
+                        </div>
+
+                        {/* Inspection Summary */}
+                        <div className="text-sm text-slate-600">
+                          <p><strong>Property:</strong> {inspection.street_address}{inspection.unit_number ? `, ${inspection.unit_number}` : ''}, {inspection.city}</p>
+                          <p><strong>Submission Date:</strong> {format(new Date(inspection.created_date), "MMMM d, yyyy")}</p>
+                        </div>
+
+                        {/* Action Button */}
+                        <div className="flex justify-end pt-2">
+                          {isReportReady ? (
+                            <Button
+                              onClick={() => handleDownloadReport(inspection)}
+                              disabled={downloading[inspection.id]}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              {downloading[inspection.id] ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Preparing...
+                                </>
+                              ) : (
+                                <>
+                                  <FileText className="w-4 h-4 mr-2" />
+                                  Download Report
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                             <Button variant="outline" disabled>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Report in Progress
+                             </Button>
+                          )}
+                        </div>
+
+                        {/* Next Steps - Only show for non-completed inspections */}
+                        {inspection.status !== 'completed' && inspection.status !== 'report_ready' && (
+                          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                            <h4 className="font-medium text-blue-900 mb-2">What's Next?</h4>
+                            <p className="text-blue-800 text-sm">
+                              {inspection.status === 'pending' && 
+                                "Please send the collected samples to our lab using the prepaid shipping label. We will notify you by email as soon as we receive them."}
+                              {inspection.status === 'in_progress' && 
+                                "Your samples are being processed. We'll notify you when the analysis is complete."}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Show completion message for completed inspections */}
+                        {isReportReady && (
+                          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                            <h4 className="font-medium text-green-900 mb-2">Report Ready</h4>
+                            <p className="text-green-800 text-sm">
+                              Your detailed analysis report is complete and available for download.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Information Section */}
+        <div className="mt-12 bg-amber-50 rounded-xl p-6 border border-amber-200">
+          <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
+          <ul className="text-amber-800 text-sm space-y-2">
+            <li>• <strong>Sample Collection:</strong> Follow the step-by-step guide provided in your email</li>
+            <li>• <strong>Shipping:</strong> Use the prepaid shipping label to send samples to our lab</li>
+            <li>• <strong>Results:</strong> Lab analysis typically takes 3-5 business days</li>
+            <li>• <strong>Questions:</strong> Contact our support team for assistance</li>
+          </ul>
+        </div>
+      </motion.div>
+    </div>
+  );
+}

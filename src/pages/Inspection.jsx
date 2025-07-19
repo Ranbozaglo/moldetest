@@ -1,0 +1,278 @@
+
+import React, { useState, useEffect } from "react";
+import { MoldInspection } from "@/api/entities";
+import { User } from "@/api/entities";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, CheckCircle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { motion, AnimatePresence } from "framer-motion";
+
+import PersonalInfoStep from "../components/inspection/PersonalInfoStep";
+import PropertyInfoStep from "../components/inspection/PropertyInfoStep";
+import MoldDetectionStep from "../components/inspection/MoldDetectionStep";
+import WaterDamageStep from "../components/inspection/WaterDamageStep";
+import ThermostatStep from "../components/inspection/ThermostatStep";
+import ReviewStep from "../components/inspection/ReviewStep";
+
+const steps = [
+  { id: 1, title: "Personal Information", component: PersonalInfoStep },
+  { id: 2, title: "Property Details", component: PropertyInfoStep },
+  { id: 3, title: "Mold Detection", component: MoldDetectionStep },
+  { id: 4, title: "Water Damage Assessment", component: WaterDamageStep },
+  { id: 5, title: "Environmental Conditions", component: ThermostatStep },
+  { id: 6, title: "Review & Submit", component: ReviewStep },
+  { id: 7, title: "Sample Collection", component: null }
+];
+
+export default function Inspection() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    client_type: "",
+    property_type: "",
+    street_address: "",
+    unit_number: "",
+    city: "",
+    state: "",
+    zip_code: "",
+    square_footage: "",
+    background_info: "",
+    has_visible_mold: false,
+    visible_mold_details: [],
+    has_water_damage: false,
+    water_damage_details: [],
+    thermostat_image: "",
+    temperature: "",
+    humidity: "",
+    environmental_data_method: "manual"
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkingExisting, setCheckingExisting] = useState(true);
+
+  useEffect(() => {
+    const checkUserAndPreloadData = async () => {
+      try {
+        const currentUser = await User.me();
+        setUser(currentUser);
+        
+        if (currentUser && currentUser.email) {
+          // Pre-fill form data with authenticated user's email ONLY
+          updateFormData({
+            email: currentUser.email
+          });
+
+          // Check if user has a pending or in_progress inspection
+          const activeInspections = await MoldInspection.filter({ 
+            email: currentUser.email,
+            status: ['pending', 'in_progress']
+          }, '-created_date', 1);
+          
+          if (activeInspections && activeInspections.length > 0) {
+            navigate(createPageUrl("MyInspections"));
+            return;
+          }
+        }
+      } catch (error) {
+        console.log("User not logged in or no active inspection:", error);
+      } finally {
+        setCheckingExisting(false);
+      }
+    };
+
+    checkUserAndPreloadData();
+  }, [navigate]);
+
+  const updateFormData = (data) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+
+  const nextStep = () => {
+    if (currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      console.log("🔍 DEBUG: Form data before submission:", formData);
+      
+      // Fetch the latest inspection to determine the next inspection number
+      const latestInspections = await MoldInspection.list('-inspection_number', 1); // Fetches one item sorted by inspection_number descending
+      let nextInspectionNumber = 100; // Start from 100 if no inspections exist
+      
+      if (latestInspections && latestInspections.length > 0) {
+          const latestNumber = latestInspections[0].inspection_number;
+          if (latestNumber && latestNumber >= 100) {
+             nextInspectionNumber = latestNumber + 1;
+          }
+      }
+
+      // Forcefully get the logged-in user's email to ensure it's correct
+      const currentUser = await User.me();
+      console.log("🔍 DEBUG: Current user from User.me():", currentUser);
+      
+      if (!currentUser || !currentUser.email) {
+        throw new Error("Could not verify user. Please log in again.");
+      }
+
+      console.log("🔍 DEBUG: Email from form:", formData.email);
+      console.log("🔍 DEBUG: Email from currentUser:", currentUser.email);
+
+      const submissionData = {
+        ...formData,
+        email: currentUser.email, // This guarantees the correct email is saved
+        square_footage: parseFloat(formData.square_footage),
+        inspection_number: nextInspectionNumber,
+        client_status_detail: "Inspection submitted - awaiting sample collection"
+      };
+
+      console.log("🔍 DEBUG: Final submission data:", submissionData);
+
+      // Convert temperature and humidity to numbers if they exist
+      if (formData.temperature !== "") {
+        submissionData.temperature = parseFloat(formData.temperature);
+      }
+      if (formData.humidity !== "") {
+        submissionData.humidity = parseFloat(formData.humidity);
+      }
+
+      const newInspection = await MoldInspection.create(submissionData);
+      console.log("🔍 DEBUG: Created inspection object:", newInspection);
+      
+      if (newInspection && newInspection.id) {
+          console.log(`🔍 DEBUG: Successfully created inspection #${nextInspectionNumber} with ID:`, newInspection.id);
+          // Use navigate for a smoother, more reliable SPA transition
+          navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection.id}`));
+      } else {
+          // This case handles if creation fails to return a valid object with an ID
+          throw new Error("Failed to create inspection or retrieve a valid ID.");
+      }
+
+    } catch (error) {
+      console.error("🔍 DEBUG: Error submitting inspection:", error);
+      alert("Failed to submit inspection. Please try again.");
+    }
+    setIsSubmitting(false);
+  };
+
+  if (checkingExisting) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20 px-6">
+        <div className="text-lg text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  const CurrentStepComponent = steps[currentStep - 1].component;
+  const progressPercentage = (currentStep / steps.length) * 100;
+
+  return (
+    <div className="min-h-screen py-8">
+      <div className="max-w-4xl mx-auto px-6">
+        {/* Header */}
+        <div className="mb-8">
+          <Link to={createPageUrl("Welcome")} className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6 group">
+            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
+            Back to Home
+          </Link>
+          
+          <div className="glass-effect rounded-2xl p-6 mb-8">
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
+              Mold Inspection & Testing Process
+            </h1>
+            
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-slate-600">
+                  Step {currentStep} of {steps.length}
+                </span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+            </div>
+            
+            {/* Step Indicators */}
+            <div className="hidden md:flex justify-between items-center">
+              {steps.map((step, index) => (
+                <div key={step.id} className="flex items-center">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-all duration-300 ${
+                    currentStep > step.id 
+                      ? 'bg-green-500 text-white' 
+                      : currentStep === step.id 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {currentStep > step.id ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      step.id
+                    )}
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`w-12 h-1 mx-2 rounded-full transition-all duration-300 ${
+                      currentStep > step.id ? 'bg-green-500' : 'bg-slate-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <motion.div
+          key={currentStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.3 }}
+          className="glass-effect rounded-2xl p-8 mb-8"
+        >
+          <h2 className="text-xl font-semibold text-slate-900 mb-6">
+            {steps[currentStep - 1].title}
+          </h2>
+          
+          {CurrentStepComponent ? (
+            <CurrentStepComponent
+              formData={formData}
+              updateFormData={updateFormData}
+              onNext={nextStep}
+              onPrev={prevStep}
+              isFirstStep={currentStep === 1}
+              isLastStep={currentStep === steps.length}
+              onSubmit={handleSubmit}
+              isSubmitting={isSubmitting}
+              user={user}
+            />
+          ) : (
+            <div className="text-center py-10">
+              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h3>
+              <p className="text-slate-600 text-lg">
+                Your inspection details have been submitted successfully.
+              </p>
+              <p className="text-slate-600 text-lg mt-1">
+                Please proceed to the Sample Collection guide.
+              </p>
+              <Button onClick={handleSubmit} disabled={isSubmitting} className="mt-6 px-8 py-3 text-lg">
+                {isSubmitting ? "Redirecting..." : "Go to Sampling Guide"}
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
