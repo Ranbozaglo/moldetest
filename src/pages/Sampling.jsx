@@ -159,7 +159,7 @@ export default function Sampling() {
 
   const loadInspectionData = async (id) => {
     try {
-      const inspectionData = await MoldInspection.get(id);
+      const inspectionData = await MoldInspection.findUnique({ id });
       
       if (inspectionData) {
         setInspectionData(inspectionData);

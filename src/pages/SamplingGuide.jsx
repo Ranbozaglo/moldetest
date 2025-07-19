@@ -31,7 +31,7 @@ export default function SamplingGuide() {
 
     const loadInspectionData = async (id) => {
         try {
-            const data = await MoldInspection.get(id);
+            const data = await MoldInspection.findUnique({ id });
             setInspectionData(data);
         } catch (error) {
             console.error("Failed to load inspection data for guide:", error);

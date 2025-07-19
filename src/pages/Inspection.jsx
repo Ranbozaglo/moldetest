@@ -2,6 +2,13 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
 import { User } from "@/api/entities";
+
+// Debug: Check if MoldInspection is properly imported
+console.log("🔍 DEBUG: MoldInspection import check:", {
+  MoldInspection,
+  hasList: typeof MoldInspection?.list === 'function',
+  methods: MoldInspection ? Object.keys(MoldInspection) : 'undefined'
+});
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle } from "lucide-react";
@@ -27,6 +34,16 @@ const steps = [
 ];
 
 export default function Inspection() {
+  // Debug: Check for any global variables that might interfere
+  if (typeof window !== 'undefined') {
+    console.log("🔍 DEBUG: Global variables check:", {
+      window_mt: window.mt,
+      window_MoldInspection: window.MoldInspection,
+      global_mt: global?.mt,
+      global_MoldInspection: global?.MoldInspection
+    });
+  }
+  
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [currentStep, setCurrentStep] = useState(1);
@@ -53,6 +70,7 @@ export default function Inspection() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
+  const [newInspection, setNewInspection] = useState(null);
 
   useEffect(() => {
     const checkUserAndPreloadData = async () => {
@@ -107,6 +125,26 @@ export default function Inspection() {
     setIsSubmitting(true);
     try {
       console.log("🔍 DEBUG: Form data before submission:", formData);
+      console.log("🔍 DEBUG: MoldInspection object:", MoldInspection);
+      console.log("🔍 DEBUG: MoldInspection.list method:", typeof MoldInspection.list);
+      console.log("🔍 DEBUG: Available methods on MoldInspection:", Object.keys(MoldInspection));
+      console.log("🔍 DEBUG: MoldInspection constructor:", MoldInspection.constructor);
+      console.log("🔍 DEBUG: MoldInspection prototype:", Object.getPrototypeOf(MoldInspection));
+      
+      // Debug the MoldInspection object
+      if (MoldInspection.debug) {
+        MoldInspection.debug();
+      }
+      
+      // Check if list method exists
+      if (typeof MoldInspection.list !== 'function') {
+        throw new Error(`MoldInspection.list is not a function. Available methods: ${Object.keys(MoldInspection).join(', ')}`);
+      }
+      
+      // Check if there's any global mt variable
+      if (typeof window !== 'undefined' && window.mt) {
+        console.log("🔍 DEBUG: Found global mt variable:", window.mt);
+      }
       
       // Fetch the latest inspection to determine the next inspection number
       const latestInspections = await MoldInspection.list('-inspection_number', 1); // Fetches one item sorted by inspection_number descending
@@ -153,8 +191,10 @@ export default function Inspection() {
       
       if (newInspection && newInspection.id) {
           console.log(`🔍 DEBUG: Successfully created inspection #${nextInspectionNumber} with ID:`, newInspection.id);
-          // Use navigate for a smoother, more reliable SPA transition
-          navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection.id}`));
+          // Store the new inspection result
+          setNewInspection(newInspection);
+          // Move to the next step (step 7) instead of navigating directly
+          setCurrentStep(7);
       } else {
           // This case handles if creation fails to return a valid object with an ID
           throw new Error("Failed to create inspection or retrieve a valid ID.");
@@ -259,15 +299,19 @@ export default function Inspection() {
           ) : (
             <div className="text-center py-10">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h3>
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Report Created!</h3>
               <p className="text-slate-600 text-lg">
                 Your inspection details have been submitted successfully.
               </p>
               <p className="text-slate-600 text-lg mt-1">
                 Please proceed to the Sample Collection guide.
               </p>
-              <Button onClick={handleSubmit} disabled={isSubmitting} className="mt-6 px-8 py-3 text-lg">
-                {isSubmitting ? "Redirecting..." : "Go to Sampling Guide"}
+              <Button 
+                onClick={() => navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection?.id || ''}`))} 
+                disabled={!newInspection?.id} 
+                className="mt-6 px-8 py-3 text-lg"
+              >
+                Go to Sampling Guide
               </Button>
             </div>
           )}
