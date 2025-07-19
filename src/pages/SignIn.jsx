@@ -33,7 +33,12 @@ export default function SignIn() {
     try {
       const result = await signIn(email, password);
       if (result.success) {
-        navigate(createPageUrl('Inspection'));
+        // Redirect based on user role
+        if (result.user.is_admin || result.user.role === 'admin') {
+          navigate(createPageUrl('AdminDashboard'));
+        } else {
+          navigate(createPageUrl('Inspection'));
+        }
       } else {
         setError(result.error || 'Sign in failed');
       }

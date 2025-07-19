@@ -13,6 +13,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { Download, Eye, ShieldCheck, FileText, Trash2, Mail, Star, FlaskConical, Search } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -25,25 +26,34 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const navigate = useNavigate();
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const currentUser = await User.me();
-        if (currentUser.role !== 'admin') {
+        // Use the authenticated user from AuthContext instead of calling User.me()
+        if (!authUser) {
           navigate(createPageUrl("Welcome"));
-        } else {
-          setUser(currentUser);
-          loadInspections();
+          return;
         }
+        
+        // Check if user is admin
+        if (authUser.role !== 'admin' && !authUser.is_admin) {
+          navigate(createPageUrl("Welcome"));
+          return;
+        }
+        
+        setUser(authUser);
+        loadInspections();
       } catch (error) {
+        console.error("Error checking user:", error);
         navigate(createPageUrl("Welcome"));
       } finally {
         setLoading(false);
       }
     };
     checkUser();
-  }, [navigate]);
+  }, [navigate, authUser]);
 
   const loadInspections = async () => {
     try {

@@ -46,7 +46,7 @@ export default function Layout({ children, currentPageName }) {
                   <FileText className="w-4 h-4 inline mr-2" />
                   My Inspections
                 </Link>
-                  {user.role === 'admin' && (
+                  {(user.role === 'admin' || user.is_admin) && (
                 <Link 
                   to={createPageUrl("AdminDashboard")} 
                   className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
