@@ -36,24 +36,23 @@ try:
     
     # Try public schema first
     try:
-        supabase.table('inspection').select('*').limit(1).execute()
-        print("✅ Supabase client initialized successfully with public schema")
+        supabase.table('api.inspection').select('*').limit(1).execute()
+        print("✅ Supabase client initialized successfully with api schema")
     except Exception as e1:
-        print(f"⚠️ Public schema test failed: {e1}")
+        print(f"⚠️ Api schema test failed: {e1}")
         
-        # Try api schema
+        # Try public schema as fallback
         try:
-            # Use raw SQL to test api schema
-            result = supabase.rpc('exec_sql', {'sql': 'SELECT 1 FROM api.inspection LIMIT 1'}).execute()
-            print("✅ Supabase client initialized successfully with api schema")
+            supabase.table('inspection').select('*').limit(1).execute()
+            print("✅ Supabase client initialized successfully with public schema")
         except Exception as e2:
-            print(f"⚠️ Api schema test failed: {e2}")
-            raise Exception("Neither public nor api schema contains the inspection table")
+            print(f"⚠️ Public schema test failed: {e2}")
+            raise Exception("Neither api nor public schema contains the inspection table")
             
 except Exception as e:
     print(f"❌ Failed to initialize Supabase client: {e}")
     print("📝 Please check your Supabase URL and anon key in the .env file")
-    print("📝 Make sure tables exist in either public or api schema")
+    print("📝 Make sure tables exist in either api or public schema")
     exit(1)
 
 # Database setup
@@ -62,7 +61,7 @@ def init_db():
     try:
         # Test connection to api schema
         print("🔍 Testing connection to api schema...")
-        supabase.table('inspection').select('*').limit(1).execute()
+        supabase.table('api.inspection').select('*').limit(1).execute()
         print("✅ Successfully connected to api schema")
     except Exception as e:
         print(f"⚠️ Api schema connection test: {e}")
@@ -71,7 +70,7 @@ def init_db():
     try:
         # Check inspection table (in api schema)
         print("🔍 Checking inspection table in api schema...")
-        supabase.table('inspection').select('*').limit(1).execute()
+        supabase.table('api.inspection').select('*').limit(1).execute()
         print("✅ Inspection table exists in api schema")
     except Exception as e:
         print(f"⚠️ Inspection table setup: {e}")
@@ -80,7 +79,7 @@ def init_db():
     try:
         # Check samples table (in api schema)
         print("🔍 Checking samples table in api schema...")
-        supabase.table('samples').select('*').limit(1).execute()
+        supabase.table('api.samples').select('*').limit(1).execute()
         print("✅ Samples table exists in api schema")
     except Exception as e:
         print(f"⚠️ Samples table setup: {e}")
@@ -89,7 +88,7 @@ def init_db():
     try:
         # Check user_profiles table (in api schema)
         print("🔍 Checking user_profiles table in api schema...")
-        supabase.table('user_profiles').select('*').limit(1).execute()
+        supabase.table('api.user_profiles').select('*').limit(1).execute()
         print("✅ User_profiles table exists in api schema")
     except Exception as e:
         print(f"⚠️ User_profiles table setup: {e}")
@@ -102,10 +101,10 @@ def init_db():
     
     try:
         # Check if admin user exists in user_profiles table
-        result = supabase.table('user_profiles').select('*').eq('email', admin_email).execute()
+        result = supabase.table('api.user_profiles').select('*').eq('email', admin_email).execute()
         if not result.data:
             # Insert admin user in user_profiles table
-            supabase.table('user_profiles').insert({
+            supabase.table('api.user_profiles').insert({
                 'id': str(uuid.uuid4()),  # Generate UUID for admin
                 'email': admin_email,
                 'full_name': 'Admin User',
@@ -144,7 +143,7 @@ def login():
     
     try:
         # Check if user exists in user_profiles table
-        result = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        result = supabase.table('api.user_profiles').select('*').eq('email', email).execute()
         user = result.data[0] if result.data else None
         
         print(f"🔍 DEBUG: User found: {user}")
@@ -186,12 +185,12 @@ def register():
     
     try:
         # Check if user already exists in user_profiles table
-        existing_user = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        existing_user = supabase.table('api.user_profiles').select('*').eq('email', email).execute()
         if existing_user.data:
             return jsonify({"error": "Email already exists"}), 400
         
         # Insert new user in user_profiles table
-        result = supabase.table('user_profiles').insert({
+        result = supabase.table('api.user_profiles').insert({
             'id': str(uuid.uuid4()),
             'email': email,
             'full_name': email.split('@')[0],  # Use email prefix as name
@@ -212,7 +211,7 @@ def register():
 def get_inspections():
     """Get all inspections"""
     try:
-        result = supabase.table('inspection').select('*, user_profiles(email, full_name)').execute()
+        result = supabase.table('api.inspection').select('*, user_profiles(email, full_name)').execute()
         inspections = result.data
         
         # Convert to expected format
@@ -253,7 +252,7 @@ def create_inspection():
     data = request.get_json()
     
     try:
-        result = supabase.table('inspection').insert({
+        result = supabase.table('api.inspection').insert({
             'full_name': data.get('full_name'),
             'street_address': data.get('street_address'),
             'city': data.get('city'),
@@ -288,7 +287,7 @@ def update_inspection(inspection_id):
     data = request.get_json()
     
     try:
-        result = supabase.table('inspections').update({
+        result = supabase.table('api.inspection').update({
             'property_address': data.get('property_address'),
             'inspection_date': data.get('inspection_date'),
             'status': data.get('status'),
@@ -312,9 +311,9 @@ def get_samples():
     
     try:
         if inspection_id:
-            result = supabase.table('samples').select('*').eq('inspection_id', inspection_id).execute()
+            result = supabase.table('api.samples').select('*').eq('inspection_id', inspection_id).execute()
         else:
-            result = supabase.table('samples').select('*').execute()
+            result = supabase.table('api.samples').select('*').execute()
         
         samples = result.data
         
@@ -342,7 +341,7 @@ def create_sample():
     data = request.get_json()
     
     try:
-        result = supabase.table('samples').insert({
+        result = supabase.table('api.samples').insert({
             'inspection_id': data.get('inspection_id'),
             'location': data.get('location'),
             'description': data.get('sample_type') or data.get('notes'),
