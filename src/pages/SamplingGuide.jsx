@@ -24,8 +24,8 @@ export default function SamplingGuide() {
             loadInspectionData(id);
         } else {
             console.error("No inspection ID found in URL parameters");
-            alert("No inspection ID found. Please start a new inspection.");
-            navigate(createPageUrl("Welcome"));
+            // Instead of showing an alert, show a user-friendly error page
+            setLoading(false);
         }
     }, [location.search, navigate]);
 
@@ -48,8 +48,15 @@ export default function SamplingGuide() {
     if (!inspectionData) {
         return (
           <div className="max-w-2xl mx-auto text-center py-20 px-6">
-            <h2 className="text-xl text-red-600 mb-4">Error Loading Data</h2>
-            <p className="text-slate-600 mb-6">We couldn't load the necessary inspection data to display this guide. Please return home and try starting the inspection again.</p>
+            <h2 className="text-xl text-red-600 mb-4">
+              {!inspectionId ? "No Inspection ID Found" : "Error Loading Data"}
+            </h2>
+            <p className="text-slate-600 mb-6">
+              {!inspectionId 
+                ? "This page requires a valid inspection ID. Please start a new inspection from the home page."
+                : "We couldn't load the necessary inspection data to display this guide. Please return home and try starting the inspection again."
+              }
+            </p>
             <Link to={createPageUrl("Welcome")}>
                 <Button>Back to Home</Button>
             </Link>

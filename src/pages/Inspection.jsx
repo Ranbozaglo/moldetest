@@ -38,9 +38,7 @@ export default function Inspection() {
   if (typeof window !== 'undefined') {
     console.log("🔍 DEBUG: Global variables check:", {
       window_mt: window.mt,
-      window_MoldInspection: window.MoldInspection,
-      global_mt: global?.mt,
-      global_MoldInspection: global?.MoldInspection
+      window_MoldInspection: window.MoldInspection
     });
   }
   
@@ -144,6 +142,19 @@ export default function Inspection() {
       // Check if there's any global mt variable
       if (typeof window !== 'undefined' && window.mt) {
         console.log("🔍 DEBUG: Found global mt variable:", window.mt);
+      }
+      
+      // Check if there's any code that might be creating an alias
+      const globalVars = Object.keys(window).filter(key => key.includes('mt') || key.includes('inspection'));
+      console.log("🔍 DEBUG: Global variables with 'mt' or 'inspection':", globalVars);
+      
+      // Check if MoldInspection is being aliased somewhere
+      if (typeof window !== 'undefined') {
+        for (const key in window) {
+          if (window[key] && typeof window[key] === 'object' && window[key].list) {
+            console.log("🔍 DEBUG: Found object with 'list' method:", key, window[key]);
+          }
+        }
       }
       
       // Fetch the latest inspection to determine the next inspection number
