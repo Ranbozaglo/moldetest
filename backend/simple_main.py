@@ -13,6 +13,8 @@ import secrets
 from supabase import create_client, Client
 from config import SUPABASE_URL, SUPABASE_ANON_KEY, validate_config
 import uuid
+from werkzeug.utils import secure_filename
+import mimetypes
 
 app = Flask(__name__)
 CORS(app)
@@ -504,6 +506,178 @@ def send_email():
         "subject": data.get('subject')
     })
 
+@app.route('/api/inspection/<int:inspection_id>/upload-lab-image', methods=['POST'])
+def upload_lab_analysis_image(inspection_id):
+    """
+    Upload lab analysis image for an inspection
+    
+    This endpoint:
+    1. Uploads the image to Supabase lab-analysis bucket
+    2. Gets the public URL of the uploaded image
+    3. Adds the URL to the lab_analysis_images array in the inspection record
+    4. Returns the uploaded image URL and inspection_id
+    """
+    try:
+        # Check if inspection exists
+        inspection_result = supabase.table('inspection').select('*').eq('id', inspection_id).execute()
+        if not inspection_result.data:
+            return jsonify({"error": f"Inspection with ID {inspection_id} not found"}), 404
+        
+        inspection = inspection_result.data[0]
+        
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            return jsonify({"error": "Only image files are allowed"}), 400
+        
+        # Validate file size (max 10MB)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        max_size = 10 * 1024 * 1024  # 10MB
+        if file_size > max_size:
+            return jsonify({"error": "File size exceeds 10MB limit"}), 400
+        
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        
+        # Create folder path: lab-analysis-images/inspection_{id}/
+        folder_path = f"lab-analysis-images/inspection_{inspection_id}"
+        file_path = f"{folder_path}/{unique_filename}"
+        
+        print(f"🔍 DEBUG: Uploading file to Supabase: {file_path}")
+        
+        # Read file content
+        file_content = file.read()
+        
+        # Upload to Supabase Storage
+        upload_result = supabase.storage.from_("lab-analysis").upload(
+            path=file_path,
+            file=file_content,
+            file_options={"content-type": file.content_type}
+        )
+        
+        if upload_result.error:
+            print(f"❌ Supabase upload error: {upload_result.error}")
+            return jsonify({"error": f"Upload failed: {upload_result.error}"}), 500
+        
+        # Get public URL
+        public_url = supabase.storage.from_("lab-analysis").get_public_url(file_path)
+        
+        print(f"✅ File uploaded successfully: {public_url}")
+        
+        # Get current lab_analysis_images array
+        current_images = []
+        if inspection.get('lab_analysis_images'):
+            try:
+                current_images = json.loads(inspection['lab_analysis_images'])
+            except json.JSONDecodeError:
+                current_images = []
+        
+        # Append new image URL to array
+        current_images.append(public_url)
+        
+        # Update inspection record with new image array
+        update_result = supabase.table('inspection').update({
+            'lab_analysis_images': json.dumps(current_images)
+        }).eq('id', inspection_id).execute()
+        
+        if update_result.error:
+            print(f"❌ Database update error: {update_result.error}")
+            return jsonify({"error": f"Failed to update inspection: {update_result.error}"}), 500
+        
+        print(f"✅ Inspection updated successfully with {len(current_images)} images")
+        
+        return jsonify({
+            "message": "Lab analysis image uploaded successfully",
+            "inspection_id": inspection_id,
+            "image_url": public_url,
+            "total_images": len(current_images),
+            "file_path": file_path
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in upload_lab_analysis_image: {e}")
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
+@app.route('/api/inspection/<int:inspection_id>/lab-image/<int:image_index>', methods=['DELETE'])
+def delete_lab_analysis_image(inspection_id, image_index):
+    """
+    Delete a specific lab analysis image from an inspection
+    """
+    try:
+        # Check if inspection exists
+        inspection_result = supabase.table('inspection').select('*').eq('id', inspection_id).execute()
+        if not inspection_result.data:
+            return jsonify({"error": f"Inspection with ID {inspection_id} not found"}), 404
+        
+        inspection = inspection_result.data[0]
+        
+        # Get current lab_analysis_images array
+        current_images = []
+        if inspection.get('lab_analysis_images'):
+            try:
+                current_images = json.loads(inspection['lab_analysis_images'])
+            except json.JSONDecodeError:
+                current_images = []
+        
+        # Validate image index
+        if image_index < 0 or image_index >= len(current_images):
+            return jsonify({"error": f"Image index {image_index} is out of range"}), 400
+        
+        # Get image URL to delete from storage
+        image_url = current_images[image_index]
+        
+        # Extract file path from URL
+        # URL format: https://xxx.supabase.co/storage/v1/object/public/lab-analysis/path/to/file
+        url_parts = image_url.split("/lab-analysis/")
+        if len(url_parts) != 2:
+            return jsonify({"error": "Invalid file URL format"}), 400
+        
+        file_path = url_parts[1]
+        
+        print(f"🔍 DEBUG: Deleting file from Supabase: {file_path}")
+        
+        # Delete from Supabase Storage
+        delete_result = supabase.storage.from_("lab-analysis").remove([file_path])
+        
+        if delete_result.error:
+            print(f"❌ Supabase delete error: {delete_result.error}")
+            return jsonify({"error": f"Delete failed: {delete_result.error}"}), 500
+        
+        # Remove from array
+        current_images.pop(image_index)
+        
+        # Update inspection record
+        update_result = supabase.table('inspection').update({
+            'lab_analysis_images': json.dumps(current_images)
+        }).eq('id', inspection_id).execute()
+        
+        if update_result.error:
+            print(f"❌ Database update error: {update_result.error}")
+            return jsonify({"error": f"Failed to update inspection: {update_result.error}"}), 500
+        
+        print(f"✅ Image deleted successfully, {len(current_images)} images remaining")
+        
+        return jsonify({
+            "message": "Lab analysis image deleted successfully",
+            "inspection_id": inspection_id,
+            "remaining_images": len(current_images)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error in delete_lab_analysis_image: {e}")
+        return jsonify({"error": f"Delete failed: {str(e)}"}), 500
+
 if __name__ == '__main__':
     print("🚀 Starting Mold Testing Houston Backend...")
     print("📊 Database initialized with Supabase")
@@ -517,6 +691,8 @@ if __name__ == '__main__':
     print("   - GET  /api/inspection/<int:inspection_id>")
     print("   - PUT  /api/inspection/<int:inspection_id>")
     print("   - DELETE /api/inspection/<int:inspection_id>")
+    print("   - POST /api/inspection/<int:inspection_id>/upload-lab-image")
+    print("   - DELETE /api/inspection/<int:inspection_id>/lab-image/<int:image_index>")
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
     print("   - POST /api/llm/summarize")
