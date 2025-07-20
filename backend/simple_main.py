@@ -33,6 +33,9 @@ if not validate_config():
 # Initialize Supabase client
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    
+    print("🔍 Using anon key for Supabase client")
+    
     # Test connection to public schema
     print("🔍 Testing connection to public schema...")
     
@@ -112,6 +115,96 @@ def init_db():
     except Exception as e:
         print(f"⚠️ Admin user setup: {e}")
         print("📝 Please check if the user_profiles table exists in public schema")
+
+def check_supabase_storage():
+    """Check Supabase storage configuration and permissions for anon key"""
+    try:
+        print("🔍 Testing Supabase storage configuration with anon key...")
+        
+        # Test storage bucket access
+        try:
+            # Try to list files in lab-analysis bucket
+            result = supabase.storage.from_("lab-analysis").list()
+            print("✅ Successfully accessed lab-analysis bucket")
+            print(f"📊 Bucket contains {len(result)} files/folders")
+        except Exception as e:
+            print(f"❌ Failed to access lab-analysis bucket: {e}")
+            print("📝 Please check:")
+            print("   1. Bucket 'lab-analysis' exists in Supabase")
+            print("   2. Bucket is public or has proper RLS policies")
+            print("   3. Your anon key has storage permissions")
+            print("   4. Storage policies allow anon access")
+        
+        # Test storage permissions
+        try:
+            # Try to get bucket info
+            bucket_info = supabase.storage.get_bucket("lab-analysis")
+            print("✅ Successfully retrieved bucket information")
+            print(f"📊 Bucket public: {bucket_info.public}")
+        except Exception as e:
+            print(f"❌ Failed to get bucket info: {e}")
+        
+        # Test upload permissions with a small test file
+        try:
+            test_content = b"test file content"
+            test_path = f"test-upload-{uuid.uuid4()}.txt"
+            
+            print(f"🔍 Testing upload with path: {test_path}")
+            
+            upload_result = supabase.storage.from_("lab-analysis").upload(
+                path=test_path,
+                file=test_content,
+                file_options={"content-type": "text/plain"}
+            )
+            
+            if hasattr(upload_result, 'error') and upload_result.error:
+                print(f"❌ Test upload failed: {upload_result.error}")
+                print("📝 This indicates storage permission issues with anon key")
+            else:
+                print("✅ Test upload successful with anon key")
+                
+                # Clean up test file
+                try:
+                    supabase.storage.from_("lab-analysis").remove([test_path])
+                    print("✅ Test file cleaned up")
+                except Exception as cleanup_error:
+                    print(f"⚠️ Failed to cleanup test file: {cleanup_error}")
+                    
+        except Exception as e:
+            print(f"❌ Test upload failed: {e}")
+            print("📝 This indicates storage permission issues with anon key")
+            print("📝 Please check your Supabase storage policies")
+            
+    except Exception as e:
+        print(f"❌ Storage configuration check failed: {e}")
+
+def validate_supabase_credentials():
+    """Validate Supabase credentials and configuration"""
+    print("🔍 Validating Supabase credentials...")
+    
+    # Check environment variables
+    print(f"📝 SUPABASE_URL: {'✅ Set' if SUPABASE_URL and SUPABASE_URL != 'your_supabase_url_here' else '❌ Not set'}")
+    print(f"📝 SUPABASE_ANON_KEY: {'✅ Set' if SUPABASE_ANON_KEY and SUPABASE_ANON_KEY != 'your_supabase_anon_key_here' else '❌ Not set'}")
+    
+    # Check URL format
+    if SUPABASE_URL and 'supabase.co' in SUPABASE_URL:
+        print("✅ Supabase URL format looks correct")
+    else:
+        print("❌ Supabase URL format may be incorrect")
+    
+    # Check key format
+    if SUPABASE_ANON_KEY and len(SUPABASE_ANON_KEY) > 50:
+        print("✅ Supabase key format looks correct")
+    else:
+        print("❌ Supabase key format may be incorrect")
+    
+    # Test basic connection
+    try:
+        result = supabase.table('inspection').select('*').limit(1).execute()
+        print("✅ Basic Supabase connection successful")
+    except Exception as e:
+        print(f"❌ Basic Supabase connection failed: {e}")
+        print("📝 Please check your credentials and network connection")
 
 # Initialize database
 init_db()
@@ -509,13 +602,14 @@ def send_email():
 @app.route('/api/inspection/<int:inspection_id>/upload-lab-image', methods=['POST'])
 def upload_lab_analysis_image(inspection_id):
     """
-    Upload lab analysis image for an inspection
+    Upload lab analysis image for an inspection with anon key authentication
     
     This endpoint:
-    1. Uploads the image to Supabase lab-analysis bucket
-    2. Gets the public URL of the uploaded image
-    3. Adds the URL to the lab_analysis_images array in the inspection record
-    4. Returns the uploaded image URL and inspection_id
+    1. Validates authentication and file
+    2. Uploads the image to Supabase lab-analysis bucket with anon key
+    3. Gets the public URL of the uploaded image
+    4. Adds the URL to the lab_analysis_images array in the inspection record
+    5. Returns the uploaded image URL and inspection_id
     """
     try:
         # Check if inspection exists
@@ -537,7 +631,7 @@ def upload_lab_analysis_image(inspection_id):
         if not file.content_type.startswith('image/'):
             return jsonify({"error": "Only image files are allowed"}), 400
         
-        # Validate file size (max 10MB)
+        # Validate file size (max 10MB for anon key)
         file.seek(0, 2)  # Seek to end
         file_size = file.tell()
         file.seek(0)  # Reset to beginning
@@ -555,25 +649,90 @@ def upload_lab_analysis_image(inspection_id):
         file_path = f"{folder_path}/{unique_filename}"
         
         print(f"🔍 DEBUG: Uploading file to Supabase: {file_path}")
+        print(f"🔍 DEBUG: File size: {file_size} bytes")
+        print(f"🔍 DEBUG: Content type: {file.content_type}")
         
         # Read file content
         file_content = file.read()
         
-        # Upload to Supabase Storage
-        upload_result = supabase.storage.from_("lab-analysis").upload(
-            path=file_path,
-            file=file_content,
-            file_options={"content-type": file.content_type}
-        )
-        
-        if upload_result.error:
-            print(f"❌ Supabase upload error: {upload_result.error}")
-            return jsonify({"error": f"Upload failed: {upload_result.error}"}), 500
+        # Optimized upload for anon key authentication
+        try:
+            # Method 1: Standard upload with proper content-type
+            upload_result = supabase.storage.from_("lab-analysis").upload(
+                path=file_path,
+                file=file_content,
+                file_options={
+                    "content-type": file.content_type,
+                    "upsert": False  # Don't overwrite existing files
+                }
+            )
+            
+            if hasattr(upload_result, 'error') and upload_result.error:
+                print(f"❌ Supabase upload error: {upload_result.error}")
+                raise Exception(f"Upload failed: {upload_result.error}")
+                
+        except Exception as upload_error:
+            print(f"❌ Primary upload method failed: {upload_error}")
+            
+            # Method 2: Try with corrected content-type detection
+            try:
+                # Determine correct content type
+                content_type = file.content_type
+                if not content_type or content_type == 'application/octet-stream':
+                    # Try to detect content type from file extension
+                    import mimetypes
+                    content_type = mimetypes.guess_type(file.filename)[0] or 'image/jpeg'
+                
+                print(f"🔍 DEBUG: Retrying with content-type: {content_type}")
+                
+                upload_result = supabase.storage.from_("lab-analysis").upload(
+                    path=file_path,
+                    file=file_content,
+                    file_options={
+                        "content-type": content_type,
+                        "upsert": True  # Allow overwrite for retry
+                    }
+                )
+                
+                if hasattr(upload_result, 'error') and upload_result.error:
+                    raise Exception(f"Retry upload failed: {upload_result.error}")
+                    
+            except Exception as retry_error:
+                print(f"❌ Retry upload method failed: {retry_error}")
+                
+                # Method 3: Try with different file path (avoid nested folders)
+                try:
+                    simple_path = f"inspection_{inspection_id}_{unique_filename}"
+                    print(f"🔍 DEBUG: Trying simple path: {simple_path}")
+                    
+                    upload_result = supabase.storage.from_("lab-analysis").upload(
+                        path=simple_path,
+                        file=file_content,
+                        file_options={
+                            "content-type": file.content_type,
+                            "upsert": True
+                        }
+                    )
+                    
+                    if hasattr(upload_result, 'error') and upload_result.error:
+                        raise Exception(f"Simple path upload failed: {upload_result.error}")
+                    
+                    # Update file_path for URL generation
+                    file_path = simple_path
+                    
+                except Exception as simple_error:
+                    print(f"❌ Simple path upload failed: {simple_error}")
+                    raise Exception(f"All upload methods failed. Last error: {str(simple_error)}")
         
         # Get public URL
-        public_url = supabase.storage.from_("lab-analysis").get_public_url(file_path)
-        
-        print(f"✅ File uploaded successfully: {public_url}")
+        try:
+            public_url = supabase.storage.from_("lab-analysis").get_public_url(file_path)
+            print(f"✅ File uploaded successfully: {public_url}")
+        except Exception as url_error:
+            print(f"❌ Failed to get public URL: {url_error}")
+            # Construct URL manually if get_public_url fails
+            public_url = f"{SUPABASE_URL}/storage/v1/object/public/lab-analysis/{file_path}"
+            print(f"🔍 DEBUG: Using constructed URL: {public_url}")
         
         # Get current lab_analysis_images array
         current_images = []
@@ -587,13 +746,18 @@ def upload_lab_analysis_image(inspection_id):
         current_images.append(public_url)
         
         # Update inspection record with new image array
-        update_result = supabase.table('inspection').update({
-            'lab_analysis_images': json.dumps(current_images)
-        }).eq('id', inspection_id).execute()
-        
-        if update_result.error:
-            print(f"❌ Database update error: {update_result.error}")
-            return jsonify({"error": f"Failed to update inspection: {update_result.error}"}), 500
+        try:
+            update_result = supabase.table('inspection').update({
+                'lab_analysis_images': json.dumps(current_images)
+            }).eq('id', inspection_id).execute()
+            
+            if hasattr(update_result, 'error') and update_result.error:
+                print(f"❌ Database update error: {update_result.error}")
+                return jsonify({"error": f"Failed to update inspection: {update_result.error}"}), 500
+                
+        except Exception as db_error:
+            print(f"❌ Database update exception: {db_error}")
+            return jsonify({"error": f"Failed to update inspection: {str(db_error)}"}), 500
         
         print(f"✅ Inspection updated successfully with {len(current_images)} images")
         
@@ -602,7 +766,9 @@ def upload_lab_analysis_image(inspection_id):
             "inspection_id": inspection_id,
             "image_url": public_url,
             "total_images": len(current_images),
-            "file_path": file_path
+            "file_path": file_path,
+            "file_size": file_size,
+            "content_type": file.content_type
         })
         
     except Exception as e:
@@ -681,6 +847,11 @@ def delete_lab_analysis_image(inspection_id, image_index):
 if __name__ == '__main__':
     print("🚀 Starting Mold Testing Houston Backend...")
     print("📊 Database initialized with Supabase")
+    
+    # Run validation checks
+    validate_supabase_credentials()
+    check_supabase_storage()
+    
     print("🔗 API available at: http://localhost:5000")
     print("📖 Health check: http://localhost:5000/health")
     print("📚 API endpoints:")

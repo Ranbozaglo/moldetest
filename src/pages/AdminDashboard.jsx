@@ -269,28 +269,188 @@ export default function AdminDashboard() {
 
     const createImageList = (images) => {
         if (!images || images.length === 0) return '<p>No photos provided.</p>';
-        return images.map(img => `<img src="${img}" alt="Evidence" style="width: 150px; height: 150px; object-fit: cover; margin: 5px; border-radius: 4px;" />`).join('');
+        return images.map(img => `<img src="${img}" alt="Evidence" style="width: 150px; height: 150px; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
+    };
+
+    const createPriorityBadge = (priority, text) => {
+        const colors = {
+            high: 'background-color: #dc2626; color: white;',
+            medium: 'background-color: #ea580c; color: white;',
+            low: 'background-color: #059669; color: white;'
+        };
+        return `<span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; ${colors[priority]}">${text}</span>`;
     };
 
     const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
-      ? inspection.visible_mold_details.map((d, i) => `<h4>Location #${i + 1}: ${d.location || 'N/A'}</h4><div>${createImageList(d.images)}</div>`).join('')
-      : '<p>No visible mold reported.</p>';
+      ? `<div style="margin-bottom: 20px;">
+          <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            ⚠️ Visible Mold Detected
+          </h3>
+          ${inspection.visible_mold_details.map((d, i) => `
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location || 'N/A'}</h4>
+                ${createPriorityBadge('high', 'High Priority')}
+              </div>
+              <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
+              <div style="text-align: center; margin: 15px 0;">
+                ${createImageList(d.images)}
+              </div>
+            </div>
+          `).join('')}
+        </div>`
+      : `<div style="margin-bottom: 20px;">
+          <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            ✅ No Visible Mold Detected
+          </h3>
+          <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
+        </div>`;
 
     const waterDamageHtml = inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0
-      ? inspection.water_damage_details.map((d, i) => `<h4>Location #${i + 1}: ${d.location || 'N/A'}</h4><div>${createImageList(d.images)}</div>`).join('')
-      : '<p>No recent water damage reported.</p>';
+      ? `<div style="margin-bottom: 20px;">
+          <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            💧 Water Damage Detected
+          </h3>
+          ${inspection.water_damage_details.map((d, i) => `
+            <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location || 'N/A'}</h4>
+                ${createPriorityBadge('medium', 'Medium Priority')}
+              </div>
+              <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">💧 Water damage detected - may contribute to mold growth</p>
+              <div style="text-align: center; margin: 15px 0;">
+                ${createImageList(d.images)}
+              </div>
+            </div>
+          `).join('')}
+        </div>`
+      : `<div style="margin-bottom: 20px;">
+          <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            ✅ No Water Damage Detected
+          </h3>
+          <p style="color: #059669; font-style: italic;">No recent water damage was reported during this inspection.</p>
+        </div>`;
     
     let environmentalHtml = '';
     if (inspection.environmental_data_method === 'photo' && inspection.thermostat_image) {
-        environmentalHtml = `<h4>Thermostat Photo:</h4><div><img src="${inspection.thermostat_image}" alt="Thermostat" /></div>`;
+        environmentalHtml = `<div style="margin-bottom: 20px;">
+          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            🌡️ Environmental Conditions
+          </h3>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
+            <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
+            <div style="text-align: center;">
+              <img src="${inspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #bfdbfe;" />
+            </div>
+          </div>
+        </div>`;
     } else if (inspection.environmental_data_method === 'manual') {
-        environmentalHtml = `<p>Temperature: ${inspection.temperature || 'N/A'}°F</p><p>Humidity: ${inspection.humidity || 'N/A'}%</p>`;
+        const humidity = inspection.humidity || 'N/A';
+        const temperature = inspection.temperature || 'N/A';
+        const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
+        
+        environmentalHtml = `<div style="margin-bottom: 20px;">
+          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            🌡️ Environmental Conditions
+          </h3>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+              <div>
+                <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Temperature</p>
+                <p style="font-size: 18px; font-weight: bold;">${temperature}°F</p>
+              </div>
+              <div>
+                <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Humidity</p>
+                <p style="font-size: 18px; font-weight: bold; ${isHighHumidity ? 'color: #dc2626;' : ''}">${humidity}%</p>
+              </div>
+            </div>
+            ${isHighHumidity ? `
+              <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="color: #d97706;">⚠️</span>
+                  <p style="color: #92400e; font-weight: bold; margin: 0; font-size: 14px;">
+                    HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
+                    Current humidity of ${humidity}% may contribute to mold development.
+                  </p>
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>`;
     } else {
-        environmentalHtml = '<p>Environmental data not provided.</p>';
+        environmentalHtml = `<div style="margin-bottom: 20px;">
+          <h3 style="color: #6b7280; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+            🌡️ Environmental Conditions
+          </h3>
+          <p style="color: #6b7280; font-style: italic;">Environmental data not provided during this inspection.</p>
+        </div>`;
     }
-    if (inspection.humidity && parseFloat(inspection.humidity) > 60) {
-        environmentalHtml += `<p style="color: red; font-weight: bold;">⚠️ HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth inside buildings. Based on the temperature and humidity readings, the HVAC system appears to NOT be operating properly.</p>`;
-    }
+    
+    // Generate recommendations based on findings
+    const generateRecommendations = () => {
+        const recommendations = [];
+        
+        if (inspection.has_visible_mold) {
+            recommendations.push({
+                priority: 'high',
+                icon: '🔴',
+                title: 'Immediate Action Required',
+                description: 'Visible mold detected. Consider professional mold assessment and remediation.'
+            });
+        }
+        
+        if (inspection.has_water_damage) {
+            recommendations.push({
+                priority: 'medium',
+                icon: '🟠',
+                title: 'Water Damage',
+                description: 'Address water damage promptly to prevent mold growth.'
+            });
+        }
+        
+        if (inspection.humidity && parseFloat(inspection.humidity) > 60) {
+            recommendations.push({
+                priority: 'medium',
+                icon: '🟡',
+                title: 'High Humidity',
+                description: 'Consider dehumidification and HVAC system maintenance.'
+            });
+        }
+        
+        if (recommendations.length === 0) {
+            recommendations.push({
+                priority: 'low',
+                icon: '🟢',
+                title: 'Good Conditions',
+                description: 'No immediate concerns detected. Continue regular monitoring.'
+            });
+        }
+        
+        return recommendations;
+    };
+    
+    const recommendationsHtml = generateRecommendations().map(rec => `
+      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${rec.priority === 'high' ? '#dc2626' : rec.priority === 'medium' ? '#ea580c' : '#059669'}; margin-top: 6px; flex-shrink: 0;"></div>
+        <div>
+          <p style="font-weight: bold; color: #374151; margin: 0 0 4px 0; font-size: 14px;">
+            ${rec.icon} ${rec.title}
+          </p>
+          <p style="color: #6b7280; margin: 0; font-size: 13px; line-height: 1.4;">
+            ${rec.description}
+          </p>
+        </div>
+      </div>
+    `).join('');
+    
+    const recommendationsSection = `<div style="margin-bottom: 20px;">
+      <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+        📋 Initial Recommendations
+      </h3>
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
+        ${recommendationsHtml}
+      </div>
+    </div>`;
     
     const samplesHtml = samples && samples.length > 0
       ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location || 'N/A'}</h4><p>${s.description || ''}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
@@ -327,8 +487,7 @@ export default function AdminDashboard() {
     <body>
         <div class="cover-page">
             <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-            <img src="/Logono.png" alt="MTH Logo" class="cover-image" />
-            <div class="cover-details">
+<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="MTH Logo" class="cover-image" />            <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
@@ -357,11 +516,8 @@ export default function AdminDashboard() {
             
             <div class="section">
                 <h2>Findings</h2>
-                <h3>Visible Mold</h3>
                 ${visibleMoldHtml}
-                <h3>Water Damage</h3>
                 ${waterDamageHtml}
-                <h3>Environmental Conditions</h3>
                 ${environmentalHtml}
             </div>
             
@@ -382,7 +538,7 @@ export default function AdminDashboard() {
 
             <div class="section">
                 <h2>Recommendations</h2>
-                <p>${inspection.recommendations || 'Pending recommendations.'}</p>
+                ${recommendationsSection}
             </div>
             
             <div class="limitations-section">
@@ -773,7 +929,7 @@ export default function AdminDashboard() {
 
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Overview
@@ -781,10 +937,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="inspections" className="flex items-center gap-2">
               <Database className="w-4 h-4" />
               All Inspections
-            </TabsTrigger>
-            <TabsTrigger value="reports" className="flex items-center gap-2">
-              <File className="w-4 h-4" />
-              Reports
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
@@ -916,15 +1068,6 @@ export default function AdminDashboard() {
                   >
                     <Database className="w-6 h-6" />
                     <span className="text-sm">Manage Inspections</span>
-                  </Button>
-                  
-                  <Button 
-                    onClick={() => setActiveTab("reports")} 
-                    variant="outline" 
-                    className="h-20 flex flex-col gap-2"
-                  >
-                    <File className="w-6 h-6" />
-                    <span className="text-sm">Generate Reports</span>
                   </Button>
                   
                   <Button 
@@ -1306,39 +1449,6 @@ export default function AdminDashboard() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Reports Tab */}
-          <TabsContent value="reports" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <File className="w-5 h-5" />
-                  Report Generation
-                </CardTitle>
-                <CardDescription>
-                  Generate comprehensive reports for inspections and analytics
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Button onClick={exportToCSV} className="h-20 flex flex-col gap-2">
-                    <FileText className="w-6 h-6" />
-                    <span>Export All Data (CSV)</span>
-                  </Button>
-                  
-                  <Button onClick={() => {}} className="h-20 flex flex-col gap-2">
-                    <File className="w-6 h-6" />
-                    <span>Generate Summary Report</span>
-                  </Button>
-                  
-                  <Button onClick={() => {}} className="h-20 flex flex-col gap-2">
-                    <BarChart3 className="w-6 h-6" />
-                    <span>Analytics Report</span>
-                  </Button>
                 </div>
               </CardContent>
             </Card>

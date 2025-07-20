@@ -3,6 +3,50 @@
 
 import { EmailService } from './entities.js';
 
+// WebP conversion utility
+const convertToWebP = async (file) => {
+  return new Promise((resolve, reject) => {
+    // Create canvas for image conversion
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      // Set canvas dimensions
+      canvas.width = img.width;
+      canvas.height = img.height;
+      
+      // Draw image on canvas
+      ctx.drawImage(img, 0, 0);
+      
+      // Convert to WebP
+      canvas.toBlob((blob) => {
+        if (blob) {
+          // Create new file with WebP extension
+          const webpFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.webp'), {
+            type: 'image/webp',
+            lastModified: Date.now()
+          });
+          resolve(webpFile);
+        } else {
+          reject(new Error('Failed to convert image to WebP'));
+        }
+      }, 'image/webp', 0.85); // 85% quality for good balance
+    };
+    
+    img.onerror = () => {
+      reject(new Error('Failed to load image for conversion'));
+    };
+    
+    // Load image from file
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 export const Core = {
   InvokeLLM: async (prompt, file_urls = []) => {
     console.log('🔍 DEBUG: InvokeLLM called with:', { prompt, file_urls });
@@ -82,24 +126,42 @@ export const Core = {
   },
   
   UploadFile: async (file, bucketType = 'inspection') => {
-    // Use Supabase Storage for file upload
     console.log('🔍 DEBUG: UploadFile called with:', { 
       fileName: file.name, 
       fileSize: file.size, 
       fileType: file.type,
-      bucketType: bucketType 
+      bucketType 
     });
     
     try {
+      // Check if file is an image and convert to WebP if needed
+      let uploadFile = file;
+      if (file.type.startsWith('image/') && !file.type.includes('webp')) {
+        try {
+          console.log('🔍 DEBUG: Converting image to WebP format...');
+          uploadFile = await convertToWebP(file);
+          console.log('🔍 DEBUG: WebP conversion successful:', {
+            originalName: file.name,
+            webpName: uploadFile.name,
+            originalSize: file.size,
+            webpSize: uploadFile.size,
+            compressionRatio: ((file.size - uploadFile.size) / file.size * 100).toFixed(1) + '%'
+          });
+        } catch (conversionError) {
+          console.warn('⚠️ WebP conversion failed, using original file:', conversionError);
+          uploadFile = file; // Fallback to original file
+        }
+      }
+      
       // Check if we're in a build environment
       if (typeof window === 'undefined') {
         console.log('🔍 DEBUG: Build environment detected, returning mock upload result');
         return {
-          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
-          file_path: `/mock/${file.name}`,
+          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${uploadFile.name}`,
+          file_path: `/mock/${uploadFile.name}`,
           bucket: bucketType === 'lab-analysis' ? 'lab-analysis' : 'mold-images',
-          size: file.size,
-          type: file.type
+          size: uploadFile.size,
+          type: uploadFile.type
         };
       }
       
@@ -111,11 +173,11 @@ export const Core = {
       } catch (importError) {
         console.warn('⚠️ Supabase module not available, using mock upload:', importError);
         return {
-          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
-          file_path: `/mock/${file.name}`,
+          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${uploadFile.name}`,
+          file_path: `/mock/${uploadFile.name}`,
           bucket: bucketType === 'lab-analysis' ? 'lab-analysis' : 'mold-images',
-          size: file.size,
-          type: file.type
+          size: uploadFile.size,
+          type: uploadFile.type
         };
       }
       
@@ -132,8 +194,8 @@ export const Core = {
       }
       
       // Upload to Supabase Storage
-      console.log('🔍 DEBUG: Uploading to Supabase Storage:', { bucketName, folderName, fileName: file.name });
-      const result = await uploadToSupabaseStorage(file, bucketName, folderName);
+      console.log('🔍 DEBUG: Uploading to Supabase Storage:', { bucketName, folderName, fileName: uploadFile.name });
+      const result = await uploadToSupabaseStorage(uploadFile, bucketName, folderName);
       
       console.log('🔍 DEBUG: UploadFile result:', result);
       

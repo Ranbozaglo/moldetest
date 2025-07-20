@@ -470,40 +470,88 @@ Return your response in this exact JSON format:
           {/* Assessment Results */}
           <Card>
             <CardHeader>
-              <CardTitle>Assessment Results</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                Assessment Results & Findings
+              </CardTitle>
+              <CardDescription>
+                Comprehensive analysis of visible mold, water damage, and environmental conditions
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-slate-600">Visible Mold</Label>
-                  <Badge variant={inspection.has_visible_mold ? "destructive" : "secondary"} className="ml-2">
-                    {inspection.has_visible_mold ? "Present" : "Not Present"}
+            <CardContent className="space-y-6">
+              {/* Summary Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                <div className="text-center">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                    inspection.has_visible_mold ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                  }`}>
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700">Visible Mold</p>
+                  <Badge variant={inspection.has_visible_mold ? "destructive" : "secondary"} className="mt-1">
+                    {inspection.has_visible_mold ? "Present" : "Not Detected"}
                   </Badge>
                 </div>
-                <div>
-                  <Label className="text-slate-600">Water Damage</Label>
-                  <Badge variant={inspection.has_water_damage ? "default" : "secondary"} className="ml-2">
-                    {inspection.has_water_damage ? "Present" : "Not Present"}
+                
+                <div className="text-center">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                    inspection.has_water_damage ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+                  }`}>
+                    <Droplets className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700">Water Damage</p>
+                  <Badge variant={inspection.has_water_damage ? "default" : "secondary"} className="mt-1">
+                    {inspection.has_water_damage ? "Present" : "Not Detected"}
+                  </Badge>
+                </div>
+                
+                <div className="text-center">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                    inspection.humidity && parseFloat(inspection.humidity) > 60 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'
+                  }`}>
+                    <Thermometer className="w-6 h-6" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-700">Environment</p>
+                  <Badge variant={inspection.humidity && parseFloat(inspection.humidity) > 60 ? "outline" : "secondary"} className="mt-1">
+                    {inspection.humidity && parseFloat(inspection.humidity) > 60 ? "High Humidity" : "Normal"}
                   </Badge>
                 </div>
               </div>
 
+              {/* Visible Mold Details */}
               {inspection.has_visible_mold && inspection.visible_mold_details && (
-                <div>
-                  <Label className="text-slate-600">Mold Locations</Label>
-                  <div className="space-y-2 mt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Visible Mold Locations</Label>
+                  </div>
+                  <div className="space-y-3">
                     {inspection.visible_mold_details.map((detail, index) => (
-                      <div key={index} className="bg-slate-50 p-3 rounded-lg">
-                        <p className="font-medium">Location {index + 1}: {detail.location}</p>
+                      <div key={index} className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-red-800">Location {index + 1}: {detail.location}</p>
+                            <p className="text-sm text-red-600 mt-1">
+                              ⚠️ Visible mold detected - requires immediate attention
+                            </p>
+                          </div>
+                          <Badge variant="destructive" className="ml-2">High Priority</Badge>
+                        </div>
                         {detail.images && detail.images.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2 mt-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                             {detail.images.map((image, imgIndex) => (
-                              <img
-                                key={imgIndex}
-                                src={image}
-                                alt={`Mold evidence ${index + 1}-${imgIndex + 1}`}
-                                className="w-full h-16 object-cover rounded border"
-                              />
+                              <div key={imgIndex} className="relative group">
+                                <img
+                                  src={image}
+                                  alt={`Mold evidence ${index + 1}-${imgIndex + 1}`}
+                                  className="w-full h-20 object-cover rounded border-2 border-red-300"
+                                />
+                                <div className="absolute inset-0 bg-red-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                                    Mold Evidence
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -513,22 +561,40 @@ Return your response in this exact JSON format:
                 </div>
               )}
 
+              {/* Water Damage Details */}
               {inspection.has_water_damage && inspection.water_damage_details && (
-                <div>
-                  <Label className="text-slate-600">Water Damage Locations</Label>
-                  <div className="space-y-2 mt-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="w-5 h-5 text-orange-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Water Damage Locations</Label>
+                  </div>
+                  <div className="space-y-3">
                     {inspection.water_damage_details.map((detail, index) => (
-                      <div key={index} className="bg-slate-50 p-3 rounded-lg">
-                        <p className="font-medium">Location {index + 1}: {detail.location}</p>
+                      <div key={index} className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-orange-800">Location {index + 1}: {detail.location}</p>
+                            <p className="text-sm text-orange-600 mt-1">
+                              💧 Water damage detected - may contribute to mold growth
+                            </p>
+                          </div>
+                          <Badge variant="default" className="ml-2">Medium Priority</Badge>
+                        </div>
                         {detail.images && detail.images.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2 mt-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                             {detail.images.map((image, imgIndex) => (
-                              <img
-                                key={imgIndex}
-                                src={image}
-                                alt={`Water damage evidence ${index + 1}-${imgIndex + 1}`}
-                                className="w-full h-16 object-cover rounded border"
-                              />
+                              <div key={imgIndex} className="relative group">
+                                <img
+                                  src={image}
+                                  alt={`Water damage evidence ${index + 1}-${imgIndex + 1}`}
+                                  className="w-full h-20 object-cover rounded border-2 border-orange-300"
+                                />
+                                <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                                    Water Damage
+                                  </span>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -537,6 +603,102 @@ Return your response in this exact JSON format:
                   </div>
                 </div>
               )}
+
+              {/* Environmental Conditions */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Thermometer className="w-5 h-5 text-blue-600" />
+                  <Label className="text-slate-700 font-semibold text-lg">Environmental Conditions</Label>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                  {inspection.environmental_data_method === 'photo' && inspection.thermostat_image ? (
+                    <div className="space-y-3">
+                      <p className="font-medium text-blue-800">Thermostat Reading</p>
+                      <div className="max-w-md">
+                        <img
+                          src={inspection.thermostat_image}
+                          alt="Thermostat reading"
+                          className="w-full h-auto rounded border-2 border-blue-300"
+                        />
+                      </div>
+                    </div>
+                  ) : inspection.environmental_data_method === 'manual' ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Temperature</p>
+                        <p className="text-lg font-semibold">{inspection.temperature || 'N/A'}°F</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">Humidity</p>
+                        <p className={`text-lg font-semibold ${inspection.humidity && parseFloat(inspection.humidity) > 60 ? 'text-red-600' : ''}`}>
+                          {inspection.humidity || 'N/A'}%
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-blue-600">Environmental data not provided</p>
+                  )}
+                  
+                  {inspection.humidity && parseFloat(inspection.humidity) > 60 && (
+                    <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                        <p className="text-sm font-medium text-yellow-800">
+                          ⚠️ HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
+                          Current humidity of {inspection.humidity}% may contribute to mold development.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-green-600" />
+                  <Label className="text-slate-700 font-semibold text-lg">Initial Recommendations</Label>
+                </div>
+                
+                <div className="bg-green-50 border border-green-200 p-4 rounded-lg space-y-2">
+                  {inspection.has_visible_mold && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-green-800">
+                        <strong>Immediate Action Required:</strong> Visible mold detected. Consider professional mold assessment and remediation.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {inspection.has_water_damage && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-green-800">
+                        <strong>Water Damage:</strong> Address water damage promptly to prevent mold growth.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {inspection.humidity && parseFloat(inspection.humidity) > 60 && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-green-800">
+                        <strong>High Humidity:</strong> Consider dehumidification and HVAC system maintenance.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!inspection.has_visible_mold && !inspection.has_water_damage && (!inspection.humidity || parseFloat(inspection.humidity) <= 60) && (
+                    <div className="flex items-start gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-green-800">
+                        <strong>Good Conditions:</strong> No immediate concerns detected. Continue regular monitoring.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 
