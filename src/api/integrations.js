@@ -34,9 +34,14 @@ export const Core = {
     return { success: true, messageId: Date.now().toString() };
   },
   
-  UploadFile: async (file) => {
+  UploadFile: async (file, bucketType = 'inspection') => {
     // Use Supabase Storage for file upload
-    console.log('🔍 DEBUG: UploadFile called with:', { fileName: file.name, fileSize: file.size, fileType: file.type });
+    console.log('🔍 DEBUG: UploadFile called with:', { 
+      fileName: file.name, 
+      fileSize: file.size, 
+      fileType: file.type,
+      bucketType: bucketType 
+    });
     
     try {
       // Check if we're in a build environment
@@ -45,7 +50,7 @@ export const Core = {
         return {
           file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
           file_path: `/mock/${file.name}`,
-          bucket: 'lab-analysis',
+          bucket: bucketType === 'lab-analysis' ? 'lab-analysis' : 'mold-images',
           size: file.size,
           type: file.type
         };
@@ -61,14 +66,24 @@ export const Core = {
         return {
           file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
           file_path: `/mock/${file.name}`,
-          bucket: 'lab-analysis',
+          bucket: bucketType === 'lab-analysis' ? 'lab-analysis' : 'mold-images',
           size: file.size,
           type: file.type
         };
       }
       
-      // Upload to Supabase Storage bucket 'lab-analysis'
-      const result = await uploadToSupabaseStorage(file, 'lab-analysis', 'lab-analysis-images');
+      // Determine bucket and folder based on type
+      let bucketName, folderName;
+      if (bucketType === 'lab-analysis') {
+        bucketName = 'lab-analysis';
+        folderName = 'lab-analysis-images';
+      } else {
+        bucketName = 'mold-images';
+        folderName = 'mold-inspections';
+      }
+      
+      // Upload to Supabase Storage
+      const result = await uploadToSupabaseStorage(file, bucketName, folderName);
       
       console.log('🔍 DEBUG: UploadFile result:', result);
       
@@ -92,12 +107,21 @@ export const Core = {
       return {
         file_url: `https://storage.moldtestinghouston.com/error/${Date.now()}_${file.name}`,
         file_path: `/error/${file.name}`,
-        bucket: 'lab-analysis',
+        bucket: bucketType === 'lab-analysis' ? 'lab-analysis' : 'mold-images',
         size: file.size,
         type: file.type,
         error: error.message
       };
     }
+  },
+  
+  // Specialized upload functions for different image types
+  UploadInspectionImage: async (file) => {
+    return await Core.UploadFile(file, 'inspection');
+  },
+  
+  UploadLabAnalysisImage: async (file) => {
+    return await Core.UploadFile(file, 'lab-analysis');
   },
   
   GenerateImage: async (prompt) => {
@@ -233,6 +257,8 @@ Return your response in this exact JSON format:
 export const InvokeLLM = Core.InvokeLLM;
 export const SendEmail = Core.SendEmail;
 export const UploadFile = Core.UploadFile;
+export const UploadInspectionImage = Core.UploadInspectionImage;
+export const UploadLabAnalysisImage = Core.UploadLabAnalysisImage;
 export const GenerateImage = Core.GenerateImage;
 export const ExtractDataFromUploadedFile = Core.ExtractDataFromUploadedFile;
 export const ProcessImageWithOCR = Core.ProcessImageWithOCR;

@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -37,28 +37,21 @@ export default function Layout({ children, currentPageName }) {
             <div></div>
             
             <nav className="hidden md:flex items-center gap-6">
-              {user && (
+              {!loading && user && (
                 <>
-                  {/* Only show "My Inspections" for non-admin users */}
+                  {/* Only show navigation for non-admin users */}
                   {!(user.role === 'admin' || user.is_admin) && (
-                    <Link 
-                      to={createPageUrl("MyInspections")} 
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
-                    >
-                      <FileText className="w-4 h-4 inline mr-2" />
-                      My Inspections
-                    </Link>
+                    <>
+                      <Link 
+                        to={createPageUrl("MyInspections")} 
+                        className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
+                      >
+                        <FileText className="w-4 h-4 inline mr-2" />
+                        My Inspections
+                      </Link>
+                    </>
                   )}
-                  {/* Show Admin Dashboard for admin users */}
-                  {(user.role === 'admin' || user.is_admin) && (
-                    <Link 
-                      to={createPageUrl("AdminDashboard")} 
-                      className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
-                    >
-                      <ShieldCheck className="w-4 h-4 inline mr-2" />
-                      Admin
-                    </Link>
-                  )}
+                  {/* Show only logout for admin users */}
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-600">
                       <User className="w-4 h-4 inline mr-1" />

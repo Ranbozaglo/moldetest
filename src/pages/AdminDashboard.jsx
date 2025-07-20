@@ -327,7 +327,7 @@ export default function AdminDashboard() {
     <body>
         <div class="cover-page">
             <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-            <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/0e72c4dcb_Untitleddesign5.png" alt="MTH Logo" class="cover-image" />
+            <img src="/Logono.png" alt="MTH Logo" class="cover-image" />
             <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>

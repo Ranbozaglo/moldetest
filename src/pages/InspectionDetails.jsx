@@ -1,34 +1,19 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { User } from "@/api/entities";
-import { UploadFile } from "@/api/integrations";
+import { UploadLabAnalysisImage } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
+import { Camera, Download, ArrowLeft, FileText, AlertTriangle, CheckCircle, Clock, User, MapPin, Calendar, Home, Mail, Phone, Thermometer, Droplets, FlaskConical, Eye, Edit, Save, Upload, X, Plus, Trash2, Star, ShieldCheck, Database, Image, File, MoreHorizontal, Send, CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap, BarChart3, PieChart, TrendingUp, Users, Search, Filter, RefreshCw, Loader2, Download as DownloadIcon, Mail as MailIcon, Eye as EyeIcon, Edit as EditIcon, Trash2 as Trash2Icon, Plus as PlusIcon, X as XIcon, Star as StarIcon, ShieldCheck as ShieldCheckIcon, Database as DatabaseIcon, Image as ImageIcon, File as FileIcon, MoreHorizontal as MoreHorizontalIcon, Send as SendIcon, CheckCircle2 as CheckCircle2Icon, XCircle as XCircleIcon, PauseCircle as PauseCircleIcon, PlayCircle as PlayCircleIcon, RotateCcw as RotateCcwIcon, Zap as ZapIcon, BarChart3 as BarChart3Icon, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, Users as UsersIcon, Search as SearchIcon, Filter as FilterIcon, RefreshCw as RefreshCcwIcon } from "lucide-react";
+import { useLocation, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { format } from "date-fns";
+import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { getUrlParam } from "@/utils/urlUtils";
-import { 
-  ArrowLeft, 
-  Upload, 
-  Save, 
-  FileText, 
-  Calendar, 
-  MapPin, 
-  User as UserIcon,
-  FlaskConical,
-  Loader2,
-  Camera,
-  CheckCircle,
-  Trash2
-} from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
+import { format } from "date-fns";
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -132,7 +117,7 @@ export default function InspectionDetails() {
         console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
         
         // Use the new upload service
-        const uploadResult = await UploadFile(file);
+        const uploadResult = await UploadLabAnalysisImage(file);
         console.log("🔍 DEBUG: Upload result:", uploadResult);
         
         const file_url = uploadResult.file_url || uploadResult.url;
@@ -326,7 +311,7 @@ export default function InspectionDetails() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <UserIcon className="w-5 h-5" />
+                <User className="w-5 h-5" />
                 Customer Information
               </CardTitle>
             </CardHeader>

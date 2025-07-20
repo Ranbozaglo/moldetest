@@ -11,7 +11,7 @@ import { Sample } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { createPageUrl } from "@/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { UploadFile } from "@/api/integrations";
+import { UploadInspectionImage } from "@/api/integrations";
 import { FlaskConical, Camera } from "lucide-react";
 import { getDisplayNumber, validateInspection } from "@/utils/inspectionUtils";
 import { getInspectionIdFromUrl } from "@/utils/urlUtils";
@@ -26,7 +26,7 @@ function SampleRow({ index, sample, updateSample, removeSample }) {
 
     setIsUploading(true);
     try {
-      const result = await UploadFile({ file });
+      const result = await UploadInspectionImage(file);
       updateSample(index, "sample_image", result.file_url);
     } catch (error) {
       console.error("Error uploading sample image:", error);

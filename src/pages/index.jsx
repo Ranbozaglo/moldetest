@@ -20,7 +20,48 @@ import SignIn from "./SignIn";
 
 import SignUp from "./SignUp";
 
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
+import { useAuth } from "@/contexts/AuthContext";
+
+// Component to redirect admin users to AdminDashboard
+function AdminRedirect() {
+  const { user, loading } = useAuth();
+  
+  // Show loading while auth is being determined
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>;
+  }
+  
+  // If user is admin, redirect to AdminDashboard
+  if (user && (user.role === 'admin' || user.is_admin)) {
+    return <Navigate to="/AdminDashboard" replace />;
+  }
+  
+  // Otherwise, show the intended page
+  return <Welcome />;
+}
+
+// Component to guard routes for admin users
+function AdminRouteGuard({ children, allowAdmin = false }) {
+  const { user, loading } = useAuth();
+  
+  // Show loading while auth is being determined
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>;
+  }
+  
+  // If user is admin and this route doesn't allow admin access, redirect to AdminDashboard
+  if (user && (user.role === 'admin' || user.is_admin) && !allowAdmin) {
+    return <Navigate to="/AdminDashboard" replace />;
+  }
+  
+  // Otherwise, show the intended component
+  return children;
+}
 
 const PAGES = {
     
@@ -68,24 +109,24 @@ function PagesContent() {
         <Layout currentPageName={currentPage}>
             <Routes>            
                 
-                    <Route path="/" element={<Welcome />} />
+                    <Route path="/" element={<AdminRedirect />} />
                 
                 
-                <Route path="/Welcome" element={<Welcome />} />
+                <Route path="/Welcome" element={<AdminRedirect />} />
                 
-                <Route path="/Inspection" element={<Inspection />} />
+                <Route path="/Inspection" element={<AdminRouteGuard><Inspection /></AdminRouteGuard>} />
                 
-                <Route path="/Sampling" element={<Sampling />} />
+                <Route path="/Sampling" element={<AdminRouteGuard><Sampling /></AdminRouteGuard>} />
                 
                 <Route path="/AdminDashboard" element={<AdminDashboard />} />
                 
-                <Route path="/InspectionDetails" element={<InspectionDetails />} />
+                <Route path="/InspectionDetails" element={<AdminRouteGuard allowAdmin={true}><InspectionDetails /></AdminRouteGuard>} />
                 
-                <Route path="/SamplingGuide" element={<SamplingGuide />} />
+                <Route path="/SamplingGuide" element={<AdminRouteGuard><SamplingGuide /></AdminRouteGuard>} />
                 
-                <Route path="/ThankYou" element={<ThankYou />} />
+                <Route path="/ThankYou" element={<AdminRouteGuard><ThankYou /></AdminRouteGuard>} />
                 
-                <Route path="/MyInspections" element={<MyInspections />} />
+                <Route path="/MyInspections" element={<AdminRouteGuard><MyInspections /></AdminRouteGuard>} />
                 
                 <Route path="/SignIn" element={<SignIn />} />
                 

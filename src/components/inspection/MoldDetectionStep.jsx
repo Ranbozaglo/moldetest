@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, ArrowLeft, Upload, X, AlertTriangle, PlusCircle } from "lucide-react";
-import { UploadFile } from "@/api/integrations";
+import { UploadInspectionImage } from "@/api/integrations";
 import { motion, AnimatePresence } from "framer-motion";
 
 function MoldLocationRow({ index, details, updateLocation, removeLocation }) {
@@ -17,7 +17,7 @@ function MoldLocationRow({ index, details, updateLocation, removeLocation }) {
 
     setIsUploading(true);
     try {
-      const uploadPromises = files.map(file => UploadFile({ file }));
+      const uploadPromises = files.map(file => UploadInspectionImage(file));
       const results = await Promise.all(uploadPromises);
       const newImageUrls = results.map(result => result.file_url);
       const updatedImages = [...details.images, ...newImageUrls];

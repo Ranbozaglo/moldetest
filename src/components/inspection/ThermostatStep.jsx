@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowRight, ArrowLeft, Upload, X, Thermometer, Droplets } from "lucide-react";
-import { UploadFile } from "@/api/integrations";
+import { UploadInspectionImage } from "@/api/integrations";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function ThermostatStep({ formData, updateFormData, onNext, onPrev }) {
@@ -20,7 +20,7 @@ export default function ThermostatStep({ formData, updateFormData, onNext, onPre
     setIsUploading(true);
     
     try {
-      const result = await UploadFile({ file });
+      const result = await UploadInspectionImage(file);
       updateFormData({ 
         thermostat_image: result.file_url,
         environmental_data_method: "photo"
