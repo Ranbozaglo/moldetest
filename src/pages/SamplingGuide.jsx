@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
 import { getInspectionIdFromUrl } from '@/utils/urlUtils';
-import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, Shield, CheckCircle } from 'lucide-react';
+import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function SamplingGuide() {
@@ -103,7 +103,11 @@ export default function SamplingGuide() {
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Shield className="w-8 h-8 text-amber-600" />
+                            <img 
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                                alt="Mold Testing Houston Logo" 
+                                className="w-8 h-8 object-contain"
+                            />
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">Important Disclaimer</h1>
                         <p className="text-lg text-slate-600">
@@ -113,7 +117,11 @@ export default function SamplingGuide() {
 
                     <div className="glass-effect p-8 rounded-2xl mb-8 border-2 border-amber-200">
                         <div className="flex items-start gap-3 mb-6">
-                            <Shield className="w-6 h-6 text-amber-600 flex-shrink-0 mt-1" />
+                            <img 
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                                alt="Mold Testing Houston Logo" 
+                                className="w-6 h-6 text-amber-600 flex-shrink-0 mt-1 object-contain"
+                            />
                             <h2 className="text-xl font-bold text-slate-900">Disclaimer</h2>
                         </div>
                         

@@ -3,7 +3,7 @@ import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
-import { Shield, CheckCircle, Clock, FileText, Camera, User } from "lucide-react";
+import { CheckCircle, Clock, FileText, Camera, User } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -56,8 +56,12 @@ export default function Welcome() {
             className="text-center max-w-4xl mx-auto"
           >
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-8">
-              <Shield className="w-4 h-4" />
-              Mold Testing Houston- Your Mold Experts!
+              <img 
+                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                alt="Mold Testing Houston Logo" 
+                className="w-4 h-4 object-contain"
+              />
+              Total Testing - Your Mold Experts!
             </div>
             
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-slate-900 mb-8 leading-tight">
@@ -82,7 +86,11 @@ export default function Welcome() {
                   size="lg" 
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                 >
-                  <Shield className="w-6 h-6 mr-3" />
+                  <img 
+                    src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                    alt="Mold Testing Houston Logo" 
+                    className="w-6 h-6 mr-3 object-contain"
+                  />
                   Start NEW Mold Inspection & Testing
                 </Button>
             </motion.div>
@@ -151,7 +159,7 @@ export default function Welcome() {
               Ready to Test Your Property?
             </h2>
             <p className="text-xl text-blue-100 mb-10">
-              Join thousands of homeowners who trust Mold Testing Houston.
+              Join thousands of homeowners who trust Total Testing .
             </p>
               <Button 
               onClick={handleStartInspection}

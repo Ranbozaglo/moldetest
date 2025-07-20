@@ -150,6 +150,8 @@ async def update_inspection(
             update_data['visible_mold_details'] = json.dumps(inspection_update.visible_mold_details)
         if inspection_update.water_damage_details is not None:
             update_data['water_damage_details'] = json.dumps(inspection_update.water_damage_details)
+        if inspection_update.lab_analysis_images is not None:
+            update_data['lab_analysis_images'] = json.dumps(inspection_update.lab_analysis_images)
         
         for field, value in update_data.items():
             setattr(db_inspection, field, value)

@@ -81,7 +81,7 @@ export default function Layout({ children, currentPageName }) {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center gap-3 mb-4 md:mb-0">
-              <span className="text-lg font-semibold">Mold Testing Houston</span>
+              <span className="text-lg font-semibold">Total Testing</span>
             </div>
             <p className="text-slate-400 text-sm">
               Professional mold inspection and testing solutions

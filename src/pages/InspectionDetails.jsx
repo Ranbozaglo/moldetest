@@ -61,11 +61,37 @@ export default function InspectionDetails() {
     }
   }, [inspectionId, currentUser]);
 
+  // Reload data when component mounts or inspectionId changes
+  useEffect(() => {
+    if (inspectionId && !loading) {
+      console.log("🔍 DEBUG: Reloading inspection data due to inspectionId change");
+      loadInspectionData();
+    }
+  }, [inspectionId]);
+
   const loadInspectionData = async () => {
     try {
       const inspectionData = await MoldInspection.filter({ id: inspectionId });
       if (inspectionData && inspectionData.length > 0) {
-        setInspection(inspectionData[0]);
+        const inspection = inspectionData[0];
+        console.log("🔍 DEBUG: Loaded inspection data:", inspection);
+        console.log("🔍 DEBUG: lab_analysis_images type:", typeof inspection.lab_analysis_images);
+        console.log("🔍 DEBUG: lab_analysis_images value:", inspection.lab_analysis_images);
+        
+        // Ensure lab_analysis_images is always an array
+        if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
+          try {
+            inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
+            console.log("🔍 DEBUG: Parsed lab_analysis_images:", inspection.lab_analysis_images);
+          } catch (parseError) {
+            console.error("❌ Error parsing lab_analysis_images JSON:", parseError);
+            inspection.lab_analysis_images = [];
+          }
+        } else if (!inspection.lab_analysis_images) {
+          inspection.lab_analysis_images = [];
+        }
+        
+        setInspection(inspection);
         
         const samplesData = await Sample.findMany({ inspection_id: inspectionId });
         setSamples(samplesData || []);
@@ -159,7 +185,21 @@ export default function InspectionDetails() {
         throw new Error('Inspection record not found');
       }
       
-      const currentImages = currentInspection[0].lab_analysis_images || [];
+      let currentImages = currentInspection[0].lab_analysis_images || [];
+      console.log("🔍 DEBUG: Current lab_analysis_images raw value:", currentInspection[0].lab_analysis_images);
+      console.log("🔍 DEBUG: Current lab_analysis_images type:", typeof currentInspection[0].lab_analysis_images);
+      
+      // Handle case where lab_analysis_images is a JSON string
+      if (typeof currentImages === 'string') {
+        try {
+          currentImages = JSON.parse(currentImages);
+          console.log("🔍 DEBUG: Parsed lab_analysis_images from JSON string:", currentImages);
+        } catch (parseError) {
+          console.error("❌ Error parsing lab_analysis_images JSON:", parseError);
+          currentImages = [];
+        }
+      }
+      
       console.log("🔍 DEBUG: Current lab_analysis_images array:", currentImages);
       
       // Step 4: Append new URLs to the array
@@ -184,6 +224,10 @@ export default function InspectionDetails() {
         ...prevInspection,
         lab_analysis_images: updatedImages
       }));
+      
+      // Also reload the data from the server to ensure consistency
+      console.log("🔍 DEBUG: Reloading inspection data from server");
+      await loadInspectionData();
 
       // Generate conclusions and recommendations based on the first uploaded image
       if (uploadedUrls.length > 0) {

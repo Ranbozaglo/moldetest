@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import json
 
 # User schemas
 class UserBase(BaseModel):
@@ -59,6 +60,45 @@ class Inspection(InspectionBase):
     status: str
     created_at: datetime
     updated_at: datetime
+    
+    @field_validator('lab_analysis_images', mode='before')
+    @classmethod
+    def parse_lab_analysis_images(cls, v):
+        """Parse lab_analysis_images from JSON string to list"""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return v
+    
+    @field_validator('visible_mold_details', mode='before')
+    @classmethod
+    def parse_visible_mold_details(cls, v):
+        """Parse visible_mold_details from JSON string to list"""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return v
+    
+    @field_validator('water_damage_details', mode='before')
+    @classmethod
+    def parse_water_damage_details(cls, v):
+        """Parse water_damage_details from JSON string to list"""
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return []
+        return v
     
     class Config:
         from_attributes = True

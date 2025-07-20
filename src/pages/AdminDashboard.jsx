@@ -17,7 +17,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { 
-  Download, Eye, ShieldCheck, FileText, Trash2, Mail, Star, FlaskConical, Search,
+  Download, Eye, FileText, Trash2, Mail, Star, FlaskConical, Search,
   BarChart3, PieChart, TrendingUp, Users, MapPin, Calendar, AlertTriangle, CheckCircle,
   Clock, Filter, RefreshCw, Database, Image, File, MoreHorizontal, Edit, Send, 
   CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap
@@ -908,7 +908,11 @@ export default function AdminDashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-              <ShieldCheck className="w-8 h-8 text-blue-600" />
+              <img 
+                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                alt="Mold Testing Houston Logo" 
+                className="w-8 h-8 object-contain"
+              />
               Admin Dashboard
             </h1>
             <p className="text-slate-600 mt-2">
