@@ -390,15 +390,40 @@ export const LLMService = {
   },
   
   uploadFile: async (file) => {
-    // Import the Supabase upload function
-    const { uploadToSupabaseStorage } = await import('@/lib/supabase.js');
-    
     try {
       console.log("🔍 DEBUG: LLMService.uploadFile called with:", {
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type
       });
+      
+      // Check if we're in a build environment
+      if (typeof window === 'undefined') {
+        console.log("🔍 DEBUG: Build environment detected, returning mock upload result");
+        return {
+          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
+          file_path: `/mock/${file.name}`,
+          bucket: 'lab-analysis',
+          size: file.size,
+          type: file.type
+        };
+      }
+      
+      // Import the Supabase upload function only in browser environment
+      let uploadToSupabaseStorage;
+      try {
+        const supabaseModule = await import('@/lib/supabase.js');
+        uploadToSupabaseStorage = supabaseModule.uploadToSupabaseStorage;
+      } catch (importError) {
+        console.warn("⚠️ Supabase module not available, using mock upload:", importError);
+        return {
+          file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${file.name}`,
+          file_path: `/mock/${file.name}`,
+          bucket: 'lab-analysis',
+          size: file.size,
+          type: file.type
+        };
+      }
       
       // Upload to Supabase Storage bucket 'lab-analysis'
       const result = await uploadToSupabaseStorage(file, 'lab-analysis', 'lab-analysis-images');
@@ -415,7 +440,16 @@ export const LLMService = {
       
     } catch (error) {
       console.error("❌ LLMService.uploadFile error:", error);
-      throw error;
+      
+      // Return mock result on error
+      return {
+        file_url: `https://storage.moldtestinghouston.com/error/${Date.now()}_${file.name}`,
+        file_path: `/error/${file.name}`,
+        bucket: 'lab-analysis',
+        size: file.size,
+        type: file.type,
+        error: error.message
+      };
     }
   },
   

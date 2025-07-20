@@ -23,6 +23,17 @@ export const ENVIRONMENT_CONFIG = {
 
 // Environment detection
 export const getCurrentEnvironment = () => {
+  // Check if we're in a build environment (no window object)
+  if (typeof window === 'undefined') {
+    // Default to development during build
+    return {
+      isProduction: false,
+      isDevelopment: true,
+      config: ENVIRONMENT_CONFIG.DEVELOPMENT,
+      hostname: 'localhost'
+    };
+  }
+  
   const hostname = window.location.hostname;
   const isProduction = hostname === 'mold-testing.netlify.app' || import.meta.env.PROD;
   const isDevelopment = hostname === 'localhost' || hostname === '127.0.0.1' || import.meta.env.DEV;
@@ -47,6 +58,11 @@ export const getEnvironmentConfig = () => {
 
 // Debug helper
 export const logEnvironmentInfo = () => {
+  // Only log in browser environment
+  if (typeof window === 'undefined') {
+    return;
+  }
+  
   const env = getCurrentEnvironment();
   console.log('🌍 Environment Info:', {
     isProduction: env.isProduction,
