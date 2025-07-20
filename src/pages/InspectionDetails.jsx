@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
+import { getUrlParam } from "@/utils/urlUtils";
 import { 
   ArrowLeft, 
   Upload, 
@@ -30,8 +31,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function InspectionDetails() {
   const location = useLocation();
-  const urlParams = new URLSearchParams(location.search);
-  const inspectionId = urlParams.get('id');
+  const inspectionId = getUrlParam(location.search, 'id');
 
   const [inspection, setInspection] = useState(null);
   const [samples, setSamples] = useState([]);
@@ -57,9 +57,14 @@ export default function InspectionDetails() {
       }
     };
 
+    console.log("🔍 DEBUG: URL search params:", location.search);
+    console.log("🔍 DEBUG: Inspection ID from params:", inspectionId);
+
     if (inspectionId) {
       checkUserAndLoadData();
     } else {
+      console.error("No inspection ID found in URL parameters");
+      console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
       setError("No inspection ID provided");
       setLoading(false);
     }

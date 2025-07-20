@@ -57,11 +57,38 @@ const testGetInspectionIdFromUrl = () => {
   console.log("Test 6 - Multiple params:", test6 === "13" ? "✅ PASS" : "❌ FAIL");
 };
 
+// Test the createPageUrl function (if available)
+const testCreatePageUrl = () => {
+  console.log("🧪 Testing createPageUrl function...");
+  
+  try {
+    // Test case 1: Basic page URL
+    const test1 = createPageUrl('InspectionDetails');
+    console.log("Test 1 - Basic URL:", test1 === "/inspectiondetails" ? "✅ PASS" : "❌ FAIL");
+    
+    // Test case 2: URL with single parameter
+    const test2 = createPageUrl('InspectionDetails', { id: '13' });
+    console.log("Test 2 - Single param:", test2 === "/inspectiondetails?id=13" ? "✅ PASS" : "❌ FAIL");
+    
+    // Test case 3: URL with multiple parameters
+    const test3 = createPageUrl('InspectionDetails', { id: '13', edit: 'true' });
+    console.log("Test 3 - Multiple params:", test3 === "/inspectiondetails?id=13&edit=true" ? "✅ PASS" : "❌ FAIL");
+    
+    // Test case 4: URL with null/undefined parameters
+    const test4 = createPageUrl('InspectionDetails', { id: '13', edit: null, other: undefined });
+    console.log("Test 4 - Null params:", test4 === "/inspectiondetails?id=13" ? "✅ PASS" : "❌ FAIL");
+    
+  } catch (error) {
+    console.log("❌ createPageUrl function not available or has errors:", error.message);
+  }
+};
+
 // Run all tests
 const runUrlTests = () => {
   console.log("🚀 Running URL utility tests...");
   testGetUrlParam();
   testGetInspectionIdFromUrl();
+  testCreatePageUrl();
   console.log("✅ All tests completed!");
 };
 

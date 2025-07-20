@@ -1129,7 +1129,11 @@ export default function AdminDashboard() {
                                 
                                 {/* View and Download Actions */}
                                 <DropdownMenuItem 
-                                  onClick={() => window.open(createPageUrl('InspectionDetails', { id: inspection.id }), '_blank')}
+                                  onClick={() => {
+                                    const url = createPageUrl('InspectionDetails', { id: inspection.id });
+                                    console.log("🔍 DEBUG: Opening InspectionDetails URL:", url);
+                                    window.open(url, '_blank');
+                                  }}
                                   className="flex items-center gap-2"
                                 >
                                   <Eye className="w-4 h-4" />
@@ -1197,7 +1201,11 @@ export default function AdminDashboard() {
                                 
                                 {/* Edit Action */}
                                 <DropdownMenuItem 
-                                  onClick={() => window.open(createPageUrl('InspectionDetails', { id: inspection.id, edit: true }), '_blank')}
+                                  onClick={() => {
+                                    const url = createPageUrl('InspectionDetails', { id: inspection.id, edit: true });
+                                    console.log("🔍 DEBUG: Opening InspectionDetails Edit URL:", url);
+                                    window.open(url, '_blank');
+                                  }}
                                   className="flex items-center gap-2"
                                 >
                                   <Edit className="w-4 h-4" />
