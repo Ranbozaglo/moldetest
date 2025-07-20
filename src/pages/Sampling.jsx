@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect } from "react";
-import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Sample } from "@/api/entities";
-import { MoldInspection } from "@/api/entities";
-import { User } from "@/api/entities";
-import { UploadFile } from "@/api/integrations";
-import { Button } from "@/components/ui/button";
-import { Plus, CheckCircle, FlaskConical, Trash2, Home, Upload, X, Camera, Info } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { createPageUrl } from "@/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle, Plus, X, Info, Upload, Trash2 } from "lucide-react";
+import { Sample } from "@/api/entities";
+import { MoldInspection } from "@/api/entities";
+import { createPageUrl } from "@/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { UploadFile } from "@/api/integrations";
+import { FlaskConical, Camera } from "lucide-react";
 
 function SampleRow({ index, sample, updateSample, removeSample }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -139,6 +140,7 @@ export default function Sampling() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false); // New state to prevent race condition
   const [showTips, setShowTips] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
     // This guard prevents the effect from running again while we are navigating away after a successful submission.
@@ -174,7 +176,9 @@ export default function Sampling() {
         // If inspection is already completed, prevent re-submission and redirect
         if (inspectionData.status === "completed") {
           alert("This inspection has already been completed. Redirecting to your inspections.");
-          navigate(createPageUrl("MyInspections")); // Changed to MyInspections
+          // Redirect admin users to AdminDashboard, regular users to MyInspections
+          const redirectPage = (user && (user.role === 'admin' || user.is_admin)) ? "AdminDashboard" : "MyInspections";
+          navigate(createPageUrl(redirectPage));
           return; // Exit early as we're redirecting
         }
       } else {
@@ -234,7 +238,9 @@ export default function Sampling() {
       
       alert("Submitted successfully!");
       
-      navigate(createPageUrl("MyInspections"));
+      // Redirect admin users to AdminDashboard, regular users to MyInspections
+      const redirectPage = (user && (user.role === 'admin' || user.is_admin)) ? "AdminDashboard" : "MyInspections";
+      navigate(createPageUrl(redirectPage));
       
     } catch (error) {
       console.error("Error during final submission:", error);

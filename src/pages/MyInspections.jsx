@@ -38,6 +38,13 @@ export default function MyInspections() {
       try {
         setUser(currentUser);
         
+        // Redirect admin users to AdminDashboard
+        if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
+          console.log("🔍 DEBUG: Admin user detected, redirecting to AdminDashboard");
+          navigate(createPageUrl("AdminDashboard"));
+          return;
+        }
+        
         if (currentUser && currentUser.email) {
           console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
           
