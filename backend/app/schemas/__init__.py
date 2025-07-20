@@ -36,6 +36,9 @@ class InspectionBase(BaseModel):
     temperature: Optional[float] = None
     humidity: Optional[float] = None
     client_status_detail: Optional[str] = None
+    lab_analysis_images: Optional[List[str]] = None
+    conclusion: Optional[str] = None
+    recommendations: Optional[str] = None
 
 class InspectionCreate(InspectionBase):
     pass
@@ -45,6 +48,9 @@ class InspectionUpdate(BaseModel):
     client_status_detail: Optional[str] = None
     visible_mold_details: Optional[List[Dict[str, Any]]] = None
     water_damage_details: Optional[List[Dict[str, Any]]] = None
+    lab_analysis_images: Optional[List[str]] = None
+    conclusion: Optional[str] = None
+    recommendations: Optional[str] = None
 
 class Inspection(InspectionBase):
     id: int

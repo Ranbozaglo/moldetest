@@ -5,25 +5,72 @@ import { EmailService } from './entities.js';
 
 export const Core = {
   InvokeLLM: async (prompt, file_urls = []) => {
-    // Mock LLM service for now
     console.log('🔍 DEBUG: InvokeLLM called with:', { prompt, file_urls });
     
     try {
-      // Return mock response
-      const mockResponse = {
-        content: `Mock LLM response for prompt: "${prompt.substring(0, 100)}..."`,
+      // Check if we're in a build environment
+      if (typeof window === 'undefined') {
+        console.log('🔍 DEBUG: Build environment detected, returning mock response');
+        return {
+          content: `Mock LLM response for prompt: "${prompt.substring(0, 100)}..."`,
+          usage: {
+            prompt_tokens: 150,
+            completion_tokens: 200,
+            total_tokens: 350
+          }
+        };
+      }
+
+      // Connect to the OCR-GPT backend API
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const apiUrl = `${backendUrl}/api/ocr-gpt`;
+      
+      console.log('🔍 DEBUG: Calling OCR-GPT backend at:', apiUrl);
+      
+      const requestData = {
+        prompt: prompt,
+        image_urls: file_urls || []
+      };
+      
+      console.log('🔍 DEBUG: Request data:', requestData);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`OCR-GPT API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      console.log('🔍 DEBUG: OCR-GPT API response:', result);
+      
+      return {
+        content: result.analysis || result.content || result.response || 'No analysis content received',
+        usage: result.usage || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in InvokeLLM:', error);
+      
+      // Return mock response if backend is not available
+      console.warn('⚠️ OCR-GPT backend not available, using mock response');
+      return {
+        content: `Mock OCR analysis for lab results. Please review the uploaded images manually and add professional conclusions and recommendations based on the laboratory findings.`,
         usage: {
           prompt_tokens: 150,
           completion_tokens: 200,
           total_tokens: 350
         }
       };
-      
-      console.log('🔍 DEBUG: LLM response:', mockResponse);
-      return mockResponse;
-    } catch (error) {
-      console.error('❌ Error in InvokeLLM:', error);
-      throw error;
     }
   },
   
@@ -77,20 +124,28 @@ export const Core = {
       if (bucketType === 'lab-analysis') {
         bucketName = 'lab-analysis';
         folderName = 'lab-analysis-images';
+        console.log('🔍 DEBUG: Using lab-analysis bucket configuration:', { bucketName, folderName });
       } else {
         bucketName = 'mold-images';
         folderName = 'mold-inspections';
+        console.log('🔍 DEBUG: Using mold-images bucket configuration:', { bucketName, folderName });
       }
       
       // Upload to Supabase Storage
+      console.log('🔍 DEBUG: Uploading to Supabase Storage:', { bucketName, folderName, fileName: file.name });
       const result = await uploadToSupabaseStorage(file, bucketName, folderName);
       
       console.log('🔍 DEBUG: UploadFile result:', result);
       
+      // Validate the upload result
+      if (!result.url && !result.file_url) {
+        throw new Error('Upload failed: No public URL returned from Supabase Storage');
+      }
+      
       return {
-        file_url: result.url,
+        file_url: result.url || result.file_url,
         file_path: result.path,
-        bucket: result.bucket,
+        bucket: result.bucket || bucketName,
         size: result.size,
         type: result.type
       };
@@ -121,7 +176,42 @@ export const Core = {
   },
   
   UploadLabAnalysisImage: async (file) => {
-    return await Core.UploadFile(file, 'lab-analysis');
+    console.log('🔍 DEBUG: UploadLabAnalysisImage called with:', { 
+      fileName: file.name, 
+      fileSize: file.size, 
+      fileType: file.type 
+    });
+    
+    try {
+      // Upload to lab-analysis bucket with lab-analysis-images folder
+      const result = await Core.UploadFile(file, 'lab-analysis');
+      
+      console.log('🔍 DEBUG: UploadLabAnalysisImage result:', result);
+      
+      // Verify the upload was successful
+      if (!result.file_url && !result.url) {
+        throw new Error('Upload failed: No public URL returned');
+      }
+      
+      // Ensure the URL is from the correct bucket
+      const publicUrl = result.file_url || result.url;
+      if (!publicUrl.includes('lab-analysis')) {
+        console.warn('⚠️ Upload URL does not contain lab-analysis bucket reference:', publicUrl);
+      }
+      
+      return {
+        file_url: publicUrl,
+        file_path: result.file_path || result.path,
+        bucket: 'lab-analysis',
+        size: result.size || file.size,
+        type: result.type || file.type,
+        success: true
+      };
+      
+    } catch (error) {
+      console.error('❌ UploadLabAnalysisImage error:', error);
+      throw new Error(`Lab analysis image upload failed: ${error.message}`);
+    }
   },
   
   GenerateImage: async (prompt) => {

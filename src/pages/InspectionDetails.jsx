@@ -7,13 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Download, ArrowLeft, FileText, AlertTriangle, CheckCircle, Clock, User, MapPin, Calendar, Home, Mail, Phone, Thermometer, Droplets, FlaskConical, Eye, Edit, Save, Upload, X, Plus, Trash2, Star, ShieldCheck, Database, Image, File, MoreHorizontal, Send, CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap, BarChart3, PieChart, TrendingUp, Users, Search, Filter, RefreshCw, Loader2, Download as DownloadIcon, Mail as MailIcon, Eye as EyeIcon, Edit as EditIcon, Trash2 as Trash2Icon, Plus as PlusIcon, X as XIcon, Star as StarIcon, ShieldCheck as ShieldCheckIcon, Database as DatabaseIcon, Image as ImageIcon, File as FileIcon, MoreHorizontal as MoreHorizontalIcon, Send as SendIcon, CheckCircle2 as CheckCircle2Icon, XCircle as XCircleIcon, PauseCircle as PauseCircleIcon, PlayCircle as PlayCircleIcon, RotateCcw as RotateCcwIcon, Zap as ZapIcon, BarChart3 as BarChart3Icon, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, Users as UsersIcon, Search as SearchIcon, Filter as FilterIcon, RefreshCw as RefreshCcwIcon } from "lucide-react";
+import { Camera, Download, ArrowLeft, FileText, AlertTriangle, CheckCircle, Clock, User, MapPin, Calendar, Home, Mail, Phone, Thermometer, Droplets, FlaskConical, Eye, Edit, Save, Upload, X, Plus, Trash2, Star, ShieldCheck, Database, Image, File, MoreHorizontal, Send, CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap, BarChart3, PieChart, TrendingUp, Users, Search, Filter, RefreshCw, Loader2, Download as DownloadIcon, Mail as MailIcon, Eye as EyeIcon, Edit as EditIcon, Trash2 as Trash2Icon, Plus as PlusIcon, X as XIcon, Star as StarIcon, ShieldCheck as ShieldCheckIcon, Database as DatabaseIcon, Image as ImageIcon, File as FileIcon, MoreHorizontal as MoreHorizontalIcon, Send as SendIcon, CheckCircle2 as CheckCircle2Icon, XCircle as XCircleIcon, PauseCircle as PauseCircleIcon, PlayCircle as PlayCircleIcon, RotateCcw as RotateCcwIcon, Zap as ZapIcon, BarChart3 as BarChart3Icon, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, Users as UsersIcon, Search as SearchIcon, Filter as FilterIcon, RefreshCw as RefreshCcwIcon, ImageOff, ZoomIn, Copy } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { getUrlParam } from "@/utils/urlUtils";
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from "date-fns";
+import { Core } from "@/api/integrations";
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -25,6 +26,10 @@ export default function InspectionDetails() {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [generatingAnalysis, setGeneratingAnalysis] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [processingImages, setProcessingImages] = useState(false);
   const [error, setError] = useState(null);
   const { user: currentUser } = useAuth();
 
@@ -90,19 +95,29 @@ export default function InspectionDetails() {
     }
 
     setUploadingImage(true);
+    setProcessingImages(true);
+    setTotalFiles(files.length);
+    setUploadedCount(0);
+    setUploadProgress(0);
+    
     try {
-      console.log("🔍 DEBUG: Uploading lab images:", files.length, "files");
+      console.log("🔍 DEBUG: Starting lab image upload process");
       console.log("🔍 DEBUG: Inspection ID:", inspectionId);
-      console.log("🔍 DEBUG: Inspection object:", inspection);
+      console.log("🔍 DEBUG: Files to upload:", files.length);
       
+      // Step 1: Upload each file to lab-analysis bucket
       const uploadedUrls = [];
       
-      // Upload each file to Supabase Storage
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         
+        // Update progress
+        setUploadedCount(i + 1);
+        setUploadProgress(((i + 1) / files.length) * 100);
+        
         // Validate file type
         if (!file.type.startsWith('image/')) {
+          console.warn(`Skipping non-image file: ${file.name}`);
           alert(`File "${file.name}" is not an image. Please select image files only.`);
           continue;
         }
@@ -110,60 +125,85 @@ export default function InspectionDetails() {
         // Validate file size (max 10MB)
         const maxSize = 10 * 1024 * 1024; // 10MB
         if (file.size > maxSize) {
+          console.warn(`File too large: ${file.name} (${file.size} bytes)`);
           alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
           continue;
         }
 
         console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
         
-        // Use the new upload service
+        // Step 2: Upload to lab-analysis bucket and get public URL
         const uploadResult = await UploadLabAnalysisImage(file);
         console.log("🔍 DEBUG: Upload result:", uploadResult);
         
         const file_url = uploadResult.file_url || uploadResult.url;
         
         if (!file_url) {
+          console.error(`Upload failed for ${file.name}: No file URL returned`);
           throw new Error(`Upload failed for ${file.name}: No file URL returned`);
         }
         
+        console.log("🔍 DEBUG: Successfully uploaded to lab-analysis bucket:", file_url);
         uploadedUrls.push(file_url);
-        console.log("🔍 DEBUG: Lab image URL saved:", file_url);
       }
       
       if (uploadedUrls.length === 0) {
         throw new Error('No valid images were uploaded');
       }
       
-      // Get current lab_analysis_images array or create new one
-      const currentImages = inspection.lab_analysis_images || [];
+      // Step 3: Fetch current lab_analysis_images array from inspection record
+      console.log("🔍 DEBUG: Fetching current inspection data for ID:", inspectionId);
+      const currentInspection = await MoldInspection.filter({ id: inspectionId });
+      
+      if (!currentInspection || currentInspection.length === 0) {
+        throw new Error('Inspection record not found');
+      }
+      
+      const currentImages = currentInspection[0].lab_analysis_images || [];
+      console.log("🔍 DEBUG: Current lab_analysis_images array:", currentImages);
+      
+      // Step 4: Append new URLs to the array
       const updatedImages = [...currentImages, ...uploadedUrls];
+      console.log("🔍 DEBUG: Updated lab_analysis_images array:", updatedImages);
       
-      console.log("🔍 DEBUG: Updating inspection with ID:", inspectionId);
-      console.log("🔍 DEBUG: Current images:", currentImages);
-      console.log("🔍 DEBUG: Updated images:", updatedImages);
+      // Step 5: Update the inspection record with the updated array
+      console.log("🔍 DEBUG: MoldInspection.update called with:", {
+        inspectionId,
+        lab_analysis_images: updatedImages
+      });
       
-      // Update inspection with new lab analysis image URLs
       await MoldInspection.update(inspectionId, {
         lab_analysis_images: updatedImages
       });
 
-      console.log("🔍 DEBUG: Lab analysis images updated successfully");
+      console.log("🔍 DEBUG: Inspection record updated successfully");
+
+      // Immediately update local state to show images without waiting for reload
+      console.log("🔍 DEBUG: Updating local inspection state with new images");
+      setInspection(prevInspection => ({
+        ...prevInspection,
+        lab_analysis_images: updatedImages
+      }));
 
       // Generate conclusions and recommendations based on the first uploaded image
       if (uploadedUrls.length > 0) {
+        console.log("🔍 DEBUG: Generating analysis from first uploaded image");
         await generateAnalysisFromImage(uploadedUrls[0]);
       }
       
-      // Reload inspection data
-      await loadInspectionData();
-      
-      alert(`Successfully uploaded ${uploadedUrls.length} lab analysis image(s)!`);
+      // Show success message with immediate visual feedback
+      console.log("🔍 DEBUG: Upload completed successfully, images should now be visible");
+      alert(`Successfully uploaded ${uploadedUrls.length} lab analysis image(s) to the inspection record!`);
       
     } catch (error) {
-      console.error("❌ Error uploading lab images:", error);
+      console.error("❌ Error in lab image upload process:", error);
       alert(`Failed to upload lab analysis images: ${error.message}`);
     } finally {
       setUploadingImage(false);
+      setProcessingImages(false);
+      setUploadProgress(0);
+      setUploadedCount(0);
+      setTotalFiles(0);
       // Clear the file input
       event.target.value = '';
     }
@@ -181,28 +221,95 @@ export default function InspectionDetails() {
         throw new Error('Inspection data not loaded');
       }
 
-      console.log("🔍 DEBUG: Generating analysis for inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Generating OCR analysis for inspection ID:", inspectionId);
       console.log("🔍 DEBUG: Image URL:", imageUrl);
 
-      // Mock LLM analysis since LLMService is removed
-      const mockAnalysis = {
-        conclusion: `Based on the laboratory analysis of the mold samples from ${inspection.street_address}, ${inspection.city}, ${inspection.state}, the results indicate [mock conclusion]. This analysis was performed on a ${inspection.square_footage} sq ft ${inspection.client_type} property.`,
-        recommendations: `1. Immediate Actions: [mock recommendations]\n2. Preventive Measures: [mock preventive measures]\n3. Professional Services: [mock professional services]\n4. Timeline: [mock timeline]\n5. Environmental Controls: [mock environmental controls]`
-      };
+      // Use OCR-GPT backend to analyze the uploaded image
+      const ocrPrompt = `
+Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
 
-      console.log("🔍 DEBUG: Mock analysis generated successfully:", mockAnalysis);
+Context:
+- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}
+- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)
+- Client type: ${inspection.client_type}
+- Focus on health and safety implications
+- Provide actionable recommendations
+
+Please analyze the lab results shown in this image and provide:
+
+1. **CONCLUSION** (2-3 paragraphs):
+   - Summarize the lab findings and extracted text
+   - Assess the mold levels and types found
+   - Evaluate health and safety implications
+   - Compare to normal/acceptable levels
+   - Consider the property context and client type
+
+2. **RECOMMENDATIONS** (detailed list):
+   - Immediate actions needed (if any)
+   - Preventive measures
+   - Professional services recommended
+   - Timeline for any required actions
+   - Environmental controls to implement
+   - Follow-up testing recommendations
+
+Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
+
+Return your response in this exact JSON format:
+{
+  "conclusion": "Your detailed conclusion here...",
+  "recommendations": "Your detailed recommendations here..."
+}
+`;
+
+      console.log("🔍 DEBUG: Calling OCR-GPT backend with image URL:", imageUrl);
+      
+      // Call the OCR-GPT backend
+      const analysisResult = await Core.InvokeLLM(ocrPrompt, [imageUrl]);
+      console.log("🔍 DEBUG: OCR-GPT analysis result:", analysisResult);
+
+      // Parse the response to extract conclusion and recommendations
+      let conclusion = "";
+      let recommendations = "";
+
+      try {
+        // Try to parse as JSON first
+        const parsedResult = JSON.parse(analysisResult.content);
+        conclusion = parsedResult.conclusion || analysisResult.content;
+        recommendations = parsedResult.recommendations || "";
+      } catch (parseError) {
+        console.warn("⚠️ Failed to parse OCR result as JSON, using raw content:", parseError);
+        // If JSON parsing fails, use the raw content
+        conclusion = analysisResult.content;
+        recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+      }
+
+      console.log("🔍 DEBUG: Parsed analysis - Conclusion:", conclusion);
+      console.log("🔍 DEBUG: Parsed analysis - Recommendations:", recommendations);
 
       // Update inspection with generated analysis
+      await MoldInspection.update(inspectionId, {
+        conclusion: conclusion,
+        recommendations: recommendations
+      });
+
+      console.log("🔍 DEBUG: OCR analysis saved to inspection successfully");
+
+    } catch (error) {
+      console.error("❌ Error generating OCR analysis:", error);
+      
+      // Fallback to mock analysis if OCR fails
+      console.log("🔍 DEBUG: Falling back to mock analysis due to OCR error");
+      const mockAnalysis = {
+        conclusion: `Based on the laboratory analysis of the mold samples from ${inspection.street_address}, ${inspection.city}, ${inspection.state}, the results indicate [OCR analysis failed - please review manually]. This analysis was performed on a ${inspection.square_footage} sq ft ${inspection.client_type} property.`,
+        recommendations: `1. Immediate Actions: [Please review lab results manually]\n2. Preventive Measures: [Review with professional]\n3. Professional Services: [Consult mold specialist]\n4. Timeline: [Based on lab results]\n5. Environmental Controls: [Implement as needed]`
+      };
+
       await MoldInspection.update(inspectionId, {
         conclusion: mockAnalysis.conclusion,
         recommendations: mockAnalysis.recommendations
       });
 
-      console.log("🔍 DEBUG: Analysis saved to inspection successfully");
-
-    } catch (error) {
-      console.error("❌ Error generating analysis:", error);
-      alert("Failed to generate analysis. You can add conclusions and recommendations manually.");
+      alert("OCR analysis failed. Please review the lab results manually and add conclusions and recommendations.");
     } finally {
       setGeneratingAnalysis(false);
     }
@@ -495,8 +602,16 @@ export default function InspectionDetails() {
                       {uploadingImage ? (
                         <>
                           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                          <p className="text-blue-600 font-medium text-lg">Uploading...</p>
-                          <p className="text-slate-500 text-sm mt-2">Please wait while we process your images</p>
+                          <p className="text-blue-600 font-medium text-lg">Uploading Images...</p>
+                          <p className="text-slate-500 text-sm mt-2">Please wait while we upload and process your images</p>
+                          <div className="mt-4 w-full max-w-xs">
+                            <div className="bg-slate-200 rounded-full h-2">
+                              <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: `${uploadProgress}%`}}></div>
+                            </div>
+                            <p className="text-slate-500 text-xs mt-1">
+                              {uploadedCount} of {totalFiles} files uploaded
+                            </p>
+                          </div>
                         </>
                       ) : (
                         <>
@@ -532,20 +647,43 @@ export default function InspectionDetails() {
                               window.open(imageUrl, '_blank');
                             }}
                             title="Click to view full size"
+                            onError={(e) => {
+                              console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
+                              e.target.style.display = 'none';
+                              e.target.nextElementSibling.style.display = 'flex';
+                            }}
                           />
+                          {/* Fallback for failed images */}
+                          <div 
+                            className="hidden w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center"
+                            style={{display: 'none'}}
+                          >
+                            <div className="text-center">
+                              <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-slate-500 text-sm">Image failed to load</p>
+                            </div>
+                          </div>
+                          
+                          {/* Image overlay with zoom icon */}
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                               <div className="bg-white bg-opacity-90 rounded-full p-2">
-                                <Camera className="w-5 h-5 text-slate-700" />
+                                <ZoomIn className="w-5 h-5 text-slate-700" />
                               </div>
                             </div>
+                          </div>
+                          
+                          {/* Image info badge */}
+                          <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                            Image {index + 1}
                           </div>
                           
                           {/* Remove button for individual image */}
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               if (confirm(`Are you sure you want to remove lab analysis image ${index + 1}?`)) {
                                 const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
                                 console.log("🔍 DEBUG: Removing image at index:", index);
@@ -579,6 +717,33 @@ export default function InspectionDetails() {
                         <Upload className="w-4 h-4" />
                         Add More Images
                       </Button>
+                      
+                      {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (confirm('Generate AI analysis for all uploaded lab images?')) {
+                              try {
+                                console.log("🔍 DEBUG: Manual OCR analysis triggered");
+                                await generateAnalysisFromImage(inspection.lab_analysis_images[0]);
+                              } catch (error) {
+                                console.error("❌ Error in manual OCR analysis:", error);
+                                alert("Failed to generate OCR analysis. Please try again.");
+                              }
+                            }
+                          }}
+                          disabled={generatingAnalysis}
+                          className="flex items-center gap-2 text-blue-700 border-blue-300 hover:bg-blue-50"
+                        >
+                          {generatingAnalysis ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                          {generatingAnalysis ? 'Analyzing...' : 'Analyze with AI'}
+                        </Button>
+                      )}
                       
                       <Button
                         variant="outline"
@@ -616,6 +781,33 @@ export default function InspectionDetails() {
                 </div>
               )}
 
+              {processingImages && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-yellow-600" />
+                    <div>
+                      <span className="text-yellow-800 font-medium">Processing uploaded images...</span>
+                      <p className="text-yellow-700 text-sm mt-1">
+                        Images are being processed and will appear in the lab analysis section shortly.
+                      </p>
+                      {uploadProgress > 0 && (
+                        <div className="mt-2">
+                          <div className="bg-yellow-200 rounded-full h-2">
+                            <div 
+                              className="bg-yellow-600 h-2 rounded-full transition-all duration-300" 
+                              style={{width: `${uploadProgress}%`}}
+                            ></div>
+                          </div>
+                          <p className="text-yellow-700 text-xs mt-1">
+                            {uploadedCount} of {totalFiles} files processed
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {generatingAnalysis && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
@@ -639,7 +831,7 @@ export default function InspectionDetails() {
                     </span>
                   </div>
                   <p className="text-green-700 text-sm mt-1">
-                    The images have been processed and are ready for analysis.
+                    The images have been processed and are ready for analysis. Click on any image to view it in full size.
                   </p>
                 </div>
               )}

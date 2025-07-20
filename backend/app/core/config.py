@@ -25,6 +25,7 @@ class Settings:
     
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     
     # Application

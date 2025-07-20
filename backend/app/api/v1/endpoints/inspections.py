@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database import get_db, Inspection as DBInspection
 from app.schemas import Inspection, InspectionCreate, InspectionUpdate
 from app.services.llm_service import llm_service
 from app.services.email_service import email_service
+from app.services.file_service import file_service
 import json
 
 router = APIRouter()
@@ -287,4 +288,146 @@ async def send_inspection_email(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send email: {str(e)}"
+        ) 
+
+@router.post("/{inspection_id}/upload-lab-image")
+async def upload_lab_analysis_image(
+    inspection_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload lab analysis image for an inspection
+    
+    This endpoint:
+    1. Uploads the image to Supabase lab-analysis bucket
+    2. Gets the public URL of the uploaded image
+    3. Adds the URL to the lab_analysis_images array in the inspection record
+    4. Returns the updated inspection data
+    """
+    try:
+        # Validate inspection exists
+        inspection = db.query(DBInspection).filter(DBInspection.id == inspection_id).first()
+        if not inspection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Inspection with ID {inspection_id} not found"
+            )
+        
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only image files are allowed"
+            )
+        
+        # Validate file size (max 10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        file_content = await file.read()
+        if len(file_content) > max_size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File size exceeds 10MB limit"
+            )
+        
+        # Upload file to Supabase storage
+        public_url = await file_service.upload_lab_analysis_image(
+            file_content=file_content,
+            file_name=file.filename,
+            inspection_id=inspection_id
+        )
+        
+        # Get current lab_analysis_images array
+        current_images = []
+        if inspection.lab_analysis_images:
+            try:
+                current_images = json.loads(inspection.lab_analysis_images)
+            except json.JSONDecodeError:
+                current_images = []
+        
+        # Append new image URL to array
+        current_images.append(public_url)
+        
+        # Update inspection record with new image array
+        inspection.lab_analysis_images = json.dumps(current_images)
+        db.commit()
+        db.refresh(inspection)
+        
+        return {
+            "message": "Lab analysis image uploaded successfully",
+            "inspection_id": inspection_id,
+            "image_url": public_url,
+            "total_images": len(current_images),
+            "updated_inspection": inspection
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload lab analysis image: {str(e)}"
+        )
+
+@router.delete("/{inspection_id}/lab-image/{image_index}")
+async def delete_lab_analysis_image(
+    inspection_id: int,
+    image_index: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a specific lab analysis image from an inspection
+    """
+    try:
+        # Validate inspection exists
+        inspection = db.query(DBInspection).filter(DBInspection.id == inspection_id).first()
+        if not inspection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Inspection with ID {inspection_id} not found"
+            )
+        
+        # Get current lab_analysis_images array
+        current_images = []
+        if inspection.lab_analysis_images:
+            try:
+                current_images = json.loads(inspection.lab_analysis_images)
+            except json.JSONDecodeError:
+                current_images = []
+        
+        # Validate image index
+        if image_index < 0 or image_index >= len(current_images):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Image index {image_index} is out of range"
+            )
+        
+        # Get image URL to delete from storage
+        image_url = current_images[image_index]
+        
+        # Delete from Supabase storage
+        await file_service.delete_lab_analysis_image(image_url)
+        
+        # Remove from array
+        current_images.pop(image_index)
+        
+        # Update inspection record
+        inspection.lab_analysis_images = json.dumps(current_images)
+        db.commit()
+        db.refresh(inspection)
+        
+        return {
+            "message": "Lab analysis image deleted successfully",
+            "inspection_id": inspection_id,
+            "remaining_images": len(current_images)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete lab analysis image: {str(e)}"
         ) 
