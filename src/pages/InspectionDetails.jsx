@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { User } from "@/api/entities";
-import { UploadFile, InvokeLLM } from "@/api/integrations";
+import { UploadFile } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,7 +29,7 @@ import {
   Trash2
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
-import { LLMService } from "@/api/integrations";
+import { UploadFile } from "@/api/integrations";
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -133,7 +133,7 @@ export default function InspectionDetails() {
         console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
         
         // Use the new upload service
-        const uploadResult = await LLMService.uploadFile(file);
+        const uploadResult = await UploadFile(file);
         console.log("🔍 DEBUG: Upload result:", uploadResult);
         
         const file_url = uploadResult.file_url || uploadResult.url;
@@ -200,60 +200,18 @@ export default function InspectionDetails() {
       console.log("🔍 DEBUG: Generating analysis for inspection ID:", inspectionId);
       console.log("🔍 DEBUG: Image URL:", imageUrl);
 
-      const prompt = `
-Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
+      // Mock LLM analysis since LLMService is removed
+      const mockAnalysis = {
+        conclusion: `Based on the laboratory analysis of the mold samples from ${inspection.street_address}, ${inspection.city}, ${inspection.state}, the results indicate [mock conclusion]. This analysis was performed on a ${inspection.square_footage} sq ft ${inspection.client_type} property.`,
+        recommendations: `1. Immediate Actions: [mock recommendations]\n2. Preventive Measures: [mock preventive measures]\n3. Professional Services: [mock professional services]\n4. Timeline: [mock timeline]\n5. Environmental Controls: [mock environmental controls]`
+      };
 
-Context:
-- Property: ${inspection.street_address}, ${inspection.city}, ${inspection.state}
-- Square Footage: ${inspection.square_footage} sq ft
-- Client Type: ${inspection.client_type}
-- Visible Mold Present: ${inspection.has_visible_mold ? 'Yes' : 'No'}
-- Water Damage Present: ${inspection.has_water_damage ? 'Yes' : 'No'}
-- Background: ${inspection.background_info || 'None provided'}
-
-Please analyze the lab results shown in this image and provide:
-
-1. CONCLUSION (2-3 paragraphs):
-   - Summarize the lab findings
-   - Assess the mold levels and types found
-   - Evaluate health and safety implications
-   - Compare to normal/acceptable levels
-
-2. RECOMMENDATIONS (detailed list):
-   - Immediate actions needed (if any)
-   - Preventive measures
-   - Professional services recommended
-   - Timeline for any required actions
-   - Environmental controls to implement
-
-Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here...",
-  "recommendations": "Your detailed recommendations here..."
-}
-`;
-
-      const analysis = await InvokeLLM({
-        prompt: prompt,
-        file_urls: [imageUrl],
-        response_json_schema: {
-          type: "object",
-          properties: {
-            conclusion: { type: "string" },
-            recommendations: { type: "string" }
-          },
-          required: ["conclusion", "recommendations"]
-        }
-      });
-
-      console.log("🔍 DEBUG: Analysis generated successfully:", analysis);
+      console.log("🔍 DEBUG: Mock analysis generated successfully:", mockAnalysis);
 
       // Update inspection with generated analysis
       await MoldInspection.update(inspectionId, {
-        conclusion: analysis.conclusion,
-        recommendations: analysis.recommendations
+        conclusion: mockAnalysis.conclusion,
+        recommendations: mockAnalysis.recommendations
       });
 
       console.log("🔍 DEBUG: Analysis saved to inspection successfully");

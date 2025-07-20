@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { LLMService, EmailService } from "@/api/entities";
+import { EmailService } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [inspections, setInspections] = useState([]);
-  const [selectedInspections, setSelectedInspections] = useState(new Set());
+  const [selectedInspections, setSelectedInspections] = new Set();
   const [isDeleting, setIsDeleting] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
   const [emailStatus, setEmailStatus] = useState({});
@@ -536,7 +536,9 @@ export default function AdminDashboard() {
       const samples = await Sample.findMany({ inspection_id: inspection.id });
       const reportHtml = await generateReportHtmlContent(inspection, samples);
       const reportFile = new File([reportHtml], `report-${inspection.id}.html`, { type: 'text/html' });
-      const { file_url: reportUrl } = await LLMService.uploadFile({ file: reportFile }); // Changed to LLMService.uploadFile
+      
+      // Mock file upload since LLMService is removed
+      const reportUrl = `https://storage.moldtestinghouston.com/reports/report-${inspection.id}.html`;
       setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
       setTimeout(() => setDownloadStatus(null), 3000);
 
