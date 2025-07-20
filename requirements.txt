@@ -1,0 +1,26 @@
+# OCR-GPT Integration Requirements
+# ===============================
+
+# OpenAI API client
+openai>=1.0.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Tesseract OCR wrapper
+pytesseract>=0.3.10
+
+# Additional utilities
+python-dotenv>=1.0.0
+
+# Optional: For better image preprocessing
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Optional: For advanced text processing
+nltk>=3.8.1
+spacy>=3.7.0
+
+# Optional: For web interface (if needed)
+flask>=3.0.0
+flask-cors>=4.0.0 

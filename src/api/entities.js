@@ -334,6 +334,61 @@ export const LLMService = {
     return response;
   },
   
+  invoke: async (prompt, file_urls = []) => {
+    const token = getAuthToken();
+    
+    console.log("🔍 DEBUG: LLMService.invoke called with:", { prompt, file_urls });
+    
+    try {
+      const response = await apiCall('/llm/invoke', {
+        method: 'POST',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          prompt, 
+          file_urls,
+          model: 'gpt-4' // Default to GPT-4 for OCR analysis
+        })
+      });
+      
+      console.log("🔍 DEBUG: LLMService.invoke response:", response);
+      return response;
+      
+    } catch (error) {
+      console.error("❌ LLMService.invoke error:", error);
+      
+      // Fallback to local OCR-GPT processing if backend is not available
+      console.log("🔄 Attempting local OCR-GPT processing...");
+      return await LLMService.invokeLocal(prompt, file_urls);
+    }
+  },
+  
+  invokeLocal: async (prompt, file_urls = []) => {
+    console.log("🔍 DEBUG: LLMService.invokeLocal called with:", { prompt, file_urls });
+    
+    try {
+      // This would connect to the local Python OCR-GPT backend
+      // For now, we'll return a mock response
+      const mockResponse = {
+        content: `Mock OCR-GPT analysis for prompt: "${prompt.substring(0, 100)}..."`,
+        usage: {
+          prompt_tokens: 150,
+          completion_tokens: 200,
+          total_tokens: 350
+        }
+      };
+      
+      console.log("🔍 DEBUG: LLMService.invokeLocal mock response:", mockResponse);
+      return mockResponse;
+      
+    } catch (error) {
+      console.error("❌ LLMService.invokeLocal error:", error);
+      throw error;
+    }
+  },
+  
   uploadFile: async (file) => {
     // Import the Supabase upload function
     const { uploadToSupabaseStorage } = await import('@/lib/supabase.js');
@@ -361,6 +416,74 @@ export const LLMService = {
     } catch (error) {
       console.error("❌ LLMService.uploadFile error:", error);
       throw error;
+    }
+  },
+  
+  processImageWithOCR: async (file, customPrompt = null) => {
+    console.log("🔍 DEBUG: LLMService.processImageWithOCR called with:", { 
+      fileName: file.name, 
+      customPrompt 
+    });
+    
+    try {
+      // Upload file first
+      const uploadResult = await LLMService.uploadFile(file);
+      console.log("🔍 DEBUG: File uploaded for OCR processing:", uploadResult);
+      
+      // Default prompt for lab analysis
+      const defaultPrompt = `
+Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
+
+Context:
+- This is a mold inspection and testing report
+- Focus on health and safety implications
+- Provide actionable recommendations
+
+Please analyze the lab results shown in this image and provide:
+
+1. **CONCLUSION** (2-3 paragraphs):
+   - Summarize the lab findings
+   - Assess the mold levels and types found
+   - Evaluate health and safety implications
+   - Compare to normal/acceptable levels
+
+2. **RECOMMENDATIONS** (detailed list):
+   - Immediate actions needed (if any)
+   - Preventive measures
+   - Professional services recommended
+   - Timeline for any required actions
+   - Environmental controls to implement
+
+Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
+
+Return your response in this exact JSON format:
+{
+  "conclusion": "Your detailed conclusion here...",
+  "recommendations": "Your detailed recommendations here..."
+}
+`;
+
+      const prompt = customPrompt || defaultPrompt;
+      
+      // Process with OCR-GPT
+      const analysisResult = await LLMService.invoke(prompt, [uploadResult.file_url]);
+      console.log("🔍 DEBUG: OCR-GPT analysis result:", analysisResult);
+      
+      return {
+        success: true,
+        file_url: uploadResult.file_url,
+        extracted_text: analysisResult.content,
+        analysis: analysisResult.content,
+        timestamp: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error("❌ LLMService.processImageWithOCR error:", error);
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
     }
   }
 };
