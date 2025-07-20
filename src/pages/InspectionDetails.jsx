@@ -93,9 +93,23 @@ export default function InspectionDetails() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Validate that we have an inspection ID
+    if (!inspectionId) {
+      alert('Error: No inspection ID found. Please refresh the page and try again.');
+      return;
+    }
+
+    // Validate that inspection data is loaded
+    if (!inspection) {
+      alert('Error: Inspection data not loaded. Please wait and try again.');
+      return;
+    }
+
     setUploadingImage(true);
     try {
       console.log("🔍 DEBUG: Uploading lab images:", files.length, "files");
+      console.log("🔍 DEBUG: Inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Inspection object:", inspection);
       
       const uploadedUrls = [];
       
@@ -140,12 +154,16 @@ export default function InspectionDetails() {
       const currentImages = inspection.lab_analysis_images || [];
       const updatedImages = [...currentImages, ...uploadedUrls];
       
+      console.log("🔍 DEBUG: Updating inspection with ID:", inspectionId);
+      console.log("🔍 DEBUG: Current images:", currentImages);
+      console.log("🔍 DEBUG: Updated images:", updatedImages);
+      
       // Update inspection with new lab analysis image URLs
-      await MoldInspection.update(inspection.id, {
+      await MoldInspection.update(inspectionId, {
         lab_analysis_images: updatedImages
       });
 
-      console.log("🔍 DEBUG: Lab analysis images updated:", updatedImages);
+      console.log("🔍 DEBUG: Lab analysis images updated successfully");
 
       // Generate conclusions and recommendations based on the first uploaded image
       if (uploadedUrls.length > 0) {
@@ -170,6 +188,18 @@ export default function InspectionDetails() {
   const generateAnalysisFromImage = async (imageUrl) => {
     setGeneratingAnalysis(true);
     try {
+      // Validate that we have an inspection ID and inspection data
+      if (!inspectionId) {
+        throw new Error('No inspection ID found');
+      }
+
+      if (!inspection) {
+        throw new Error('Inspection data not loaded');
+      }
+
+      console.log("🔍 DEBUG: Generating analysis for inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Image URL:", imageUrl);
+
       const prompt = `
 Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
 
@@ -218,14 +248,18 @@ Return your response in this exact JSON format:
         }
       });
 
+      console.log("🔍 DEBUG: Analysis generated successfully:", analysis);
+
       // Update inspection with generated analysis
-      await MoldInspection.update(inspection.id, {
+      await MoldInspection.update(inspectionId, {
         conclusion: analysis.conclusion,
         recommendations: analysis.recommendations
       });
 
+      console.log("🔍 DEBUG: Analysis saved to inspection successfully");
+
     } catch (error) {
-      console.error("Error generating analysis:", error);
+      console.error("❌ Error generating analysis:", error);
       alert("Failed to generate analysis. You can add conclusions and recommendations manually.");
     } finally {
       setGeneratingAnalysis(false);
@@ -235,13 +269,28 @@ Return your response in this exact JSON format:
   const handleSave = async () => {
     setSaving(true);
     try {
-      await MoldInspection.update(inspection.id, {
+      // Validate that we have an inspection ID and inspection data
+      if (!inspectionId) {
+        throw new Error('No inspection ID found');
+      }
+
+      if (!inspection) {
+        throw new Error('Inspection data not loaded');
+      }
+
+      console.log("🔍 DEBUG: Saving changes for inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Conclusion:", inspection.conclusion);
+      console.log("🔍 DEBUG: Recommendations:", inspection.recommendations);
+
+      await MoldInspection.update(inspectionId, {
         conclusion: inspection.conclusion,
         recommendations: inspection.recommendations
       });
+
+      console.log("🔍 DEBUG: Changes saved successfully");
       alert("Changes saved successfully!");
     } catch (error) {
-      console.error("Error saving:", error);
+      console.error("❌ Error saving:", error);
       alert("Failed to save changes. Please try again.");
     } finally {
       setSaving(false);
@@ -557,10 +606,15 @@ Return your response in this exact JSON format:
                             onClick={() => {
                               if (confirm(`Are you sure you want to remove lab analysis image ${index + 1}?`)) {
                                 const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
-                                MoldInspection.update(inspection.id, {
+                                console.log("🔍 DEBUG: Removing image at index:", index);
+                                console.log("🔍 DEBUG: Updated images:", updatedImages);
+                                MoldInspection.update(inspectionId, {
                                   lab_analysis_images: updatedImages
                                 }).then(() => {
                                   loadInspectionData();
+                                }).catch((error) => {
+                                  console.error("❌ Error removing image:", error);
+                                  alert("Failed to remove image. Please try again.");
                                 });
                               }
                             }}
@@ -589,10 +643,14 @@ Return your response in this exact JSON format:
                         size="sm"
                         onClick={() => {
                           if (confirm('Are you sure you want to remove all lab analysis images?')) {
-                            MoldInspection.update(inspection.id, {
+                            console.log("🔍 DEBUG: Removing all lab analysis images for inspection ID:", inspectionId);
+                            MoldInspection.update(inspectionId, {
                               lab_analysis_images: []
                             }).then(() => {
                               loadInspectionData();
+                            }).catch((error) => {
+                              console.error("❌ Error removing all images:", error);
+                              alert("Failed to remove all images. Please try again.");
                             });
                           }
                         }}
