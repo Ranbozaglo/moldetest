@@ -97,9 +97,10 @@ export const uploadToSupabaseStorage = async (file, bucketName, folder = '') => 
       throw new Error('Supabase client not available');
     }
     
-    const session = await getCurrentSession();
-    if (!session) {
-      throw new Error('No active session found');
+    // Check for custom authentication instead of Supabase session
+    const savedUser = localStorage.getItem('mth_user');
+    if (!savedUser) {
+      throw new Error('Authentication required. Please log in to upload files. If you are already logged in, try refreshing the page.');
     }
 
     // Generate unique filename

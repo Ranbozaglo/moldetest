@@ -83,7 +83,12 @@ export const Core = {
     } catch (error) {
       console.error('❌ UploadFile error:', error);
       
-      // Return mock result on error
+      // Provide specific guidance for authentication errors
+      if (error.message && error.message.includes('Authentication required')) {
+        throw new Error('Please log in to upload files. If you are already logged in, try refreshing the page or logging out and back in.');
+      }
+      
+      // Return mock result on other errors
       return {
         file_url: `https://storage.moldtestinghouston.com/error/${Date.now()}_${file.name}`,
         file_path: `/error/${file.name}`,
