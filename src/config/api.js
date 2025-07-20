@@ -1,7 +1,17 @@
 // API Configuration for Flask Backend
+import { getEnvironmentConfig } from './environment.js';
+
+const envConfig = getEnvironmentConfig();
+
 export const API_CONFIG = {
-  // Backend API base URL - Flask backend runs on port 5000
-  BASE_URL: 'http://localhost:5000/api',
+  // Dynamic backend API base URL based on environment
+  BASE_URL: envConfig.BACKEND_URL,
+  
+  // Environment detection
+  ENVIRONMENT: envConfig.environment,
+  
+  // Production URL for the frontend
+  PRODUCTION_URL: 'https://mold-testing.netlify.app',
   
   // API endpoints matching Flask backend and actual database schema
   ENDPOINTS: {
@@ -13,7 +23,8 @@ export const API_CONFIG = {
       LIST: '/inspection',
       CREATE: '/inspection',
       GET: (id) => `/inspection/${id}`,
-      UPDATE: (id) => `/inspection/${id}`
+      UPDATE: (id) => `/inspection/${id}`,
+      DELETE: (id) => `/inspection/${id}`
     },
     SAMPLES: {
       LIST: '/samples',
@@ -36,10 +47,22 @@ export const API_CONFIG = {
   RETRY: {
     MAX_ATTEMPTS: 3,
     DELAY: 1000
-  }
+  },
+  
+  // Environment-specific settings
+  DEBUG: envConfig.DEBUG,
+  LOG_LEVEL: envConfig.LOG_LEVEL
 };
 
 // Simple configuration getter
 export const getApiConfig = () => {
   return API_CONFIG;
+};
+
+// Environment detection helper
+export const getEnvironment = () => {
+  return {
+    ...envConfig,
+    apiConfig: API_CONFIG
+  };
 }; 

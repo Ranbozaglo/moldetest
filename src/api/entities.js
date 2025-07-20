@@ -1,12 +1,15 @@
 // API client for Flask backend communication
 import { getApiConfig } from '@/config/api.js';
+import { logEnvironmentInfo } from '@/config/environment.js';
 
 const API_CONFIG = getApiConfig();
-const API_BASE_URL = API_CONFIG.BASE_URL;
+
+// Log environment info on module load
+logEnvironmentInfo();
 
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${API_CONFIG.BASE_URL}${endpoint}`;
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -15,15 +18,35 @@ const apiCall = async (endpoint, options = {}) => {
     ...options
   };
 
+  // Debug logging in development
+  if (API_CONFIG.DEBUG) {
+    console.log(`🔍 API Call: ${options.method || 'GET'} ${url}`);
+    if (options.body) {
+      console.log('🔍 Request body:', JSON.parse(options.body));
+    }
+  }
+
   try {
     const response = await fetch(url, config);
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+      const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
+      
+      if (API_CONFIG.DEBUG) {
+        console.error(`❌ API Error: ${options.method || 'GET'} ${url}`, errorMessage);
+      }
+      
+      throw new Error(errorMessage);
     }
     
-    return await response.json();
+    const data = await response.json();
+    
+    if (API_CONFIG.DEBUG) {
+      console.log(`✅ API Success: ${options.method || 'GET'} ${url}`, data);
+    }
+    
+    return data;
   } catch (error) {
     console.error(`API call failed for ${endpoint}:`, error);
     throw error;
