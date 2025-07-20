@@ -5,6 +5,7 @@ import { MoldInspection } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
+import { getInspectionIdFromUrl } from '@/utils/urlUtils';
 import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, Shield, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -17,8 +18,7 @@ export default function SamplingGuide() {
     const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
     useEffect(() => {
-        const params = new URLSearchParams(location.search);
-        const id = params.get("inspectionId");
+        const id = getInspectionIdFromUrl(location.search);
         
         console.log("🔍 DEBUG: URL search params:", location.search);
         console.log("🔍 DEBUG: Inspection ID from params:", id);
@@ -28,6 +28,7 @@ export default function SamplingGuide() {
             loadInspectionData(id);
         } else {
             console.error("No inspection ID found in URL parameters");
+            console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
             // Instead of showing an alert, show a user-friendly error page
             setLoading(false);
         }

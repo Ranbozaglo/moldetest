@@ -360,7 +360,8 @@ export default function Inspection() {
                   console.log("🔍 DEBUG: newInspection?.id:", newInspection?.id);
                   if (newInspection?.id) {
                     console.log("🔍 DEBUG: Navigating to SamplingGuide with ID:", newInspection.id);
-                    navigate(createPageUrl(`SamplingGuide?inspectionId=${newInspection.id}`));
+                    // Use consistent parameter name (lowercase for better compatibility)
+                    navigate(createPageUrl(`SamplingGuide?inspectionid=${newInspection.id}`));
                   } else {
                     console.error("🔍 DEBUG: No inspection ID available for navigation");
                     alert("Error: Inspection ID not found. Please try submitting the inspection again.");

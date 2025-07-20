@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UploadFile } from "@/api/integrations";
 import { FlaskConical, Camera } from "lucide-react";
 import { getDisplayNumber, validateInspection } from "@/utils/inspectionUtils";
+import { getInspectionIdFromUrl } from "@/utils/urlUtils";
 
 function SampleRow({ index, sample, updateSample, removeSample }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -147,8 +148,7 @@ export default function Sampling() {
     // This guard prevents the effect from running again while we are navigating away after a successful submission.
     if (isCompleting) return;
 
-    const params = new URLSearchParams(location.search);
-    const id = params.get("inspectionId");
+    const id = getInspectionIdFromUrl(location.search);
     
     if (id) {
       setInspectionId(id);
