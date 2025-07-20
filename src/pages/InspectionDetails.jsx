@@ -76,7 +76,7 @@ export default function InspectionDetails() {
       if (inspectionData && inspectionData.length > 0) {
         setInspection(inspectionData[0]);
         
-        const samplesData = await Sample.filter({ inspection_id: inspectionId });
+        const samplesData = await Sample.findMany({ inspection_id: inspectionId });
         setSamples(samplesData || []);
       } else {
         setError("Inspection not found");

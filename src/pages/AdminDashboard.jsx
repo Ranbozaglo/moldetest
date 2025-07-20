@@ -162,13 +162,15 @@ export default function AdminDashboard() {
   };
 
   const handleSelectInspection = (inspectionId, checked) => {
-    const newSelected = new Set(selectedInspections);
     if (checked) {
-      newSelected.add(inspectionId);
+      setSelectedInspections(prev => new Set([...prev, inspectionId]));
     } else {
-      newSelected.delete(inspectionId);
+      setSelectedInspections(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(inspectionId);
+        return newSet;
+      });
     }
-    setSelectedInspections(newSelected);
   };
 
   const handleDeleteSelected = async (idsToDelete = null) => {
@@ -382,6 +384,8 @@ export default function AdminDashboard() {
   };
 
   const downloadPDF = async (inspection) => {
+    console.log("🔍 DEBUG: downloadPDF called with inspection:", inspection);
+    
     // This is now the "Download Report" button logic
     if (inspection.report_html_url) {
       setDownloadStatus({ type: 'info', message: `Preparing download...` });
@@ -389,6 +393,7 @@ export default function AdminDashboard() {
         const displayNum = getDisplayNumber(inspection);
         const fileName = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
 
+        console.log("🔍 DEBUG: Fetching pre-generated report from:", inspection.report_html_url);
         const response = await fetch(inspection.report_html_url);
         if (!response.ok) throw new Error('Failed to fetch report file.');
 
@@ -418,10 +423,15 @@ export default function AdminDashboard() {
         throw new Error("Could not find inspection details.");
       }
       
-      const samples = await Sample.filter({ inspection_id: inspection.id });
+      console.log("🔍 DEBUG: Fetching samples for inspection ID:", inspection.id);
+      const samples = await Sample.findMany({ inspection_id: inspection.id });
+      console.log("🔍 DEBUG: Samples fetched:", samples);
+      
       const displayNum = getDisplayNumber(inspection);
+      console.log("🔍 DEBUG: Generating report HTML for:", displayNum);
       
       const reportHtml = await generateReportHtmlContent(inspection, samples);
+      console.log("🔍 DEBUG: Report HTML generated successfully");
       
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
@@ -437,7 +447,13 @@ export default function AdminDashboard() {
       setTimeout(() => setDownloadStatus(null), 3000);
       
     } catch (error) {
-      console.error("Error generating report:", error);
+      console.error("❌ Error generating report:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        stack: error.stack,
+        inspection: inspection,
+        inspectionId: inspection?.id
+      });
       setDownloadStatus({ type: 'error', message: `Failed to generate report: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
@@ -500,7 +516,7 @@ export default function AdminDashboard() {
       
       // Step 1: Generate and upload the report
       setDownloadStatus({ type: 'info', message: `Generating and storing report for ${displayNum}...` });
-      const samples = await Sample.filter({ inspection_id: inspection.id });
+      const samples = await Sample.findMany({ inspection_id: inspection.id });
       const reportHtml = await generateReportHtmlContent(inspection, samples);
       const reportFile = new File([reportHtml], `report-${inspection.id}.html`, { type: 'text/html' });
       const { file_url: reportUrl } = await LLMService.uploadFile({ file: reportFile }); // Changed to LLMService.uploadFile

@@ -109,7 +109,7 @@ export default function MyInspections() {
   
   const generateAndDownloadReport = async (inspection) => {
     try {
-      const samples = await Sample.filter({ inspection_id: inspection.id });
+      const samples = await Sample.findMany({ inspection_id: inspection.id });
       const displayNum = getDisplayNumber(inspection);
       
       const disclaimerText = "The Mold Testing Houston DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Mold Testing Houston, LLC is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
