@@ -171,8 +171,21 @@ export default function MyInspections() {
         : '<p>No samples were documented for this inspection.</p>';
 
       const labAnalysisHtml = inspection.lab_analysis_image_url
-          ? `<img src="${inspection.lab_analysis_image_url}" alt="Lab Analysis Results" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; margin: 10px 0;" />`
-          : '<p>Lab analysis results have not been uploaded yet.</p>';
+          ? `<div class="lab-analysis-section">
+              <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
+              <div style="text-align: center; margin: 20px 0;">
+                <img src="${inspection.lab_analysis_image_url}" alt="Lab Analysis Results" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                <p style="color: #666; font-size: 14px; margin-top: 10px; font-style: italic;">Laboratory mold analysis report</p>
+              </div>
+              ${inspection.conclusion ? `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #004aac;">
+                <h4 style="color: #004aac; margin-bottom: 10px;">Analysis Summary</h4>
+                <p style="line-height: 1.6;">${inspection.conclusion}</p>
+              </div>` : ''}
+            </div>`
+          : `<div class="lab-analysis-section">
+              <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
+              <p style="color: #666; font-style: italic;">Lab analysis results have not been uploaded yet.</p>
+            </div>`;
 
       const reportHtml = `
       <!DOCTYPE html>

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -25,9 +25,11 @@ import {
   FlaskConical,
   Loader2,
   Camera,
-  CheckCircle
+  CheckCircle,
+  Trash2
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
+import { LLMService } from "@/api/integrations";
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -91,14 +93,39 @@ export default function InspectionDetails() {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (JPEG, PNG, GIF, etc.)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+
     setUploadingImage(true);
     try {
-      const { file_url } = await UploadFile({ file });
+      console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
+      
+      // Use the new upload service
+      const uploadResult = await LLMService.uploadFile(file);
+      console.log("🔍 DEBUG: Upload result:", uploadResult);
+      
+      const file_url = uploadResult.file_url || uploadResult.url;
+      
+      if (!file_url) {
+        throw new Error('Upload failed: No file URL returned');
+      }
       
       // Update inspection with lab image URL
       await MoldInspection.update(inspection.id, {
         lab_analysis_image_url: file_url
       });
+
+      console.log("🔍 DEBUG: Lab image URL saved:", file_url);
 
       // Generate conclusions and recommendations based on the lab image
       await generateAnalysisFromImage(file_url);
@@ -106,11 +133,15 @@ export default function InspectionDetails() {
       // Reload inspection data
       await loadInspectionData();
       
+      alert('Lab analysis image uploaded successfully!');
+      
     } catch (error) {
-      console.error("Error uploading lab image:", error);
-      alert("Failed to upload lab analysis image. Please try again.");
+      console.error("❌ Error uploading lab image:", error);
+      alert(`Failed to upload lab analysis image: ${error.message}`);
     } finally {
       setUploadingImage(false);
+      // Clear the file input
+      event.target.value = '';
     }
   };
 
@@ -430,10 +461,13 @@ Return your response in this exact JSON format:
                 <Camera className="w-5 h-5" />
                 Lab Analysis
               </CardTitle>
+              <CardDescription>
+                Upload and analyze laboratory mold test results
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {!inspection.lab_analysis_image_url ? (
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
@@ -442,35 +476,85 @@ Return your response in this exact JSON format:
                     id="lab-analysis-upload"
                     disabled={uploadingImage}
                   />
-                  <label htmlFor="lab-analysis-upload" className="cursor-pointer">
-                    <Upload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-slate-600 font-medium">
-                      {uploadingImage ? "Uploading..." : "Upload Lab Analysis Image"}
-                    </p>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Click to select an image of the lab analysis results
-                    </p>
+                  <label htmlFor="lab-analysis-upload" className="cursor-pointer block">
+                    <div className="flex flex-col items-center">
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
+                          <p className="text-blue-600 font-medium text-lg">Uploading...</p>
+                          <p className="text-slate-500 text-sm mt-2">Please wait while we process your image</p>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-12 h-12 text-slate-400 mb-4" />
+                          <p className="text-slate-600 font-medium text-lg">Upload Lab Analysis Image</p>
+                          <p className="text-slate-500 text-sm mt-2">
+                            Click to select an image of the lab analysis results
+                          </p>
+                          <p className="text-slate-400 text-xs mt-2">
+                            Supports: JPEG, PNG, GIF • Max size: 10MB
+                          </p>
+                        </>
+                      )}
+                    </div>
                   </label>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <Label className="text-slate-600">Lab Analysis Image</Label>
-                    <img
-                      src={inspection.lab_analysis_image_url}
-                      alt="Lab Analysis"
-                      className="w-full max-w-md h-auto rounded-lg border mt-2"
-                    />
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <Label className="text-slate-600 font-medium">Lab Analysis Image</Label>
+                    <div className="mt-3 relative group">
+                      <img
+                        src={inspection.lab_analysis_image_url}
+                        alt="Lab Analysis Results"
+                        className="w-full max-w-full h-auto rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                        onClick={() => {
+                          // Open image in new tab for full view
+                          window.open(inspection.lab_analysis_image_url, '_blank');
+                        }}
+                        title="Click to view full size"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <div className="bg-white bg-opacity-90 rounded-full p-2">
+                            <Camera className="w-5 h-5 text-slate-700" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => document.getElementById('lab-analysis-upload').click()}
+                        disabled={uploadingImage}
+                        className="flex items-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Replace Image
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Are you sure you want to remove this lab analysis image?')) {
+                            MoldInspection.update(inspection.id, {
+                              lab_analysis_image_url: null
+                            }).then(() => {
+                              loadInspectionData();
+                            });
+                          }
+                        }}
+                        className="flex items-center gap-2 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.getElementById('lab-analysis-upload').click()}
-                    disabled={uploadingImage}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Replace Image
-                  </Button>
+                  
                   <input
                     type="file"
                     accept="image/*"
@@ -484,12 +568,26 @@ Return your response in this exact JSON format:
 
               {generatingAnalysis && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <span className="text-blue-800 font-medium">Analyzing lab results...</span>
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                    <div>
+                      <span className="text-blue-800 font-medium">Analyzing lab results...</span>
+                      <p className="text-blue-700 text-sm mt-1">
+                        AI is generating professional conclusions and recommendations based on the lab analysis.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-blue-700 text-sm mt-1">
-                    AI is generating professional conclusions and recommendations based on the lab analysis.
+                </div>
+              )}
+
+              {inspection.lab_analysis_image_url && !generatingAnalysis && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <span className="text-green-800 font-medium">Lab analysis uploaded successfully</span>
+                  </div>
+                  <p className="text-green-700 text-sm mt-1">
+                    The image has been processed and is ready for analysis.
                   </p>
                 </div>
               )}

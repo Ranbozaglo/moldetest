@@ -332,6 +332,22 @@ export const LLMService = {
       body: JSON.stringify({ text })
     });
     return response;
+  },
+  
+  uploadFile: async (file) => {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await apiCall('/upload/file', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+        // Note: Don't set Content-Type for FormData, let the browser set it
+      },
+      body: formData
+    });
+    return response;
   }
 };
 
