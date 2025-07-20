@@ -1,20 +1,26 @@
 // Backend API integrations
 // These services now connect to the Python OCR-GPT backend API
 
-import { LLMService, EmailService } from './entities.js';
+import { EmailService } from './entities.js';
 
 export const Core = {
   InvokeLLM: async (prompt, file_urls = []) => {
-    // Use OCR-GPT backend service for text analysis
+    // Mock LLM service for now
     console.log('🔍 DEBUG: InvokeLLM called with:', { prompt, file_urls });
     
     try {
-      const response = await LLMService.invoke(prompt, file_urls);
-      console.log('🔍 DEBUG: LLM response:', response);
-      return {
-        content: response.content,
-        usage: response.usage
+      // Return mock response
+      const mockResponse = {
+        content: `Mock LLM response for prompt: "${prompt.substring(0, 100)}..."`,
+        usage: {
+          prompt_tokens: 150,
+          completion_tokens: 200,
+          total_tokens: 350
+        }
       };
+      
+      console.log('🔍 DEBUG: LLM response:', mockResponse);
+      return mockResponse;
     } catch (error) {
       console.error('❌ Error in InvokeLLM:', error);
       throw error;
