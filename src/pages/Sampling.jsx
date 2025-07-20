@@ -13,6 +13,7 @@ import { createPageUrl } from "@/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { UploadFile } from "@/api/integrations";
 import { FlaskConical, Camera } from "lucide-react";
+import { getDisplayNumber, validateInspection } from "@/utils/inspectionUtils";
 
 function SampleRow({ index, sample, updateSample, removeSample }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -164,7 +165,18 @@ export default function Sampling() {
       const inspectionData = await MoldInspection.findUnique({ id });
       
       if (inspectionData) {
+        // Validate the inspection data
+        const validation = validateInspection(inspectionData);
+        if (!validation.isValid) {
+          console.error("🔍 DEBUG: Inspection validation failed:", validation.errors);
+          alert("Invalid inspection data. Please start a new inspection.");
+          navigate(createPageUrl("Welcome"));
+          return;
+        }
+        
+        console.log("🔍 DEBUG: Inspection display number:", getDisplayNumber(inspectionData));
         setInspectionData(inspectionData);
+        
         // Pre-populate samples if they exist for this inspection
         if (inspectionData.samples && inspectionData.samples.length > 0) {
           setSamples(inspectionData.samples.map(s => ({

@@ -4,6 +4,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { MoldInspection } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
+import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
 import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, Shield, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -39,6 +40,15 @@ export default function SamplingGuide() {
             console.log("🔍 DEBUG: Loaded inspection data:", data);
             
             if (data && data.id) {
+                // Validate the inspection data
+                const validation = validateInspection(data);
+                if (!validation.isValid) {
+                    console.error("🔍 DEBUG: Inspection validation failed:", validation.errors);
+                    setInspectionData(null);
+                    return;
+                }
+                
+                console.log("🔍 DEBUG: Inspection display number:", getDisplayNumber(data));
                 setInspectionData(data);
             } else {
                 console.error("🔍 DEBUG: No inspection data found for ID:", id);

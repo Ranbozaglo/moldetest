@@ -16,6 +16,7 @@ import { ArrowLeft, CheckCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { getDisplayNumber, validateInspection, getNextInspectionNumber } from "@/utils/inspectionUtils";
 
 import PersonalInfoStep from "../components/inspection/PersonalInfoStep";
 import PropertyInfoStep from "../components/inspection/PropertyInfoStep";
@@ -167,14 +168,9 @@ export default function Inspection() {
       
       // Fetch the latest inspection to determine the next inspection number
       const latestInspections = await MoldInspection.list('-inspection_number', 1); // Fetches one item sorted by inspection_number descending
-      let nextInspectionNumber = 100; // Start from 100 if no inspections exist
+      const nextInspectionNumber = getNextInspectionNumber(latestInspections);
       
-      if (latestInspections && latestInspections.length > 0) {
-          const latestNumber = latestInspections[0].inspection_number;
-          if (latestNumber && latestNumber >= 100) {
-             nextInspectionNumber = latestNumber + 1;
-          }
-      }
+      console.log("🔍 DEBUG: Next inspection number will be:", nextInspectionNumber);
 
       // Forcefully get the logged-in user's email to ensure it's correct
       console.log("🔍 DEBUG: Current user from AuthContext:", currentUser);
@@ -190,7 +186,8 @@ export default function Inspection() {
         ...formData,
         email: currentUser.email, // This guarantees the correct email is saved
         square_footage: parseFloat(formData.square_footage),
-        inspection_number: nextInspectionNumber,
+        // Don't manually assign inspection_number - let the database trigger handle it
+        // inspection_number: nextInspectionNumber,
         client_status_detail: "Inspection submitted - awaiting sample collection"
       };
 
@@ -207,13 +204,41 @@ export default function Inspection() {
       const newInspection = await MoldInspection.create(submissionData);
       console.log("🔍 DEBUG: Created inspection object:", newInspection);
       console.log("🔍 DEBUG: Inspection ID:", newInspection?.id);
+      console.log("🔍 DEBUG: Inspection number:", newInspection?.inspection_number);
       console.log("🔍 DEBUG: Inspection type:", typeof newInspection);
       console.log("🔍 DEBUG: Inspection keys:", newInspection ? Object.keys(newInspection) : 'null');
       
+      // Validate the created inspection
+      const validation = validateInspection(newInspection);
+      if (!validation.isValid) {
+        console.error("🔍 DEBUG: Inspection validation failed:", validation.errors);
+        throw new Error(`Inspection validation failed: ${validation.errors.join(', ')}`);
+      }
+      
       if (newInspection && newInspection.id) {
-          console.log(`🔍 DEBUG: Successfully created inspection #${nextInspectionNumber} with ID:`, newInspection.id);
-          // Store the new inspection result
-          setNewInspection(newInspection);
+          console.log(`🔍 DEBUG: Successfully created inspection with ID:`, newInspection.id);
+          console.log(`🔍 DEBUG: Inspection number assigned:`, newInspection.inspection_number);
+          console.log(`🔍 DEBUG: Display number:`, getDisplayNumber(newInspection));
+          
+          // If the trigger didn't assign an inspection_number, update it manually
+          if (!newInspection.inspection_number) {
+              console.log("🔍 DEBUG: No inspection_number assigned by trigger, updating manually...");
+              try {
+                  const updatedInspection = await MoldInspection.update(newInspection.id, {
+                      inspection_number: nextInspectionNumber
+                  });
+                  console.log("🔍 DEBUG: Updated inspection with number:", updatedInspection);
+                  setNewInspection(updatedInspection);
+              } catch (updateError) {
+                  console.error("🔍 DEBUG: Failed to update inspection number:", updateError);
+                  // Continue with the original inspection object
+                  setNewInspection(newInspection);
+              }
+          } else {
+              // Store the new inspection result
+              setNewInspection(newInspection);
+          }
+          
           console.log("🔍 DEBUG: Set newInspection state to:", newInspection);
           // Move to the next step (step 7) instead of navigating directly
           setCurrentStep(7);
