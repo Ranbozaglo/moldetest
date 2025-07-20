@@ -29,7 +29,6 @@ import {
   Trash2
 } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
-import { UploadFile } from "@/api/integrations";
 
 export default function InspectionDetails() {
   const location = useLocation();
