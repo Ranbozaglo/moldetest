@@ -90,54 +90,76 @@ export default function InspectionDetails() {
   };
 
   const handleLabImageUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (JPEG, PNG, GIF, etc.)');
-      return;
-    }
-
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert('File size must be less than 10MB');
-      return;
-    }
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     setUploadingImage(true);
     try {
-      console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
+      console.log("🔍 DEBUG: Uploading lab images:", files.length, "files");
       
-      // Use the new upload service
-      const uploadResult = await LLMService.uploadFile(file);
-      console.log("🔍 DEBUG: Upload result:", uploadResult);
+      const uploadedUrls = [];
       
-      const file_url = uploadResult.file_url || uploadResult.url;
-      
-      if (!file_url) {
-        throw new Error('Upload failed: No file URL returned');
+      // Upload each file to Supabase Storage
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          alert(`File "${file.name}" is not an image. Please select image files only.`);
+          continue;
+        }
+
+        // Validate file size (max 10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+          alert(`File "${file.name}" is too large. Maximum size is 10MB.`);
+          continue;
+        }
+
+        console.log("🔍 DEBUG: Uploading lab image:", file.name, file.size, file.type);
+        
+        // Use the new upload service
+        const uploadResult = await LLMService.uploadFile(file);
+        console.log("🔍 DEBUG: Upload result:", uploadResult);
+        
+        const file_url = uploadResult.file_url || uploadResult.url;
+        
+        if (!file_url) {
+          throw new Error(`Upload failed for ${file.name}: No file URL returned`);
+        }
+        
+        uploadedUrls.push(file_url);
+        console.log("🔍 DEBUG: Lab image URL saved:", file_url);
       }
       
-      // Update inspection with lab image URL
+      if (uploadedUrls.length === 0) {
+        throw new Error('No valid images were uploaded');
+      }
+      
+      // Get current lab_analysis_images array or create new one
+      const currentImages = inspection.lab_analysis_images || [];
+      const updatedImages = [...currentImages, ...uploadedUrls];
+      
+      // Update inspection with new lab analysis image URLs
       await MoldInspection.update(inspection.id, {
-        lab_analysis_image_url: file_url
+        lab_analysis_images: updatedImages
       });
 
-      console.log("🔍 DEBUG: Lab image URL saved:", file_url);
+      console.log("🔍 DEBUG: Lab analysis images updated:", updatedImages);
 
-      // Generate conclusions and recommendations based on the lab image
-      await generateAnalysisFromImage(file_url);
+      // Generate conclusions and recommendations based on the first uploaded image
+      if (uploadedUrls.length > 0) {
+        await generateAnalysisFromImage(uploadedUrls[0]);
+      }
       
       // Reload inspection data
       await loadInspectionData();
       
-      alert('Lab analysis image uploaded successfully!');
+      alert(`Successfully uploaded ${uploadedUrls.length} lab analysis image(s)!`);
       
     } catch (error) {
-      console.error("❌ Error uploading lab image:", error);
-      alert(`Failed to upload lab analysis image: ${error.message}`);
+      console.error("❌ Error uploading lab images:", error);
+      alert(`Failed to upload lab analysis images: ${error.message}`);
     } finally {
       setUploadingImage(false);
       // Clear the file input
@@ -466,11 +488,12 @@ Return your response in this exact JSON format:
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!inspection.lab_analysis_image_url ? (
+              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleLabImageUpload}
                     className="hidden"
                     id="lab-analysis-upload"
@@ -482,17 +505,17 @@ Return your response in this exact JSON format:
                         <>
                           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                           <p className="text-blue-600 font-medium text-lg">Uploading...</p>
-                          <p className="text-slate-500 text-sm mt-2">Please wait while we process your image</p>
+                          <p className="text-slate-500 text-sm mt-2">Please wait while we process your images</p>
                         </>
                       ) : (
                         <>
                           <Upload className="w-12 h-12 text-slate-400 mb-4" />
-                          <p className="text-slate-600 font-medium text-lg">Upload Lab Analysis Image</p>
+                          <p className="text-slate-600 font-medium text-lg">Upload Lab Analysis Images</p>
                           <p className="text-slate-500 text-sm mt-2">
-                            Click to select an image of the lab analysis results
+                            Click to select one or more images of the lab analysis results
                           </p>
                           <p className="text-slate-400 text-xs mt-2">
-                            Supports: JPEG, PNG, GIF • Max size: 10MB
+                            Supports: JPEG, PNG, GIF • Max size: 10MB per image
                           </p>
                         </>
                       )}
@@ -502,25 +525,51 @@ Return your response in this exact JSON format:
               ) : (
                 <div className="space-y-4">
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <Label className="text-slate-600 font-medium">Lab Analysis Image</Label>
-                    <div className="mt-3 relative group">
-                      <img
-                        src={inspection.lab_analysis_image_url}
-                        alt="Lab Analysis Results"
-                        className="w-full max-w-full h-auto rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
-                        onClick={() => {
-                          // Open image in new tab for full view
-                          window.open(inspection.lab_analysis_image_url, '_blank');
-                        }}
-                        title="Click to view full size"
-                      />
-                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          <div className="bg-white bg-opacity-90 rounded-full p-2">
-                            <Camera className="w-5 h-5 text-slate-700" />
+                    <Label className="text-slate-600 font-medium">
+                      Lab Analysis Images ({inspection.lab_analysis_images.length})
+                    </Label>
+                    
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {inspection.lab_analysis_images.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={imageUrl}
+                            alt={`Lab Analysis Results ${index + 1}`}
+                            className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                            onClick={() => {
+                              // Open image in new tab for full view
+                              window.open(imageUrl, '_blank');
+                            }}
+                            title="Click to view full size"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                              <div className="bg-white bg-opacity-90 rounded-full p-2">
+                                <Camera className="w-5 h-5 text-slate-700" />
+                              </div>
+                            </div>
                           </div>
+                          
+                          {/* Remove button for individual image */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to remove lab analysis image ${index + 1}?`)) {
+                                const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
+                                MoldInspection.update(inspection.id, {
+                                  lab_analysis_images: updatedImages
+                                }).then(() => {
+                                  loadInspectionData();
+                                });
+                              }
+                            }}
+                            className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
-                      </div>
+                      ))}
                     </div>
                     
                     <div className="flex gap-2 mt-3">
@@ -532,16 +581,16 @@ Return your response in this exact JSON format:
                         className="flex items-center gap-2"
                       >
                         <Upload className="w-4 h-4" />
-                        Replace Image
+                        Add More Images
                       </Button>
                       
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          if (confirm('Are you sure you want to remove this lab analysis image?')) {
+                          if (confirm('Are you sure you want to remove all lab analysis images?')) {
                             MoldInspection.update(inspection.id, {
-                              lab_analysis_image_url: null
+                              lab_analysis_images: []
                             }).then(() => {
                               loadInspectionData();
                             });
@@ -550,7 +599,7 @@ Return your response in this exact JSON format:
                         className="flex items-center gap-2 text-red-600 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
-                        Remove
+                        Remove All
                       </Button>
                     </div>
                   </div>
@@ -558,6 +607,7 @@ Return your response in this exact JSON format:
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     onChange={handleLabImageUpload}
                     className="hidden"
                     id="lab-analysis-upload"
@@ -580,14 +630,16 @@ Return your response in this exact JSON format:
                 </div>
               )}
 
-              {inspection.lab_analysis_image_url && !generatingAnalysis && (
+              {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && !generatingAnalysis && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-green-800 font-medium">Lab analysis uploaded successfully</span>
+                    <span className="text-green-800 font-medium">
+                      {inspection.lab_analysis_images.length} lab analysis image(s) uploaded successfully
+                    </span>
                   </div>
                   <p className="text-green-700 text-sm mt-1">
-                    The image has been processed and is ready for analysis.
+                    The images have been processed and are ready for analysis.
                   </p>
                 </div>
               )}

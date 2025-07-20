@@ -1,0 +1,149 @@
+import { createClient } from '@supabase/supabase-js';
+import { getEnvironmentConfig } from '@/config/environment.js';
+
+const config = getEnvironmentConfig();
+
+export const supabase = createClient(
+  config.SUPABASE_URL,
+  config.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true
+    }
+  }
+);
+
+// Helper function to get the current user's session
+export const getCurrentSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('Error getting session:', error);
+      return null;
+    }
+    return session;
+  } catch (error) {
+    console.error('Error getting session:', error);
+    return null;
+  }
+};
+
+// Helper function to get the current user
+export const getCurrentUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error('Error getting user:', error);
+      return null;
+    }
+    return user;
+  } catch (error) {
+    console.error('Error getting user:', error);
+    return null;
+  }
+};
+
+// Helper function to upload file to Supabase Storage
+export const uploadToSupabaseStorage = async (file, bucketName, folder = '') => {
+  try {
+    const session = await getCurrentSession();
+    if (!session) {
+      throw new Error('No active session found');
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `${folder}/${timestamp}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
+
+    console.log('🔍 DEBUG: Uploading to Supabase Storage:', {
+      bucket: bucketName,
+      fileName: fileName,
+      fileSize: file.size,
+      fileType: file.type
+    });
+
+    // Upload file to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('❌ Supabase upload error:', error);
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+
+    console.log('✅ Supabase upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+    console.log('🔍 DEBUG: Public URL:', publicUrl);
+
+    return {
+      url: publicUrl,
+      path: fileName,
+      bucket: bucketName,
+      size: file.size,
+      type: file.type
+    };
+
+  } catch (error) {
+    console.error('❌ Error uploading to Supabase Storage:', error);
+    throw error;
+  }
+};
+
+// Helper function to delete file from Supabase Storage
+export const deleteFromSupabaseStorage = async (filePath, bucketName) => {
+  try {
+    console.log('🔍 DEBUG: Deleting from Supabase Storage:', {
+      bucket: bucketName,
+      filePath: filePath
+    });
+
+    const { error } = await supabase.storage
+      .from(bucketName)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('❌ Supabase delete error:', error);
+      throw new Error(`Delete failed: ${error.message}`);
+    }
+
+    console.log('✅ Supabase delete successful');
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error deleting from Supabase Storage:', error);
+    throw error;
+  }
+};
+
+// Helper function to list files in a bucket
+export const listSupabaseStorageFiles = async (bucketName, folder = '') => {
+  try {
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .list(folder);
+
+    if (error) {
+      console.error('❌ Supabase list error:', error);
+      throw new Error(`List failed: ${error.message}`);
+    }
+
+    return data;
+
+  } catch (error) {
+    console.error('❌ Error listing Supabase Storage files:', error);
+    throw error;
+  }
+}; 

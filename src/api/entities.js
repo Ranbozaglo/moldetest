@@ -335,19 +335,33 @@ export const LLMService = {
   },
   
   uploadFile: async (file) => {
-    const token = getAuthToken();
-    const formData = new FormData();
-    formData.append('file', file);
+    // Import the Supabase upload function
+    const { uploadToSupabaseStorage } = await import('@/lib/supabase.js');
     
-    const response = await apiCall('/upload/file', {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : ''
-        // Note: Don't set Content-Type for FormData, let the browser set it
-      },
-      body: formData
-    });
-    return response;
+    try {
+      console.log("🔍 DEBUG: LLMService.uploadFile called with:", {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      });
+      
+      // Upload to Supabase Storage bucket 'lab-analysis'
+      const result = await uploadToSupabaseStorage(file, 'lab-analysis', 'lab-analysis-images');
+      
+      console.log("🔍 DEBUG: LLMService.uploadFile result:", result);
+      
+      return {
+        file_url: result.url,
+        file_path: result.path,
+        bucket: result.bucket,
+        size: result.size,
+        type: result.type
+      };
+      
+    } catch (error) {
+      console.error("❌ LLMService.uploadFile error:", error);
+      throw error;
+    }
   }
 };
 
