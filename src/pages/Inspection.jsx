@@ -188,7 +188,8 @@ export default function Inspection() {
         square_footage: parseFloat(formData.square_footage),
         // Don't manually assign inspection_number - let the database trigger handle it
         // inspection_number: nextInspectionNumber,
-        client_status_detail: "Inspection submitted - awaiting sample collection"
+        client_status_detail: "Inspection submitted - awaiting sample collection",
+        created_date: new Date().toISOString() // Add the current date
       };
 
       console.log("🔍 DEBUG: Final submission data:", submissionData);

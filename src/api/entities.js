@@ -140,6 +140,13 @@ export const MoldInspection = {
       id = idOrFilters.id;
     }
     
+    console.log("🔍 DEBUG: MoldInspection.update called with:", {
+      idOrFilters,
+      id,
+      data,
+      token: token ? "present" : "missing"
+    });
+    
     const response = await apiCall(`/inspection/${id}`, {
       method: 'PUT',
       headers: {
@@ -148,6 +155,8 @@ export const MoldInspection = {
       },
       body: JSON.stringify(data)
     });
+    
+    console.log("🔍 DEBUG: MoldInspection.update response:", response);
     return response;
   },
   

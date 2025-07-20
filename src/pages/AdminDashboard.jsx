@@ -600,23 +600,51 @@ export default function AdminDashboard() {
   const updateInspectionStatus = async (inspectionId, newStatus) => {
     try {
       console.log(`🔍 DEBUG: Updating inspection ${inspectionId} status to ${newStatus}`);
+      console.log(`🔍 DEBUG: Inspection ID type:`, typeof inspectionId);
+      console.log(`🔍 DEBUG: New status type:`, typeof newStatus);
       
-      const updatedInspection = await MoldInspection.update(inspectionId, { status: newStatus });
+      // Validate inputs
+      if (!inspectionId) {
+        throw new Error("Inspection ID is required");
+      }
+      
+      if (!newStatus) {
+        throw new Error("New status is required");
+      }
+      
+      // Convert to string if needed
+      const inspectionIdStr = String(inspectionId);
+      const statusStr = String(newStatus);
+      
+      console.log(`🔍 DEBUG: Using inspection ID:`, inspectionIdStr);
+      console.log(`🔍 DEBUG: Using status:`, statusStr);
+      
+      const updatedInspection = await MoldInspection.update(inspectionIdStr, { 
+        status: statusStr,
+        updated_date: new Date().toISOString() // Add update timestamp
+      });
+      
       console.log("🔍 DEBUG: Status updated successfully:", updatedInspection);
       
       // Update the local state
       setInspections(prevInspections => 
         prevInspections.map(inspection => 
-          inspection.id === inspectionId 
-            ? { ...inspection, status: newStatus }
+          inspection.id === inspectionId || inspection.id === inspectionIdStr
+            ? { ...inspection, status: statusStr }
             : inspection
         )
       );
       
-      alert(`Status updated to ${newStatus}`);
+      alert(`Status updated to ${statusStr}`);
     } catch (error) {
-      console.error("Error updating inspection status:", error);
-      alert("Failed to update status. Please try again.");
+      console.error("❌ Error updating inspection status:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        stack: error.stack,
+        inspectionId,
+        newStatus
+      });
+      alert(`Failed to update status: ${error.message}`);
     }
   };
 
@@ -1079,7 +1107,16 @@ export default function AdminDashboard() {
                                   {getAvailableStatuses(inspection.status).map((status) => (
                                     <DropdownMenuItem 
                                       key={status}
-                                      onClick={() => updateInspectionStatus(inspection.id, status)}
+                                      onClick={() => {
+                                        console.log("🔍 DEBUG: Status update clicked:", {
+                                          inspectionId: inspection.id,
+                                          inspectionIdType: typeof inspection.id,
+                                          currentStatus: inspection.status,
+                                          newStatus: status,
+                                          inspection: inspection
+                                        });
+                                        updateInspectionStatus(inspection.id, status);
+                                      }}
                                       className="flex items-center gap-2"
                                     >
                                       {React.createElement(getStatusDisplay(status).icon, { className: "w-4 h-4" })}
