@@ -118,32 +118,64 @@ export default function MyInspections() {
       const css = `
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
           .page-break { page-break-after: always; }
-          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 40px; }
-          .cover-title { font-size: 48px; font-weight: bold; color: #004aac; margin-bottom: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-          .cover-image { max-width: 450px; height: auto; border-radius: 15px; margin: 40px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
-          .cover-details { background: rgba(255,255,255,0.9); padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 500px; }
-          .cover-detail-item { margin: 15px 0; font-size: 18px; }
+          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; }
+          .cover-title { font-size: 28px; font-weight: bold; color: #004aac; margin-bottom: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+          .cover-image { max-width: 100%; height: auto; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
+          .cover-details { background: rgba(255,255,255,0.9); padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 100%; }
+          .cover-detail-item { margin: 10px 0; font-size: 16px; }
           .cover-detail-label { font-weight: bold; color: #004aac; }
-          .report-container { max-width: 800px; margin: 0 auto; background-color: #fff; padding: 40px; }
-          .section { margin-bottom: 35px; }
-          .section h2 { font-size: 22px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
-          .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 25px; margin: 30px 0; }
-          .disclaimer-title { color: #004aac; font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; }
+          .section { margin-bottom: 25px; }
+          .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
+          .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
+          .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
           .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; }
-          .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 25px; margin: 20px 0; }
-          .limitations-title { color: #004aac; font-size: 20px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
+          .limitations-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
           .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; }
-          .client-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+          .client-info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin: 20px 0; }
           .client-info-item { padding: 10px; background: #f8f9fa; border-radius: 5px; }
           .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
           .client-info-value { margin-top: 5px; font-size: 16px; }
-          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
-          img { max-width: 250px; height: auto; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
+          .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
+          img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
+          
+          /* Mobile-specific improvements */
+          @media (max-width: 768px) {
+              .cover-title { font-size: 24px; }
+              .cover-details { padding: 15px; }
+              .cover-detail-item { font-size: 14px; }
+              .report-container { padding: 15px; }
+              .section h2 { font-size: 18px; }
+              .disclaimer-box, .limitations-section { padding: 15px; }
+              .disclaimer-title, .limitations-title { font-size: 16px; }
+              .disclaimer-text, .limitations-text { font-size: 13px; }
+              .client-info-item { padding: 8px; }
+              .client-info-label { font-size: 13px; }
+              .client-info-value { font-size: 14px; }
+          }
+          
+          @media (min-width: 769px) {
+              .cover-title { font-size: 48px; }
+              .cover-page { padding: 40px; }
+              .cover-image { max-width: 450px; }
+              .cover-details { padding: 30px; max-width: 500px; }
+              .cover-detail-item { font-size: 18px; }
+              .report-container { max-width: 800px; padding: 40px; }
+              .section h2 { font-size: 22px; }
+              .disclaimer-box, .limitations-section { padding: 25px; }
+              .disclaimer-title, .limitations-title { font-size: 20px; }
+              .disclaimer-text, .limitations-text { font-size: 14px; }
+              .client-info-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
+              .client-info-item { padding: 10px; }
+              .client-info-label { font-size: 14px; }
+              .client-info-value { font-size: 16px; }
+          }
       `;
 
       const createImageList = (images) => {
           if (!images || images.length === 0) return '<p>No photos provided.</p>';
-          return images.map(img => `<img src="${img}" alt="Evidence" style="width: 150px; height: 150px; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
+          return images.map(img => `<img src="${img}" alt="Evidence" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
       };
 
       const createPriorityBadge = (priority, text) => {
@@ -356,6 +388,7 @@ export default function MyInspections() {
       <html>
       <head>
           <title>Mold Inspection Report</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>${css}</style>
       </head>
       <body>
