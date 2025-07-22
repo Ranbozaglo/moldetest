@@ -40,6 +40,7 @@ class InspectionBase(BaseModel):
     lab_analysis_images: Optional[List[str]] = None
     conclusion: Optional[str] = None
     recommendations: Optional[str] = None
+    created_by: Optional[str] = None
 
 class InspectionCreate(InspectionBase):
     pass

@@ -95,7 +95,8 @@ export const MoldInspection = {
         water_damage_locations: data.water_damage_locations,
         status: data.status || 'pending',
         email: data.email,
-        is_sample: data.is_sample || false
+        is_sample: data.is_sample || false,
+        created_by: data.created_by // Pass created_by if present
       })
     });
     

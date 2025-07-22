@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
 import { User } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from '@/lib/supabase';
 
 // Debug: Check if MoldInspection is properly imported
 console.log("🔍 DEBUG: MoldInspection import check:", {
@@ -201,6 +202,13 @@ export default function Inspection() {
       if (formData.humidity !== "") {
         submissionData.humidity = parseFloat(formData.humidity);
       }
+
+      // Get Supabase session for created_by
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user || !session.user.email) {
+        throw new Error('Could not get Supabase session or user email.');
+      }
+      submissionData.created_by = session.user.email;
 
       const newInspection = await MoldInspection.create(submissionData);
       console.log("🔍 DEBUG: Created inspection object:", newInspection);

@@ -55,6 +55,7 @@ class Inspection(Base):
     lab_analysis_images = Column(Text)  # JSON array of image URLs
     conclusion = Column(Text)  # Lab analysis conclusion
     recommendations = Column(Text)  # Lab analysis recommendations
+    created_by = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

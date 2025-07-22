@@ -23,6 +23,8 @@ async def create_inspection(
         latest_inspection = db.query(DBInspection).order_by(DBInspection.inspection_number.desc()).first()
         next_number = 1001 if not latest_inspection else latest_inspection.inspection_number + 1
         
+        # Debug log for created_by
+        print(f"🔍 DEBUG: Received created_by: {getattr(inspection, 'created_by', None)}")
         # Create inspection
         db_inspection = DBInspection(
             inspection_number=next_number,
@@ -42,7 +44,8 @@ async def create_inspection(
             water_damage_details=json.dumps(inspection.water_damage_details) if inspection.water_damage_details else None,
             temperature=inspection.temperature,
             humidity=inspection.humidity,
-            client_status_detail=inspection.client_status_detail or "Inspection submitted - awaiting sample collection"
+            client_status_detail=inspection.client_status_detail or "Inspection submitted - awaiting sample collection",
+            created_by=getattr(inspection, 'created_by', None)
         )
         
         db.add(db_inspection)
