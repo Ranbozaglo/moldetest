@@ -193,8 +193,6 @@ export default function Inspection() {
         created_date: new Date().toISOString() // Add the current date
       };
 
-      console.log("🔍 DEBUG: Final submission data:", submissionData);
-
       // Convert temperature and humidity to numbers if they exist
       if (formData.temperature !== "") {
         submissionData.temperature = parseFloat(formData.temperature);
@@ -209,6 +207,9 @@ export default function Inspection() {
         throw new Error('Could not get Supabase session or user email.');
       }
       submissionData.created_by = session.user.email;
+
+      // Now log the true final data
+      console.log("🔍 DEBUG: Final submission data:", submissionData);
 
       const newInspection = await MoldInspection.create(submissionData);
       console.log("🔍 DEBUG: Created inspection object:", newInspection);
