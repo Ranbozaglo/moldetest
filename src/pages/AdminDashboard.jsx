@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
@@ -23,6 +22,7 @@ import {
   CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -43,31 +43,40 @@ export default function AdminDashboard() {
   const { user: authUser } = useAuth();
 
   useEffect(() => {
-    const checkUser = async () => {
+    (async () => {
       try {
-        // Use the authenticated user from AuthContext instead of calling User.me()
-        if (!authUser) {
-          navigate(createPageUrl("Welcome"));
-          return;
-        }
-        
-        // Check if user is admin
-        if (authUser.role !== 'admin' && !authUser.is_admin) {
-          navigate(createPageUrl("Welcome"));
-          return;
-        }
-        
-        setUser(authUser);
-        loadInspections();
-      } catch (error) {
-        console.error("Error checking user:", error);
-        navigate(createPageUrl("Welcome"));
-      } finally {
+        await requireSupabaseSession('/sign-in');
+        checkUser();
+      } catch (err) {
+        console.error('🔍 DEBUG: Auth check failed:', err);
         setLoading(false);
       }
-    };
-    checkUser();
-  }, [navigate, authUser]);
+    })();
+  }, [authUser]);
+
+  const checkUser = async () => {
+    try {
+      // Use the authenticated user from AuthContext instead of calling User.me()
+      if (!authUser) {
+        navigate(createPageUrl("Welcome"));
+        return;
+      }
+      
+      // Check if user is admin
+      if (authUser.role !== 'admin' && !authUser.is_admin) {
+        navigate(createPageUrl("Welcome"));
+        return;
+      }
+      
+      setUser(authUser);
+      loadInspections();
+    } catch (error) {
+      console.error("Error checking user:", error);
+      navigate(createPageUrl("Welcome"));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadInspections = async () => {
     try {

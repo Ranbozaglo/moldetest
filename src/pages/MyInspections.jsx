@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from '@/contexts/AuthContext';
+import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
 
 export default function MyInspections() {
   const [inspections, setInspections] = useState([]);
@@ -34,58 +35,67 @@ export default function MyInspections() {
   const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    (async () => {
       try {
-        setUser(currentUser);
-        
-        // Redirect admin users to AdminDashboard
-        if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
-          console.log("🔍 DEBUG: Admin user detected, redirecting to AdminDashboard");
-          navigate(createPageUrl("AdminDashboard"));
-          return;
-        }
-        
-        if (currentUser && currentUser.email) {
-          console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
-          
-          // Try multiple approaches to find inspections
+        await requireSupabaseSession('/sign-in');
+        const fetchUserData = async () => {
           try {
-            // First, try the filter method
-            const userInspections = await MoldInspection.filter({ email: currentUser.email }, "-created_date");
-            console.log("🔍 DEBUG: Found inspections with filter:", userInspections);
+            setUser(currentUser);
             
-            if (userInspections && userInspections.length > 0) {
-              setInspections(userInspections);
-            } else {
-              // Fallback: Get all inspections and filter manually
-              console.log("🔍 DEBUG: No inspections found with filter, trying manual search...");
-              const allInspections = await MoldInspection.list("-created_date", 100);
-              console.log("🔍 DEBUG: All inspections:", allInspections);
-              
-              const matchingInspections = allInspections.filter(inspection => 
-                inspection.email && inspection.email.toLowerCase() === currentUser.email.toLowerCase()
-              );
-              console.log("🔍 DEBUG: Matching inspections after manual filter:", matchingInspections);
-              setInspections(matchingInspections);
+            // Redirect admin users to AdminDashboard
+            if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
+              console.log("🔍 DEBUG: Admin user detected, redirecting to AdminDashboard");
+              navigate(createPageUrl("AdminDashboard"));
+              return;
             }
-          } catch (inspectionError) {
-            console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
-            setError("Failed to load inspections. Please try refreshing the page.");
+            
+            if (currentUser && currentUser.email) {
+              console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
+              
+              // Try multiple approaches to find inspections
+              try {
+                // First, try the filter method
+                const userInspections = await MoldInspection.filter({ email: currentUser.email }, "-created_date");
+                console.log("🔍 DEBUG: Found inspections with filter:", userInspections);
+                
+                if (userInspections && userInspections.length > 0) {
+                  setInspections(userInspections);
+                } else {
+                  // Fallback: Get all inspections and filter manually
+                  console.log("🔍 DEBUG: No inspections found with filter, trying manual search...");
+                  const allInspections = await MoldInspection.list("-created_date", 100);
+                  console.log("🔍 DEBUG: All inspections:", allInspections);
+                  
+                  const matchingInspections = allInspections.filter(inspection => 
+                    inspection.email && inspection.email.toLowerCase() === currentUser.email.toLowerCase()
+                  );
+                  console.log("🔍 DEBUG: Matching inspections after manual filter:", matchingInspections);
+                  setInspections(matchingInspections);
+                }
+              } catch (inspectionError) {
+                console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
+                setError("Failed to load inspections. Please try refreshing the page.");
+              }
+            } else {
+              console.log("🔍 DEBUG: No current user email found, redirecting to Welcome");
+              navigate(createPageUrl("Welcome"));
+            }
+          } catch (err) {
+            console.error("🔍 DEBUG: Error loading user:", err);
+            setError("Failed to load user information. Please try logging in again.");
+            navigate(createPageUrl("Welcome"));
+          } finally {
+            setLoading(false);
           }
-        } else {
-          console.log("🔍 DEBUG: No current user email found, redirecting to Welcome");
-          navigate(createPageUrl("Welcome"));
-        }
+        };
+
+        fetchUserData();
       } catch (err) {
-        console.error("🔍 DEBUG: Error loading user:", err);
-        setError("Failed to load user information. Please try logging in again.");
-        navigate(createPageUrl("Welcome"));
-      } finally {
+        console.error('🔍 DEBUG: Auth check failed:', err);
+        setError('You must be logged in to view this page.');
         setLoading(false);
       }
-    };
-
-    fetchUserData();
+    })();
   }, [navigate, currentUser]);
 
   const getDisplayNumber = (inspection) => {

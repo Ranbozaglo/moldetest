@@ -15,6 +15,7 @@ import { getUrlParam } from "@/utils/urlUtils";
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from "date-fns";
 import { Core } from "@/api/integrations";
+import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -34,31 +35,40 @@ export default function InspectionDetails() {
   const { user: currentUser } = useAuth();
 
   useEffect(() => {
-    const checkUserAndLoadData = async () => {
+    (async () => {
       try {
-        if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
-          setError("Access denied. Admin privileges required.");
-          return;
+        await requireSupabaseSession('/sign-in');
+        const checkUserAndLoadData = async () => {
+          try {
+            if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
+              setError("Access denied. Admin privileges required.");
+              return;
+            }
+            await loadInspectionData();
+          } catch (error) {
+            setError("Failed to verify admin access.");
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        console.log("🔍 DEBUG: URL search params:", location.search);
+        console.log("🔍 DEBUG: Inspection ID from params:", inspectionId);
+
+        if (inspectionId) {
+          checkUserAndLoadData();
+        } else {
+          console.error("No inspection ID found in URL parameters");
+          console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
+          setError("No inspection ID provided");
+          setLoading(false);
         }
-        await loadInspectionData();
-      } catch (error) {
-        setError("Failed to verify admin access.");
-      } finally {
+      } catch (err) {
+        console.error("🔍 DEBUG: Auth check failed:", err);
+        setError('You must be logged in to view this page.');
         setLoading(false);
       }
-    };
-
-    console.log("🔍 DEBUG: URL search params:", location.search);
-    console.log("🔍 DEBUG: Inspection ID from params:", inspectionId);
-
-    if (inspectionId) {
-      checkUserAndLoadData();
-    } else {
-      console.error("No inspection ID found in URL parameters");
-      console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
-      setError("No inspection ID provided");
-      setLoading(false);
-    }
+    })();
   }, [inspectionId, currentUser]);
 
   // Reload data when component mounts or inspectionId changes
@@ -105,6 +115,13 @@ export default function InspectionDetails() {
   };
 
   const handleLabImageUpload = async (event) => {
+    try {
+      await requireSupabaseSession('/sign-in');
+    } catch (err) {
+      alert('You must be logged in to upload files.');
+      return;
+    }
+
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
