@@ -16,39 +16,58 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔍 PROD DEBUG: AuthProvider initializing...');
+    
     // Check for existing user session in localStorage
     const savedUser = localStorage.getItem('mth_user');
+    console.log('🔍 PROD DEBUG: Saved user from localStorage:', savedUser ? 'exists' : 'not found');
+    
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
+        console.log('🔍 PROD DEBUG: Parsed user data:', userData);
         
         // Update admin role for specific emails if needed
         const adminEmails = ['rotemiluz53@gmail.com'];
         if (adminEmails.includes(userData.email) && userData.role !== 'admin') {
+          console.log('🔍 PROD DEBUG: Updating admin role for:', userData.email);
           userData.role = 'admin';
+          userData.is_admin = true;
           localStorage.setItem('mth_user', JSON.stringify(userData));
         }
         
+        console.log('🔍 PROD DEBUG: Setting user state:', userData);
         setUser(userData);
       } catch (error) {
-        console.error('Error parsing saved user:', error);
+        console.error('🔍 PROD DEBUG: Error parsing saved user:', error);
         localStorage.removeItem('mth_user');
       }
     }
+    
+    console.log('🔍 PROD DEBUG: AuthProvider loading complete, setting loading to false');
     setLoading(false);
   }, []);
 
   const signIn = async (email, password) => {
     try {
-      console.log('🔍 DEBUG: AuthContext signIn called with:', { email });
+      const isProduction = window.location.hostname !== 'localhost';
+      const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
+      
+      console.log(`${logPrefix} AuthContext signIn called with:`, { 
+        email, 
+        environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT',
+        hostname: window.location.hostname,
+        currentUrl: window.location.href
+      });
       
       // Call backend API for authentication
       const response = await User.login(email, password);
-      console.log('🔍 DEBUG: Backend login response:', response);
+      console.log(`${logPrefix} Backend login response:`, response);
       
       // Ensure we have the required response structure
       if (!response || !response.user || !response.access_token) {
-        throw new Error('Invalid response from server');
+        console.error(`${logPrefix} Invalid server response:`, response);
+        throw new Error(`Invalid response from server - missing ${!response ? 'response' : !response.user ? 'user' : 'access_token'}`);
       }
       
       // Create user object with token from Flask backend
@@ -69,16 +88,20 @@ export const AuthProvider = ({ children }) => {
         createdAt: new Date().toISOString()
       };
       
-      console.log('🔍 DEBUG: Created user object:', user);
+      console.log(`${logPrefix} Created user object:`, user);
       
       setUser(user);
       localStorage.setItem('mth_user', JSON.stringify(user));
       
-      console.log('🔍 DEBUG: User state updated and saved to localStorage');
+      console.log(`${logPrefix} User state updated and saved to localStorage`);
       
       return { success: true, user: user };
     } catch (error) {
-      console.error('🔍 DEBUG: Sign in error:', error);
+      console.error(`${logPrefix} Sign in error:`, {
+        message: error.message,
+        stack: error.stack,
+        environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
+      });
       return { success: false, error: error.message || 'Sign in failed' };
     }
   };
@@ -108,8 +131,21 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = () => {
+    console.log('🔍 PROD DEBUG: signOut called - clearing user state and localStorage');
     setUser(null);
     localStorage.removeItem('mth_user');
+  };
+
+  // Debug helper function
+  const debugAuthState = () => {
+    const savedUser = localStorage.getItem('mth_user');
+    console.log('🔍 PROD DEBUG: === AUTH STATE DEBUG ===');
+    console.log('🔍 PROD DEBUG: React state user:', user);
+    console.log('🔍 PROD DEBUG: Loading state:', loading);
+    console.log('🔍 PROD DEBUG: localStorage mth_user:', savedUser);
+    console.log('🔍 PROD DEBUG: Current URL:', window.location.href);
+    console.log('🔍 PROD DEBUG: ========================');
+    return { user, loading, savedUser, currentUrl: window.location.href };
   };
 
   const value = {
@@ -117,8 +153,12 @@ export const AuthProvider = ({ children }) => {
     loading,
     signIn,
     signUp,
-    signOut
+    signOut,
+    debugAuthState
   };
+
+  // Debug log when auth state changes
+  console.log('🔍 PROD DEBUG: AuthContext value update - user:', user ? `${user.email} (${user.role})` : 'null', 'loading:', loading);
 
   return (
     <AuthContext.Provider value={value}>

@@ -40,21 +40,27 @@ export default function SignIn() {
         
         // Redirect based on user role with direct paths
         if (result.user.is_admin || result.user.role === 'admin') {
-          console.log('🔍 DEBUG: Redirecting admin user to AdminDashboard');
+          console.log('🔍 PROD DEBUG: SignIn - Redirecting admin user to AdminDashboard');
+          console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
           try {
             navigate('/AdminDashboard', { replace: true });
+            console.log('🔍 PROD DEBUG: SignIn - Navigate to AdminDashboard called successfully');
           } catch (navError) {
-            console.error('🔍 DEBUG: Navigation error to AdminDashboard:', navError);
+            console.error('🔍 PROD DEBUG: SignIn - Navigation error to AdminDashboard:', navError);
             // Fallback navigation
+            console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
             window.location.href = '/AdminDashboard';
           }
         } else {
-          console.log('🔍 DEBUG: Redirecting regular user to Inspection');
+          console.log('🔍 PROD DEBUG: SignIn - Redirecting regular user to Inspection');
+          console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
           try {
             navigate('/Inspection', { replace: true });
+            console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
           } catch (navError) {
-            console.error('🔍 DEBUG: Navigation error to Inspection:', navError);
+            console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
             // Fallback navigation
+            console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
             window.location.href = '/Inspection';
           }
         }

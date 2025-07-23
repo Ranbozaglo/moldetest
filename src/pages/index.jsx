@@ -27,8 +27,11 @@ import { useAuth } from "@/contexts/AuthContext";
 function AdminRedirect() {
   const { user, loading } = useAuth();
   
+  console.log('🔍 PROD DEBUG: AdminRedirect - user:', user, 'loading:', loading);
+  
   // Show loading while auth is being determined
   if (loading) {
+    console.log('🔍 PROD DEBUG: AdminRedirect - showing loading spinner');
     return <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>;
@@ -36,10 +39,12 @@ function AdminRedirect() {
   
   // If user is admin, redirect to AdminDashboard
   if (user && (user.role === 'admin' || user.is_admin)) {
+    console.log('🔍 PROD DEBUG: AdminRedirect - redirecting admin to AdminDashboard');
     return <Navigate to="/AdminDashboard" replace />;
   }
   
   // Otherwise, show the intended page
+  console.log('🔍 PROD DEBUG: AdminRedirect - showing Welcome page');
   return <Welcome />;
 }
 
@@ -47,19 +52,30 @@ function AdminRedirect() {
 function AdminRouteGuard({ children, allowAdmin = false }) {
   const { user, loading } = useAuth();
   
+  console.log('🔍 PROD DEBUG: AdminRouteGuard - user:', user, 'loading:', loading, 'allowAdmin:', allowAdmin);
+  
   // Show loading while auth is being determined
   if (loading) {
+    console.log('🔍 PROD DEBUG: AdminRouteGuard - showing loading spinner');
     return <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>;
   }
   
+  // Check if user is not authenticated at all
+  if (!user) {
+    console.log('🔍 PROD DEBUG: AdminRouteGuard - no user found, redirecting to SignIn');
+    return <Navigate to="/SignIn" replace />;
+  }
+  
   // If user is admin and this route doesn't allow admin access, redirect to AdminDashboard
   if (user && (user.role === 'admin' || user.is_admin) && !allowAdmin) {
+    console.log('🔍 PROD DEBUG: AdminRouteGuard - admin user accessing non-admin route, redirecting to AdminDashboard');
     return <Navigate to="/AdminDashboard" replace />;
   }
   
   // Otherwise, show the intended component
+  console.log('🔍 PROD DEBUG: AdminRouteGuard - showing protected content');
   return children;
 }
 

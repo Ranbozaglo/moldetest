@@ -18,37 +18,68 @@ const apiCall = async (endpoint, options = {}) => {
     ...options
   };
 
-  // Debug logging in development
-  if (API_CONFIG.DEBUG) {
-    console.log(`🔍 API Call: ${options.method || 'GET'} ${url}`);
-    if (options.body) {
-      console.log('🔍 Request body:', JSON.parse(options.body));
-    }
+  // Enhanced logging for production debugging
+  const isProduction = window.location.hostname !== 'localhost';
+  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
+  
+  console.log(`${logPrefix} API Call: ${options.method || 'GET'} ${url}`);
+  console.log(`${logPrefix} Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  console.log(`${logPrefix} Backend URL: ${API_CONFIG.BASE_URL}`);
+  
+  if (options.body) {
+    console.log(`${logPrefix} Request body:`, JSON.parse(options.body));
   }
+  
+  // Add timeout for production
+  const timeoutMs = isProduction ? 15000 : 30000;
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs}ms`)), timeoutMs)
+  );
 
   try {
-    const response = await fetch(url, config);
+    console.log(`${logPrefix} Starting fetch request...`);
+    const response = await Promise.race([fetch(url, config), timeoutPromise]);
+    
+    console.log(`${logPrefix} Response received:`, {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries())
+    });
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData.error || errorData.detail || `HTTP ${response.status}: ${response.statusText}`;
       
-      if (API_CONFIG.DEBUG) {
-        console.error(`❌ API Error: ${options.method || 'GET'} ${url}`, errorMessage);
-      }
+      console.error(`${logPrefix} API Error:`, {
+        url,
+        method: options.method || 'GET',
+        status: response.status,
+        errorMessage,
+        errorData
+      });
       
       throw new Error(errorMessage);
     }
     
     const data = await response.json();
     
-    if (API_CONFIG.DEBUG) {
-      console.log(`✅ API Success: ${options.method || 'GET'} ${url}`, data);
-    }
+    console.log(`${logPrefix} API Success:`, {
+      url,
+      method: options.method || 'GET',
+      dataReceived: !!data,
+      dataKeys: data ? Object.keys(data) : []
+    });
     
     return data;
   } catch (error) {
-    console.error(`API call failed for ${endpoint}:`, error);
+    console.error(`${logPrefix} API call failed:`, {
+      endpoint,
+      url,
+      method: options.method || 'GET',
+      error: error.message,
+      stack: error.stack
+    });
     throw error;
   } 
 };
@@ -346,9 +377,54 @@ export const Sample = {
   }
 };
 
+// Backend health check (for production debugging)
+const checkBackendHealth = async () => {
+  const isProduction = window.location.hostname !== 'localhost';
+  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
+  
+  console.log(`${logPrefix} Checking backend health...`);
+  
+  try {
+    const healthUrl = `${API_CONFIG.BASE_URL.replace('/api', '')}/health`;
+    console.log(`${logPrefix} Health check URL: ${healthUrl}`);
+    
+    const response = await fetch(healthUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    console.log(`${logPrefix} Health check response:`, {
+      status: response.status,
+      ok: response.ok,
+      statusText: response.statusText
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`${logPrefix} Backend is healthy:`, data);
+      return { healthy: true, data };
+    } else {
+      console.error(`${logPrefix} Backend health check failed:`, response.status);
+      return { healthy: false, status: response.status };
+    }
+  } catch (error) {
+    console.error(`${logPrefix} Backend health check error:`, error.message);
+    return { healthy: false, error: error.message };
+  }
+};
+
 // User entity for authentication
 export const User = {
   login: async (email, password) => {
+    // Check backend health first in production
+    const isProduction = window.location.hostname !== 'localhost';
+    if (isProduction) {
+      const health = await checkBackendHealth();
+      if (!health.healthy) {
+        throw new Error(`Backend is not responding: ${health.error || health.status}`);
+      }
+    }
+    
     const response = await apiCall('/auth/login', {
       method: 'POST',
       headers: {
@@ -395,6 +471,52 @@ export const EmailService = {
     return response;
   }
 };
+
+// Production debugging helper - attach to window for console access
+if (typeof window !== 'undefined') {
+  window.debugBackend = {
+    // Test backend connectivity
+    testHealth: () => checkBackendHealth(),
+    
+    // Test login endpoint
+    testLogin: async (email = 'rotemiluz53@gmail.com', password = 'admin123') => {
+      console.log('🔍 PROD DEBUG: Testing login endpoint...');
+      try {
+        const result = await User.login(email, password);
+        console.log('🔍 PROD DEBUG: Login test successful:', result);
+        return result;
+      } catch (error) {
+        console.error('🔍 PROD DEBUG: Login test failed:', error);
+        return { error: error.message };
+      }
+    },
+    
+    // Check current environment
+    checkEnv: () => {
+      const isProduction = window.location.hostname !== 'localhost';
+      console.log('🔍 PROD DEBUG: Environment info:', {
+        isProduction,
+        hostname: window.location.hostname,
+        backendUrl: API_CONFIG.BASE_URL,
+        currentUrl: window.location.href
+      });
+      return { isProduction, backendUrl: API_CONFIG.BASE_URL };
+    },
+    
+    // Check localStorage auth state
+    checkAuth: () => {
+      const savedUser = localStorage.getItem('mth_user');
+      console.log('🔍 PROD DEBUG: Auth state:', {
+        hasStoredUser: !!savedUser,
+        userData: savedUser ? JSON.parse(savedUser) : null
+      });
+      return savedUser ? JSON.parse(savedUser) : null;
+    }
+  };
+  
+  console.log('🔍 PROD DEBUG: Backend debugging tools available via window.debugBackend');
+  console.log('🔍 PROD DEBUG: Try: debugBackend.testHealth(), debugBackend.testLogin(), debugBackend.checkEnv(), debugBackend.checkAuth()');
+}
 
 // Default export for backward compatibility
 export default {

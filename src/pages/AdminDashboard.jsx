@@ -43,37 +43,51 @@ export default function AdminDashboard() {
   const { user: authUser } = useAuth();
 
   useEffect(() => {
+    console.log('🔍 PROD DEBUG: AdminDashboard useEffect triggered, authUser:', authUser);
+    
     (async () => {
       try {
+        console.log('🔍 PROD DEBUG: AdminDashboard - calling requireSupabaseSession');
         await requireSupabaseSession('/SignIn');
+        console.log('🔍 PROD DEBUG: AdminDashboard - requireSupabaseSession passed, calling checkUser');
         checkUser();
       } catch (err) {
-        console.error('🔍 DEBUG: Auth check failed:', err);
+        console.error('🔍 PROD DEBUG: AdminDashboard - Auth check failed:', err);
+        console.log('🔍 PROD DEBUG: AdminDashboard - Setting loading to false due to auth failure');
         setLoading(false);
       }
     })();
   }, [authUser]);
 
   const checkUser = async () => {
+    console.log('🔍 PROD DEBUG: AdminDashboard checkUser called, authUser:', authUser);
+    
     try {
       // Use the authenticated user from AuthContext instead of calling User.me()
       if (!authUser) {
+        console.log('🔍 PROD DEBUG: AdminDashboard - No authUser found, redirecting to Welcome');
         navigate(createPageUrl("Welcome"));
         return;
       }
+      
+      console.log('🔍 PROD DEBUG: AdminDashboard - authUser found, checking admin status');
+      console.log('🔍 PROD DEBUG: AdminDashboard - authUser.role:', authUser.role, 'authUser.is_admin:', authUser.is_admin);
       
       // Check if user is admin
       if (authUser.role !== 'admin' && !authUser.is_admin) {
+        console.log('🔍 PROD DEBUG: AdminDashboard - User is not admin, redirecting to Welcome');
         navigate(createPageUrl("Welcome"));
         return;
       }
       
+      console.log('🔍 PROD DEBUG: AdminDashboard - User is admin, setting user and loading inspections');
       setUser(authUser);
       loadInspections();
     } catch (error) {
-      console.error("Error checking user:", error);
+      console.error('🔍 PROD DEBUG: AdminDashboard - Error checking user:', error);
       navigate(createPageUrl("Welcome"));
     } finally {
+      console.log('🔍 PROD DEBUG: AdminDashboard - Setting loading to false');
       setLoading(false);
     }
   };
