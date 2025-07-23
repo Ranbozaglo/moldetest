@@ -1,9 +1,39 @@
-// Environment Configuration
+// Dynamic API URL Configuration with Environment Variable Override Support
+const getApiUrls = () => {
+  // Environment variable override for API base URL
+  const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  if (envBaseUrl) {
+    // If VITE_API_BASE_URL is provided, extract base and full URLs
+    const baseUrl = envBaseUrl.replace('/api', ''); 
+    return {
+      BASE_API_URL: baseUrl,
+      BACKEND_URL: envBaseUrl.endsWith('/api') ? envBaseUrl : `${envBaseUrl}/api`
+    };
+  }
+  
+  // Otherwise use environment-based defaults
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1';
+  
+  if (isProduction) {
+    return {
+      BASE_API_URL: 'https://moldetest.onrender.com',
+      BACKEND_URL: 'https://moldetest.onrender.com/api'
+    };
+  } else {
+    return {
+      BASE_API_URL: 'http://localhost:5000',
+      BACKEND_URL: 'http://localhost:5000/api'
+    };
+  }
+};
+
 export const ENVIRONMENT_CONFIG = {
   // Production settings
   PRODUCTION: {
     FRONTEND_URL: 'https://mold-testing.netlify.app',
-    BACKEND_URL: import.meta.env.VITE_API_BASE_URL || 'https://moldetest.onrender.com/api', // Updated with actual Render URL
+    ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://qtrypzzcjebvfcihiynt.supabase.co',
     SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cnlwempjamVidmZjaWhpeW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8',
     DEBUG: false,
@@ -13,7 +43,7 @@ export const ENVIRONMENT_CONFIG = {
   // Development settings
   DEVELOPMENT: {
     FRONTEND_URL: 'http://localhost:5173',
-    BACKEND_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+    ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://qtrypzzcjebvfcihiynt.supabase.co',
     SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF0cnlwempjamVidmZjaWhpeW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ5NzI5NzAsImV4cCI6MjA1MDU0ODk3MH0.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8',
     DEBUG: true,
@@ -56,6 +86,17 @@ export const getEnvironmentConfig = () => {
   };
 };
 
+// Helper functions for dynamic API URL access
+export const getBaseApiUrl = () => {
+  const apiUrls = getApiUrls();
+  return apiUrls.BASE_API_URL;
+};
+
+export const getBackendUrl = () => {
+  const apiUrls = getApiUrls();
+  return apiUrls.BACKEND_URL;
+};
+
 // Debug helper
 export const logEnvironmentInfo = () => {
   // Only log in browser environment
@@ -64,11 +105,14 @@ export const logEnvironmentInfo = () => {
   }
   
   const env = getCurrentEnvironment();
+  const apiUrls = getApiUrls();
+  
   console.log('🌍 Environment Info:', {
     isProduction: env.isProduction,
     isDevelopment: env.isDevelopment,
     hostname: env.hostname,
-    backendUrl: env.config.BACKEND_URL,
+    baseApiUrl: apiUrls.BASE_API_URL,
+    backendUrl: apiUrls.BACKEND_URL,
     frontendUrl: env.config.FRONTEND_URL,
     viteEnv: {
       PROD: import.meta.env.PROD,

@@ -385,7 +385,7 @@ const checkBackendHealth = async () => {
   console.log(`${logPrefix} Checking backend health...`);
   
   try {
-    const healthUrl = `${API_CONFIG.BASE_URL.replace('/api', '')}/health`;
+    const healthUrl = `${API_CONFIG.BASE_API_URL}/health`;
     console.log(`${logPrefix} Health check URL: ${healthUrl}`);
     
     const response = await fetch(healthUrl, {
@@ -497,10 +497,17 @@ if (typeof window !== 'undefined') {
       console.log('🔍 PROD DEBUG: Environment info:', {
         isProduction,
         hostname: window.location.hostname,
-        backendUrl: API_CONFIG.BASE_URL,
+        baseApiUrl: API_CONFIG.BASE_API_URL,
+        backendUrl: API_CONFIG.BACKEND_URL,
+        fullApiUrl: API_CONFIG.BASE_URL,
         currentUrl: window.location.href
       });
-      return { isProduction, backendUrl: API_CONFIG.BASE_URL };
+      return { 
+        isProduction, 
+        baseApiUrl: API_CONFIG.BASE_API_URL,
+        backendUrl: API_CONFIG.BACKEND_URL,
+        fullApiUrl: API_CONFIG.BASE_URL 
+      };
     },
     
     // Check localStorage auth state

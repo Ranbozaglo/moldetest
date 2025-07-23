@@ -1,11 +1,17 @@
 // API Configuration for Flask Backend
-import { getEnvironmentConfig } from './environment.js';
+import { getEnvironmentConfig, getBaseApiUrl, getBackendUrl } from './environment.js';
 
 const envConfig = getEnvironmentConfig();
 
 export const API_CONFIG = {
   // Dynamic backend API base URL based on environment
   BASE_URL: envConfig.BACKEND_URL,
+  
+  // Base API URL without /api suffix (for other endpoints like /health)
+  BASE_API_URL: getBaseApiUrl(),
+  
+  // Full backend URL with /api (for main API endpoints)
+  BACKEND_URL: getBackendUrl(),
   
   // Environment detection
   ENVIRONMENT: envConfig.environment,
@@ -65,4 +71,9 @@ export const getEnvironment = () => {
     ...envConfig,
     apiConfig: API_CONFIG
   };
-}; 
+};
+
+// Direct access to dynamic URLs (for convenience)
+export const BASE_API_URL = API_CONFIG.BASE_API_URL;
+export const BACKEND_URL = API_CONFIG.BACKEND_URL;
+export const FULL_API_URL = API_CONFIG.BASE_URL; 

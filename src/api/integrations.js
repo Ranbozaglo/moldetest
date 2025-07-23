@@ -2,6 +2,7 @@
 // These services now connect to the Python OCR-GPT backend API
 
 import { EmailService } from './entities.js';
+import { getBaseApiUrl } from '@/config/environment.js';
 
 // WebP conversion utility
 const convertToWebP = async (file) => {
@@ -65,9 +66,9 @@ export const Core = {
         };
       }
 
-      // Connect to the OCR-GPT backend API
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-      const apiUrl = `${backendUrl}/api/ocr-gpt`;
+      // Connect to the OCR-GPT backend API using dynamic configuration
+      const baseApiUrl = getBaseApiUrl();
+      const apiUrl = `${baseApiUrl}/api/ocr-gpt`;
       
       console.log('🔍 DEBUG: Calling OCR-GPT backend at:', apiUrl);
       
