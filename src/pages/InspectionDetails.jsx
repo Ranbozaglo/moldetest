@@ -225,22 +225,21 @@ export default function InspectionDetails() {
         lab_analysis_images: updatedImages
       });
       
-      await MoldInspection.update(inspectionId, {
+      const updateResult = await MoldInspection.update(inspectionId, {
         lab_analysis_images: updatedImages
       });
 
+      console.log("🔍 DEBUG: Update result from API:", updateResult);
       console.log("🔍 DEBUG: Inspection record updated successfully");
 
-      // Immediately update local state to show images without waiting for reload
-      console.log("🔍 DEBUG: Updating local inspection state with new images");
-      setInspection(prevInspection => ({
-        ...prevInspection,
-        lab_analysis_images: updatedImages
-      }));
+      // Small delay to ensure database commit
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Also reload the data from the server to ensure consistency
-      console.log("🔍 DEBUG: Reloading inspection data from server");
+      // Reload the data from the server to ensure consistency and proper JSON parsing
+      console.log("🔍 DEBUG: Reloading inspection data from server after upload");
       await loadInspectionData();
+      
+      console.log("🔍 DEBUG: Inspection data reloaded successfully");
 
       // Generate conclusions and recommendations based on the first uploaded image
       if (uploadedUrls.length > 0) {
@@ -251,12 +250,6 @@ export default function InspectionDetails() {
       // Show success message with immediate visual feedback
       console.log("🔍 DEBUG: Upload completed successfully, images should now be visible");
       alert(`Successfully uploaded ${uploadedUrls.length} lab analysis image(s) to the inspection record!`);
-      
-      // Force a small delay and then refresh data again to ensure images are displayed
-      setTimeout(async () => {
-        console.log("🔍 DEBUG: Force refreshing data after upload to ensure images are visible");
-        await loadInspectionData();
-      }, 1000);
       
     } catch (error) {
       console.error("❌ Error in lab image upload process:", error);
@@ -811,16 +804,11 @@ Return your response in this exact JSON format:
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(() => {
-                // Debug logging for display condition
-                console.log("🔍 DEBUG: Lab analysis display check:");
-                console.log("🔍 DEBUG: inspection.lab_analysis_images:", inspection.lab_analysis_images);
-                console.log("🔍 DEBUG: typeof:", typeof inspection.lab_analysis_images);
-                console.log("🔍 DEBUG: Array.isArray:", Array.isArray(inspection.lab_analysis_images));
-                console.log("🔍 DEBUG: length:", inspection.lab_analysis_images?.length);
-                console.log("🔍 DEBUG: Show upload area:", (!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0));
-                return null;
-              })()}
+              {/* Debug: Log lab analysis images state */}
+              {console.log("🔍 DEBUG: Rendering lab analysis section with images:", inspection.lab_analysis_images)}
+              {console.log("🔍 DEBUG: Images array length:", inspection.lab_analysis_images ? inspection.lab_analysis_images.length : 'undefined')}
+              {console.log("🔍 DEBUG: Images array type:", typeof inspection.lab_analysis_images)}
+              
               {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   <input
@@ -858,9 +846,6 @@ Return your response in this exact JSON format:
                           <p className="text-slate-400 text-xs mt-2">
                             Supports: JPEG, PNG, GIF • Max size: 10MB per image
                           </p>
-                          <p className="text-slate-400 text-xs mt-1">
-                            If images don't appear after upload, check browser console or refresh the page
-                          </p>
                         </>
                       )}
                     </div>
@@ -869,23 +854,9 @@ Return your response in this exact JSON format:
               ) : (
                 <div className="space-y-4">
                   <div className="bg-slate-50 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <Label className="text-slate-600 font-medium">
-                        Lab Analysis Images ({inspection.lab_analysis_images.length})
-                      </Label>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          console.log("🔍 DEBUG: Manual refresh clicked");
-                          await loadInspectionData();
-                        }}
-                        className="text-xs"
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Refresh
-                      </Button>
-                    </div>
+                    <Label className="text-slate-600 font-medium">
+                      Lab Analysis Images ({inspection.lab_analysis_images.length})
+                    </Label>
                     
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {inspection.lab_analysis_images.map((imageUrl, index) => (

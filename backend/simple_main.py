@@ -597,24 +597,50 @@ def create_inspection():
     print(f"🔍 DEBUG: Creating inspection with data:", data)
     
     try:
-        result = supabase.table('inspection').insert({
+        # Prepare data for insertion - handle JSON serialization for arrays
+        inspection_data = {
             'full_name': data.get('full_name'),
             'street_address': data.get('street_address'),
+            'unit_number': data.get('unit_number'),
             'city': data.get('city'),
             'state': data.get('state'),
             'zip_code': data.get('zip_code'),
             'property_type': data.get('property_type'),
             'client_type': data.get('client_type'),
             'square_footage': data.get('square_footage'),
+            'background_info': data.get('background_info'),
             'has_visible_mold': data.get('has_visible_mold'),
-            'mold_locations': data.get('mold_locations'),
             'has_water_damage': data.get('has_water_damage'),
-            'water_damage_locations': data.get('water_damage_locations'),
+            'environmental_data_method': data.get('environmental_data_method'),
+            'temperature': data.get('temperature'),
+            'humidity': data.get('humidity'),
             'status': data.get('status', 'pending'),
             'created_by_id': data.get('user_id'),
             'email': data.get('email'),
-            'is_sample': data.get('is_sample', False)
-        }).execute()
+            'is_sample': data.get('is_sample', False),
+            'client_status_detail': data.get('client_status_detail'),
+            'created_date': data.get('created_date')
+        }
+        
+        # Handle image arrays - serialize as JSON
+        if 'visible_mold_details' in data and data['visible_mold_details']:
+            inspection_data['visible_mold_details'] = json.dumps(data['visible_mold_details'])
+            print(f"🔍 DEBUG: Serializing visible_mold_details: {len(data['visible_mold_details'])} entries")
+        
+        if 'water_damage_details' in data and data['water_damage_details']:
+            inspection_data['water_damage_details'] = json.dumps(data['water_damage_details'])
+            print(f"🔍 DEBUG: Serializing water_damage_details: {len(data['water_damage_details'])} entries")
+        
+        if 'lab_analysis_images' in data and data['lab_analysis_images']:
+            inspection_data['lab_analysis_images'] = json.dumps(data['lab_analysis_images'])
+            print(f"🔍 DEBUG: Serializing lab_analysis_images: {len(data['lab_analysis_images'])} images")
+        
+        if 'thermostat_image' in data and data['thermostat_image']:
+            inspection_data['thermostat_image'] = data['thermostat_image']
+        
+        print(f"🔍 DEBUG: Final inspection data for insert:", inspection_data)
+        
+        result = supabase.table('inspection').insert(inspection_data).execute()
         
         print(f"🔍 DEBUG: Supabase result:", result)
         print(f"🔍 DEBUG: Result data:", result.data)
@@ -659,6 +685,40 @@ def update_inspection(inspection_id):
             update_data['has_water_damage'] = data['has_water_damage']
         if 'is_sample' in data:
             update_data['is_sample'] = data['is_sample']
+        
+        # Handle image fields - serialize arrays as JSON
+        if 'lab_analysis_images' in data:
+            if isinstance(data['lab_analysis_images'], list):
+                update_data['lab_analysis_images'] = json.dumps(data['lab_analysis_images'])
+                print(f"🔍 DEBUG: Serializing lab_analysis_images: {len(data['lab_analysis_images'])} images")
+            else:
+                update_data['lab_analysis_images'] = data['lab_analysis_images']
+        
+        if 'visible_mold_details' in data:
+            if isinstance(data['visible_mold_details'], list):
+                update_data['visible_mold_details'] = json.dumps(data['visible_mold_details'])
+                print(f"🔍 DEBUG: Serializing visible_mold_details: {len(data['visible_mold_details'])} entries")
+            else:
+                update_data['visible_mold_details'] = data['visible_mold_details']
+        
+        if 'water_damage_details' in data:
+            if isinstance(data['water_damage_details'], list):
+                update_data['water_damage_details'] = json.dumps(data['water_damage_details'])
+                print(f"🔍 DEBUG: Serializing water_damage_details: {len(data['water_damage_details'])} entries")
+            else:
+                update_data['water_damage_details'] = data['water_damage_details']
+        
+        if 'thermostat_image' in data:
+            update_data['thermostat_image'] = data['thermostat_image']
+            print(f"🔍 DEBUG: Updating thermostat_image: {data['thermostat_image']}")
+        
+        # Handle text fields for conclusions and recommendations
+        if 'conclusion' in data:
+            update_data['conclusion'] = data['conclusion']
+        if 'recommendations' in data:
+            update_data['recommendations'] = data['recommendations']
+        if 'client_status_detail' in data:
+            update_data['client_status_detail'] = data['client_status_detail']
         
         print(f"🔍 DEBUG: Update data to apply:", update_data)
         
