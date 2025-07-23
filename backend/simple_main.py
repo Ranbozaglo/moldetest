@@ -325,12 +325,17 @@ def get_inspections():
         # Apply limit
         if limit:
             query = query.limit(int(limit))
-        
+
         print(f"🔍 DEBUG: Executing query...")
         result = query.execute()
         inspections = result.data
         print(f"🔍 DEBUG: Found {len(inspections)} inspections")
-        
+
+        # Filter by email if provided
+        email = request.args.get('email')
+        if email:
+            inspections = [i for i in inspections if i.get('email') == email]
+
         # Convert to expected format with ALL available fields
         result_list = []
         for inspection in inspections:

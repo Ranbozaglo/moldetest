@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-OCR-GPT System Startup Script
-=============================
+OCR-GPT System Startup Script with Google Cloud Vision
+======================================================
 
 This script starts the complete OCR-GPT integration system including:
-- Python OCR-GPT backend API
+- Python OCR-GPT backend API with Google Cloud Vision
 - Web interface (optional)
 - Health checks and monitoring
 """
@@ -24,17 +24,19 @@ def check_dependencies():
         'flask',
         'flask-cors',
         'openai',
-        'pytesseract',
+        'google-cloud-vision',
         'Pillow',
-        'opencv-python',
-        'numpy'
+        'python-dotenv'
     ]
     
     missing_packages = []
     
     for package in required_packages:
         try:
-            __import__(package.replace('-', '_'))
+            if package == 'google-cloud-vision':
+                __import__('google.cloud.vision')
+            else:
+                __import__(package.replace('-', '_'))
             print(f"✅ {package}")
         except ImportError:
             print(f"❌ {package} - Missing")
@@ -50,26 +52,36 @@ def check_dependencies():
     return True
 
 def check_environment():
-    """Check environment variables and configuration."""
-    print("\n🔍 Checking environment...")
+    """Check if required environment variables are set."""
+    print("🔍 Checking environment variables...")
     
-    # Check OpenAI API key
-    api_key = os.getenv('OPENAI_API_KEY')
-    if api_key:
-        print("✅ OpenAI API key found")
-    else:
-        print("⚠️  OpenAI API key not set")
-        print("Please set: export OPENAI_API_KEY='your-api-key'")
+    required_env_vars = {
+        'OPENAI_API_KEY': 'OpenAI API key for GPT analysis',
+        'GOOGLE_APPLICATION_CREDENTIALS': 'Path to Google Cloud service account JSON file'
+    }
     
-    # Check Tesseract
-    try:
-        import pytesseract
-        version = pytesseract.get_tesseract_version()
-        print(f"✅ Tesseract version: {version}")
-    except Exception as e:
-        print(f"❌ Tesseract not available: {e}")
+    missing_vars = []
+    
+    for var, description in required_env_vars.items():
+        if os.getenv(var):
+            print(f"✅ {var}")
+        else:
+            print(f"❌ {var} - Missing ({description})")
+            missing_vars.append(var)
+    
+    if missing_vars:
+        print(f"\n⚠️  Missing environment variables: {', '.join(missing_vars)}")
+        print("\nTo set up Google Cloud Vision:")
+        print("1. Create a Google Cloud project")
+        print("2. Enable the Vision API")
+        print("3. Create a service account and download the JSON key file")
+        print("4. Set GOOGLE_APPLICATION_CREDENTIALS to the path of the JSON file")
+        print("\nExample:")
+        print("export GOOGLE_APPLICATION_CREDENTIALS='/path/to/your/service-account-key.json'")
+        print("export OPENAI_API_KEY='your-openai-api-key'")
         return False
     
+    print("✅ All environment variables are set")
     return True
 
 def start_backend_api():

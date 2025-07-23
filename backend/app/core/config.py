@@ -30,6 +30,9 @@ class Settings:
     
     # Application
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
-    CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS",
+     "http://localhost:3000,http://localhost:5173,https://mold-testing.netlify.app,https://mold-testing.netlify.app/,http://localhost:5000/api/ocr-gpt"
+     
+    ).split(",")
 
 settings = Settings() 

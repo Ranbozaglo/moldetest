@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-OCR-GPT API Backend
-===================
+OCR-GPT API Backend with Google Cloud Vision
+============================================
 
 Flask API backend that provides OCR-GPT integration endpoints
-for the Mold Testing Houston application.
+for the Mold Testing Houston application using Google Cloud Vision API.
 """
 
 import os
@@ -18,13 +18,13 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-# Import our OCR-GPT integration
+# Import our OCR-GPT integration with Google Cloud Vision
 try:
-    from ocr_gpt_advanced import AdvancedOCRGPTIntegration
+    from ocr_gpt_integration import OCRGPTIntegration
     OCR_GPT_AVAILABLE = True
 except ImportError:
     OCR_GPT_AVAILABLE = False
-    print("⚠️  OCR-GPT integration not available. Install required packages.")
+    print("⚠️  OCR-GPT integration not available. Install required packages: google-cloud-vision openai")
 
 # Configure logging
 logging.basicConfig(
@@ -47,16 +47,17 @@ Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)
 Path(app.config['RESULTS_FOLDER']).mkdir(exist_ok=True)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'}
 
-# Initialize OCR-GPT system
+# Initialize OCR-GPT system with Google Cloud Vision
 ocr_gpt = None
 if OCR_GPT_AVAILABLE:
     try:
-        ocr_gpt = AdvancedOCRGPTIntegration()
-        logger.info("OCR-GPT system initialized successfully")
+        ocr_gpt = OCRGPTIntegration()
+        logger.info("OCR-GPT system with Google Cloud Vision initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize OCR-GPT system: {e}")
+        logger.error("Make sure OPENAI_API_KEY and GOOGLE_APPLICATION_CREDENTIALS are set")
         ocr_gpt = None
 
 
@@ -66,13 +67,14 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def process_image_with_ocr_gpt(image_path: str, prompt: Optional[str] = None) -> Dict[str, Any]:
+def process_image_with_ocr_gpt(image_path: str, prompt: Optional[str] = None, languages: list = None) -> Dict[str, Any]:
     """
-    Process an image with OCR-GPT integration.
+    Process an image with OCR-GPT integration using Google Cloud Vision.
     
     Args:
         image_path: Path to the image file
         prompt: Custom prompt for analysis
+        languages: List of language codes for OCR
         
     Returns:
         Dictionary with processing results
@@ -80,12 +82,12 @@ def process_image_with_ocr_gpt(image_path: str, prompt: Optional[str] = None) ->
     if not ocr_gpt:
         return {
             "success": False,
-            "error": "OCR-GPT system not available",
+            "error": "OCR-GPT system not available. Check Google Cloud Vision and OpenAI credentials.",
             "timestamp": datetime.now().isoformat()
         }
     
     try:
-        logger.info(f"Processing image with OCR-GPT: {image_path}")
+        logger.info(f"Processing image with Google Cloud Vision OCR-GPT: {image_path}")
         
         # Default prompt for lab analysis if none provided
         if not prompt:
@@ -115,16 +117,32 @@ Please analyze the lab results shown in this image and provide:
 Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
 """
         
-        # Process the image
+        # Process the image with Google Cloud Vision
         result = ocr_gpt.process_image(
             image_path=image_path,
             custom_prompt=prompt,
-            languages=['eng', 'heb'],
+            languages=languages or ['en', 'he'],
             model="gpt-4"
         )
         
-        logger.info("OCR-GPT processing completed successfully")
-        return result
+        if result['success']:
+            logger.info("Google Cloud Vision OCR-GPT processing completed successfully")
+            return {
+                "success": True,
+                "extracted_text": result['extracted_text'],
+                "analysis": result['analysis'],
+                "ocr_details": result.get('ocr_details', {}),
+                "model_used": result.get('model_used', 'gpt-4'),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            logger.error(f"OCR-GPT processing failed: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown processing error'),
+                "stage": result.get('stage', 'unknown'),
+                "timestamp": datetime.now().isoformat()
+            }
         
     except Exception as e:
         logger.error(f"Error in OCR-GPT processing: {e}")
@@ -141,6 +159,9 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'ocr_gpt_available': ocr_gpt is not None,
+        'ocr_method': 'google_cloud_vision',
+        'openai_configured': bool(os.getenv('OPENAI_API_KEY')),
+        'google_cloud_configured': bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS')),
         'timestamp': datetime.now().isoformat()
     })
 
@@ -221,7 +242,7 @@ def ocr_process():
         
         # Check file extension
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF'}), 400
+            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF, WEBP'}), 400
         
         # Get processing parameters
         custom_prompt = request.form.get('custom_prompt', None)
@@ -264,7 +285,7 @@ def ocr_analyze():
         
         # Check file extension
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF'}), 400
+            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF, WEBP'}), 400
         
         # Save uploaded file
         filename = secure_filename(file.filename)
@@ -337,7 +358,7 @@ def upload_file():
         
         # Check file extension
         if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF'}), 400
+            return jsonify({'error': 'Invalid file type. Allowed: PNG, JPG, JPEG, GIF, BMP, TIFF, WEBP'}), 400
         
         # Save uploaded file
         filename = secure_filename(file.filename)

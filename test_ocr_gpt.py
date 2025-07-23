@@ -1,236 +1,176 @@
 #!/usr/bin/env python3
 """
-Test Script for OCR-GPT Integration
-===================================
+Test script for OCR-GPT Integration with Google Cloud Vision
+============================================================
 
-This script tests the OCR-GPT integration system with sample images.
+This script tests the OCR-GPT integration system using Google Cloud Vision API.
 """
 
 import os
 import sys
-import logging
 from pathlib import Path
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def test_basic_functionality():
-    """Test basic OCR-GPT functionality."""
-    try:
-        from ocr_gpt_integration import OCRGPTIntegration
-        
-        print("🧪 Testing basic OCR-GPT integration...")
-        
-        # Initialize the system
-        ocr_gpt = OCRGPTIntegration()
-        print("✅ Basic system initialized successfully")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Basic functionality test failed: {e}")
-        return False
-
-def test_advanced_functionality():
-    """Test advanced OCR-GPT functionality."""
-    try:
-        from ocr_gpt_advanced import AdvancedOCRGPTIntegration
-        
-        print("🧪 Testing advanced OCR-GPT integration...")
-        
-        # Initialize the system
-        ocr_gpt = AdvancedOCRGPTIntegration()
-        print("✅ Advanced system initialized successfully")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Advanced functionality test failed: {e}")
-        return False
-
-def test_web_interface():
-    """Test web interface functionality."""
-    try:
-        from web_interface import app
-        
-        print("🧪 Testing web interface...")
-        
-        # Test if Flask app can be created
-        with app.test_client() as client:
-            response = client.get('/health')
-            print("✅ Web interface test passed")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Web interface test failed: {e}")
-        return False
-
-def test_dependencies():
-    """Test if all dependencies are available."""
-    dependencies = [
-        ('openai', 'OpenAI API client'),
-        ('PIL', 'Pillow image processing'),
-        ('pytesseract', 'Tesseract OCR wrapper'),
-        ('cv2', 'OpenCV for image processing'),
-        ('numpy', 'NumPy for numerical operations'),
-        ('flask', 'Flask web framework'),
-    ]
+def test_environment():
+    """Test if environment is properly configured."""
+    print("🧪 Testing Environment Configuration")
+    print("=" * 50)
     
-    print("🧪 Testing dependencies...")
+    # Check OpenAI API key
+    openai_key = os.getenv('OPENAI_API_KEY')
+    if openai_key:
+        print("✅ OpenAI API key is set")
+    else:
+        print("❌ OpenAI API key is missing")
+        print("   Set: export OPENAI_API_KEY='your-api-key'")
+        return False
     
-    for module_name, description in dependencies:
-        try:
-            __import__(module_name)
-            print(f"✅ {description} ({module_name})")
-        except ImportError as e:
-            print(f"❌ {description} ({module_name}): {e}")
+    # Check Google Cloud credentials
+    google_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if google_creds:
+        if os.path.exists(google_creds):
+            print("✅ Google Cloud credentials file found")
+        else:
+            print(f"❌ Google Cloud credentials file not found: {google_creds}")
             return False
+    else:
+        print("❌ Google Cloud credentials not set")
+        print("   Set: export GOOGLE_APPLICATION_CREDENTIALS='/path/to/service-account.json'")
+        return False
     
     return True
 
-def test_tesseract():
-    """Test Tesseract OCR installation."""
-    try:
-        import pytesseract
-        
-        print("🧪 Testing Tesseract OCR...")
-        
-        # Get Tesseract version
-        version = pytesseract.get_tesseract_version()
-        print(f"✅ Tesseract version: {version}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Tesseract test failed: {e}")
-        return False
-
-def test_openai_key():
-    """Test OpenAI API key availability."""
-    api_key = os.getenv('OPENAI_API_KEY')
+def test_imports():
+    """Test if all required packages can be imported."""
+    print("\n🧪 Testing Package Imports")
+    print("=" * 50)
     
-    if api_key:
-        print("✅ OpenAI API key found")
+    packages = [
+        ('openai', 'OpenAI API client'),
+        ('google.cloud.vision', 'Google Cloud Vision API'),
+        ('PIL', 'Pillow image processing'),
+        ('flask', 'Flask web framework'),
+        ('flask_cors', 'Flask CORS support')
+    ]
+    
+    all_imported = True
+    
+    for package, description in packages:
+        try:
+            __import__(package)
+            print(f"✅ {package} - {description}")
+        except ImportError as e:
+            print(f"❌ {package} - {description} - Error: {e}")
+            all_imported = False
+    
+    return all_imported
+
+def test_ocr_gpt_integration():
+    """Test the OCR-GPT integration system."""
+    print("\n🧪 Testing OCR-GPT Integration")
+    print("=" * 50)
+    
+    try:
+        from ocr_gpt_integration import OCRGPTIntegration
+        print("✅ OCR-GPT integration module imported successfully")
+        
+        # Initialize the system
+        ocr_gpt = OCRGPTIntegration()
+        print("✅ OCR-GPT system initialized successfully")
+        
+        # Test text analysis (without image)
+        test_text = "Mold Analysis Report: Aspergillus niger - 1000 CFU/m³, Penicillium - 500 CFU/m³"
+        analysis = ocr_gpt.analyze_text_with_gpt(test_text)
+        
+        if analysis and len(analysis) > 10:
+            print("✅ GPT text analysis working")
+            print(f"   Sample analysis: {analysis[:100]}...")
+        else:
+            print("❌ GPT text analysis failed")
+            return False
+        
         return True
-    else:
-        print("⚠️  OpenAI API key not set (will need to be set before use)")
+        
+    except Exception as e:
+        print(f"❌ OCR-GPT integration test failed: {e}")
         return False
 
-def create_test_image():
-    """Create a simple test image with text."""
+def test_api_backend():
+    """Test the API backend."""
+    print("\n🧪 Testing API Backend")
+    print("=" * 50)
+    
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        # Import and test the API
+        sys.path.append('backend')
+        from backend.ocr_gpt_api import app, ocr_gpt
         
-        print("🧪 Creating test image...")
-        
-        # Create a simple image with text
-        img = Image.new('RGB', (400, 200), color='white')
-        draw = ImageDraw.Draw(img)
-        
-        # Try to use a default font
-        try:
-            font = ImageFont.truetype("arial.ttf", 20)
-        except:
-            font = ImageFont.load_default()
-        
-        # Add English text
-        draw.text((20, 20), "Hello World!", fill='black', font=font)
-        draw.text((20, 50), "This is a test image for OCR.", fill='black', font=font)
-        
-        # Add Hebrew text (if font supports it)
-        try:
-            draw.text((20, 80), "שלום עולם!", fill='black', font=font)
-            draw.text((20, 110), "זהו תמונה לבדיקה של OCR.", fill='black', font=font)
-        except:
-            print("⚠️  Hebrew text not supported by current font")
-        
-        # Save the image
-        test_image_path = "test_image.jpg"
-        img.save(test_image_path)
-        print(f"✅ Test image created: {test_image_path}")
-        
-        return test_image_path
-        
-    except Exception as e:
-        print(f"❌ Failed to create test image: {e}")
-        return None
-
-def test_full_pipeline():
-    """Test the complete OCR-GPT pipeline."""
-    try:
-        from ocr_gpt_advanced import AdvancedOCRGPTIntegration
-        
-        print("🧪 Testing complete pipeline...")
-        
-        # Create test image
-        test_image_path = create_test_image()
-        if not test_image_path:
-            print("❌ Cannot test pipeline without test image")
-            return False
-        
-        # Initialize system
-        ocr_gpt = AdvancedOCRGPTIntegration()
-        
-        # Process the test image
-        result = ocr_gpt.process_image(test_image_path)
-        
-        if result['success']:
-            print("✅ Complete pipeline test passed")
-            print(f"📝 Extracted text length: {len(result['extracted_text'])} characters")
-            print(f"🤖 GPT analysis length: {len(result['gpt_analysis'])} characters")
-            return True
+        if ocr_gpt:
+            print("✅ API backend OCR-GPT system initialized")
         else:
-            print(f"❌ Pipeline test failed: {result.get('error', 'Unknown error')}")
+            print("❌ API backend OCR-GPT system not initialized")
             return False
-            
+        
+        # Test health endpoint
+        with app.test_client() as client:
+            response = client.get('/health')
+            if response.status_code == 200:
+                data = response.get_json()
+                print(f"✅ Health endpoint working - Status: {data.get('status')}")
+                print(f"   OCR method: {data.get('ocr_method')}")
+                print(f"   OpenAI configured: {data.get('openai_configured')}")
+                print(f"   Google Cloud configured: {data.get('google_cloud_configured')}")
+            else:
+                print(f"❌ Health endpoint failed - Status: {response.status_code}")
+                return False
+        
+        return True
+        
     except Exception as e:
-        print(f"❌ Pipeline test failed: {e}")
+        print(f"❌ API backend test failed: {e}")
         return False
 
 def main():
     """Run all tests."""
-    print("🚀 OCR-GPT Integration Test Suite")
-    print("=" * 50)
+    print("🚀 OCR-GPT Integration Test Suite with Google Cloud Vision")
+    print("=" * 60)
     
     tests = [
-        ("Dependencies", test_dependencies),
-        ("Tesseract OCR", test_tesseract),
-        ("OpenAI API Key", test_openai_key),
-        ("Basic Functionality", test_basic_functionality),
-        ("Advanced Functionality", test_advanced_functionality),
-        ("Web Interface", test_web_interface),
-        ("Complete Pipeline", test_full_pipeline),
+        ("Environment Configuration", test_environment),
+        ("Package Imports", test_imports),
+        ("OCR-GPT Integration", test_ocr_gpt_integration),
+        ("API Backend", test_api_backend)
     ]
     
     passed = 0
-    total = len(tests)
+    failed = 0
     
     for test_name, test_func in tests:
-        print(f"\n{'='*20} {test_name} {'='*20}")
-        if test_func():
-            passed += 1
-        print()
+        print(f"\n🔍 Running: {test_name}")
+        try:
+            if test_func():
+                passed += 1
+                print(f"✅ {test_name} - PASSED")
+            else:
+                failed += 1
+                print(f"❌ {test_name} - FAILED")
+        except Exception as e:
+            failed += 1
+            print(f"❌ {test_name} - ERROR: {e}")
     
-    print("=" * 50)
-    print(f"📊 Test Results: {passed}/{total} tests passed")
+    # Summary
+    print("\n" + "=" * 60)
+    print("🏁 Test Summary")
+    print("=" * 60)
+    print(f"✅ Passed: {passed}")
+    print(f"❌ Failed: {failed}")
+    print(f"📊 Total: {passed + failed}")
     
-    if passed == total:
-        print("🎉 All tests passed! The system is ready to use.")
-        print("\nNext steps:")
-        print("1. Set your OpenAI API key: export OPENAI_API_KEY='your-key'")
-        print("2. Run: python ocr_gpt_integration.py test_image.jpg")
-        print("3. Or start web interface: python web_interface.py")
+    if failed == 0:
+        print("\n🎉 All tests passed! OCR-GPT system is ready to use.")
+        return True
     else:
-        print("❌ Some tests failed. Please check the errors above.")
-        print("\nTroubleshooting:")
-        print("1. Run: python setup.py")
-        print("2. Install missing dependencies")
-        print("3. Set OpenAI API key")
-        print("4. Install Tesseract OCR")
-    
-    return passed == total
+        print(f"\n⚠️  {failed} test(s) failed. Please fix the issues above.")
+        return False
 
 if __name__ == "__main__":
     success = main()

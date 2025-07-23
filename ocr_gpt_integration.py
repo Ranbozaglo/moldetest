@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
 """
-OCR-GPT Integration System
-==========================
+OCR-GPT Integration System with Google Cloud Vision
+===================================================
 
-This system integrates Tesseract OCR with OpenAI GPT to:
-1. Extract text from images (Hebrew and English)
+This system integrates Google Cloud Vision API with OpenAI GPT to:
+1. Extract text from images using Google Cloud Vision (Hebrew and English)
 2. Send extracted text to GPT-4 for analysis
 3. Return the model's response
 
 Requirements:
-- Tesseract OCR installed on the system
+- Google Cloud Vision API credentials
 - OpenAI API key in environment variables
-- Python packages: openai, pillow, pytesseract
+- Python packages: openai, google-cloud-vision, pillow
 """
 
 import os
 import sys
 import logging
-from typing import Optional, Dict, Any
+import base64
+from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 # Third-party imports
 import openai
 from PIL import Image
-import pytesseract
+from google.cloud import vision
 
 # Configure logging
 logging.basicConfig(
@@ -39,245 +40,258 @@ logger = logging.getLogger(__name__)
 
 class OCRGPTIntegration:
     """
-    Main class for OCR-GPT integration system.
+    Main class for OCR-GPT integration system using Google Cloud Vision.
     """
     
-    def __init__(self, openai_api_key: Optional[str] = None):
+    def __init__(self, openai_api_key: Optional[str] = None, google_credentials_path: Optional[str] = None):
         """
         Initialize the OCR-GPT integration system.
         
         Args:
             openai_api_key: OpenAI API key. If None, will try to get from environment.
+            google_credentials_path: Path to Google Cloud credentials JSON file.
         """
+        # Initialize OpenAI
         self.openai_api_key = openai_api_key or os.getenv('OPENAI_API_KEY')
         if not self.openai_api_key:
-            raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it to the constructor.")
+            raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY environment variable.")
         
-        # Initialize OpenAI client
         openai.api_key = self.openai_api_key
+        logger.info("OpenAI client initialized")
         
-        # Configure Tesseract
-        self._configure_tesseract()
+        # Initialize Google Cloud Vision
+        if google_credentials_path:
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = google_credentials_path
+        elif not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+            logger.warning("Google Cloud credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS environment variable.")
         
-        logger.info("OCR-GPT Integration system initialized successfully")
-    
-    def _configure_tesseract(self):
-        """Configure Tesseract OCR settings."""
         try:
-            # Set Tesseract configuration for Hebrew and English
-            self.tesseract_config = '--oem 3 --psm 6 -l heb+eng'
-            
-            # Test Tesseract installation
-            pytesseract.get_tesseract_version()
-            logger.info(f"Tesseract version: {pytesseract.get_tesseract_version()}")
-            
+            self.vision_client = vision.ImageAnnotatorClient()
+            logger.info("Google Cloud Vision client initialized")
         except Exception as e:
-            logger.error(f"Tesseract configuration failed: {e}")
-            raise RuntimeError("Tesseract OCR is not properly installed or configured")
+            logger.error(f"Failed to initialize Google Cloud Vision client: {e}")
+            raise
     
-    def extract_text_from_image(self, image_path: str) -> str:
+    def extract_text_from_image(self, image_path: str, languages: List[str] = None) -> Dict[str, Any]:
         """
-        Extract text from an image using Tesseract OCR.
+        Extract text from image using Google Cloud Vision API.
         
         Args:
             image_path: Path to the image file
+            languages: List of language codes (e.g., ['en', 'he'])
             
         Returns:
-            Extracted text as string
+            Dictionary with extracted text and metadata
         """
         try:
             logger.info(f"Extracting text from image: {image_path}")
             
-            # Open and preprocess image
-            image = Image.open(image_path)
+            # Read image file
+            with open(image_path, 'rb') as image_file:
+                content = image_file.read()
             
-            # Extract text using Tesseract
-            extracted_text = pytesseract.image_to_string(
-                image, 
-                config=self.tesseract_config
+            # Create Vision API image object
+            image = vision.Image(content=content)
+            
+            # Configure text detection with language hints
+            image_context = vision.ImageContext()
+            if languages:
+                image_context.language_hints = languages
+            
+            # Perform text detection
+            response = self.vision_client.text_detection(
+                image=image,
+                image_context=image_context
             )
             
-            # Clean up the extracted text
-            cleaned_text = self._clean_extracted_text(extracted_text)
+            # Check for errors
+            if response.error.message:
+                raise Exception(f"Google Cloud Vision API error: {response.error.message}")
             
-            logger.info(f"Successfully extracted {len(cleaned_text)} characters from image")
-            logger.debug(f"Extracted text: {cleaned_text[:200]}...")
-            
-            return cleaned_text
-            
+            # Extract text
+            texts = response.text_annotations
+            if texts:
+                extracted_text = texts[0].description
+                logger.info(f"Successfully extracted {len(extracted_text)} characters")
+                
+                return {
+                    'success': True,
+                    'text': extracted_text,
+                    'confidence': 'high',  # Google Cloud Vision doesn't provide confidence scores
+                    'language_detected': 'multiple' if languages and len(languages) > 1 else (languages[0] if languages else 'auto'),
+                    'method': 'google_cloud_vision'
+                }
+            else:
+                logger.warning("No text found in image")
+                return {
+                    'success': True,
+                    'text': '',
+                    'confidence': 'low',
+                    'language_detected': 'none',
+                    'method': 'google_cloud_vision'
+                }
+                
         except Exception as e:
             logger.error(f"Error extracting text from image: {e}")
-            raise
+            return {
+                'success': False,
+                'error': str(e),
+                'text': '',
+                'method': 'google_cloud_vision'
+            }
     
-    def _clean_extracted_text(self, text: str) -> str:
+    def analyze_text_with_gpt(self, text: str, custom_prompt: str = None, model: str = "gpt-4") -> str:
         """
-        Clean and normalize extracted text.
-        
-        Args:
-            text: Raw extracted text
-            
-        Returns:
-            Cleaned text
-        """
-        # Remove extra whitespace and normalize
-        cleaned = ' '.join(text.split())
-        
-        # Remove common OCR artifacts
-        cleaned = cleaned.replace('|', 'I')  # Common OCR mistake
-        cleaned = cleaned.replace('0', 'O')  # Common OCR mistake in certain contexts
-        
-        return cleaned
-    
-    def analyze_text_with_gpt(self, text: str, prompt: Optional[str] = None) -> str:
-        """
-        Send extracted text to OpenAI GPT for analysis.
+        Analyze extracted text using OpenAI GPT.
         
         Args:
             text: Extracted text to analyze
-            prompt: Custom prompt for GPT. If None, uses default prompt.
+            custom_prompt: Custom prompt for analysis
+            model: OpenAI model to use
             
         Returns:
-            GPT's response as string
+            GPT analysis response
         """
         try:
-            logger.info("Sending text to GPT for analysis")
+            if not text.strip():
+                return "No text was extracted from the image for analysis."
             
             # Default prompt if none provided
-            if not prompt:
-                prompt = """
-                Analyze the following text extracted from an image. 
-                Please provide:
-                1. A summary of the main content
-                2. Key points or important information
-                3. Any relevant insights or observations
+            if not custom_prompt:
+                custom_prompt = """
+                Please analyze the following text extracted from a mold testing laboratory report:
                 
-                Text to analyze:
                 {text}
                 
-                Please provide a clear and structured response.
+                Provide a professional analysis including:
+                1. Summary of findings
+                2. Health implications
+                3. Recommendations for action
+                4. Any concerning levels or types of mold detected
                 """
             
-            # Format the prompt with the extracted text
-            formatted_prompt = prompt.format(text=text)
+            # Format prompt with extracted text
+            formatted_prompt = custom_prompt.format(text=text)
             
-            # Call OpenAI GPT-4
+            logger.info(f"Sending text to GPT-4 for analysis (model: {model})")
+            
+            # Call OpenAI API (compatible with version 0.28.1)
             response = openai.ChatCompletion.create(
-                model="gpt-4",
+                model=model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that analyzes text extracted from images. Provide clear, structured responses."},
+                    {"role": "system", "content": "You are a professional mold inspection analyst with expertise in interpreting laboratory reports."},
                     {"role": "user", "content": formatted_prompt}
                 ],
-                max_tokens=1000,
-                temperature=0.7
+                max_tokens=1500,
+                temperature=0.3
             )
             
-            gpt_response = response.choices[0].message.content
-            logger.info("Successfully received response from GPT")
-            logger.debug(f"GPT response: {gpt_response[:200]}...")
+            analysis = response.choices[0].message.content
+            logger.info("GPT analysis completed successfully")
             
-            return gpt_response
+            return analysis
             
         except Exception as e:
-            logger.error(f"Error calling OpenAI GPT: {e}")
-            raise
+            logger.error(f"Error in GPT analysis: {e}")
+            return f"Error analyzing text: {str(e)}"
     
-    def process_image(self, image_path: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def process_image(self, image_path: str, custom_prompt: str = None, languages: List[str] = None, model: str = "gpt-4") -> Dict[str, Any]:
         """
-        Complete pipeline: extract text from image and analyze with GPT.
+        Complete image processing pipeline: OCR + GPT analysis.
         
         Args:
             image_path: Path to the image file
             custom_prompt: Custom prompt for GPT analysis
+            languages: List of language codes for OCR
+            model: OpenAI model to use
             
         Returns:
-            Dictionary containing extracted text and GPT analysis
+            Dictionary with complete processing results
         """
         try:
-            logger.info(f"Starting complete processing pipeline for: {image_path}")
+            logger.info(f"Starting complete image processing for: {image_path}")
             
-            # Step 1: Extract text from image
-            extracted_text = self.extract_text_from_image(image_path)
+            # Step 1: Extract text using Google Cloud Vision
+            ocr_result = self.extract_text_from_image(image_path, languages or ['en', 'he'])
+            
+            if not ocr_result['success']:
+                return {
+                    'success': False,
+                    'error': f"OCR failed: {ocr_result.get('error', 'Unknown error')}",
+                    'stage': 'ocr'
+                }
+            
+            extracted_text = ocr_result['text']
             
             if not extracted_text.strip():
-                logger.warning("No text was extracted from the image")
                 return {
-                    "extracted_text": "",
-                    "gpt_analysis": "No text was found in the image to analyze.",
-                    "success": False,
-                    "error": "No text extracted"
+                    'success': True,
+                    'extracted_text': '',
+                    'analysis': 'No text was found in the image to analyze.',
+                    'ocr_details': ocr_result
                 }
             
             # Step 2: Analyze with GPT
-            gpt_analysis = self.analyze_text_with_gpt(extracted_text, custom_prompt)
+            analysis = self.analyze_text_with_gpt(extracted_text, custom_prompt, model)
             
-            result = {
-                "extracted_text": extracted_text,
-                "gpt_analysis": gpt_analysis,
-                "success": True,
-                "image_path": image_path
+            logger.info("Complete image processing finished successfully")
+            
+            return {
+                'success': True,
+                'extracted_text': extracted_text,
+                'analysis': analysis,
+                'ocr_details': ocr_result,
+                'model_used': model
             }
             
-            logger.info("Complete processing pipeline finished successfully")
-            return result
-            
         except Exception as e:
-            logger.error(f"Error in processing pipeline: {e}")
+            logger.error(f"Error in complete image processing: {e}")
             return {
-                "extracted_text": "",
-                "gpt_analysis": f"Error processing image: {str(e)}",
-                "success": False,
-                "error": str(e)
+                'success': False,
+                'error': str(e),
+                'stage': 'processing'
             }
 
 
 def main():
     """
-    Main function to demonstrate the OCR-GPT integration.
+    Main function for testing the OCR-GPT integration.
     """
+    # Check for required environment variables
+    if not os.getenv('OPENAI_API_KEY'):
+        print("❌ OPENAI_API_KEY environment variable is required")
+        return
+    
+    if not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
+        print("❌ GOOGLE_APPLICATION_CREDENTIALS environment variable is required")
+        print("   Set it to the path of your Google Cloud service account JSON file")
+        return
+    
     try:
         # Initialize the system
-        logger.info("Initializing OCR-GPT Integration System")
         ocr_gpt = OCRGPTIntegration()
+        print("✅ OCR-GPT system initialized successfully")
         
-        # Example usage
+        # Test with a sample image (if provided as command line argument)
         if len(sys.argv) > 1:
             image_path = sys.argv[1]
+            if os.path.exists(image_path):
+                print(f"🔍 Processing image: {image_path}")
+                result = ocr_gpt.process_image(image_path)
+                
+                if result['success']:
+                    print("✅ Processing completed successfully")
+                    print(f"📝 Extracted text: {result['extracted_text'][:200]}...")
+                    print(f"🤖 Analysis: {result['analysis'][:200]}...")
+                else:
+                    print(f"❌ Processing failed: {result['error']}")
+            else:
+                print(f"❌ Image file not found: {image_path}")
         else:
-            # Default test image path
-            image_path = "test_image.jpg"
-        
-        # Check if image file exists
-        if not Path(image_path).exists():
-            logger.error(f"Image file not found: {image_path}")
-            print(f"Error: Image file not found: {image_path}")
-            print("Usage: python ocr_gpt_integration.py <image_path>")
-            return
-        
-        # Process the image
-        result = ocr_gpt.process_image(image_path)
-        
-        # Display results
-        print("\n" + "="*50)
-        print("OCR-GPT INTEGRATION RESULTS")
-        print("="*50)
-        
-        if result["success"]:
-            print(f"\n📷 Image: {result['image_path']}")
-            print(f"\n📝 Extracted Text ({len(result['extracted_text'])} characters):")
-            print("-" * 30)
-            print(result['extracted_text'])
+            print("💡 Usage: python ocr_gpt_integration.py <image_path>")
             
-            print(f"\n🤖 GPT Analysis:")
-            print("-" * 30)
-            print(result['gpt_analysis'])
-        else:
-            print(f"\n❌ Processing failed: {result.get('error', 'Unknown error')}")
-        
-        print("\n" + "="*50)
-        
     except Exception as e:
-        logger.error(f"Main execution error: {e}")
-        print(f"Error: {e}")
+        print(f"❌ Failed to initialize system: {e}")
 
 
 if __name__ == "__main__":

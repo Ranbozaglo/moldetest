@@ -108,12 +108,17 @@ export const MoldInspection = {
   
   findMany: async (filters = {}) => {
     const token = getAuthToken();
-    const queryParams = new URLSearchParams();
-    
-    if (filters.user_id) {
-      queryParams.append('created_by_id', filters.user_id);
+    // Send user's email as a query param for backend filtering
+    const user = localStorage.getItem('mth_user');
+    let email = '';
+    if (user) {
+      const userData = JSON.parse(user);
+      email = userData.email;
     }
-    
+    const queryParams = new URLSearchParams();
+    if (email) {
+      queryParams.append('email', email);
+    }
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
@@ -162,25 +167,29 @@ export const MoldInspection = {
   },
   
   list: async (sortBy = '-created_at', limit = 10) => {
-    console.log("🔍 DEBUG: MoldInspection.list called with:", { sortBy, limit });
-    
+    // Send user's email as a query param for backend filtering
     const token = getAuthToken();
+    const user = localStorage.getItem('mth_user');
+    let email = '';
+    if (user) {
+      const userData = JSON.parse(user);
+      email = userData.email;
+    }
     const queryParams = new URLSearchParams();
-    
     if (sortBy) {
       queryParams.append('sort', sortBy);
     }
     if (limit) {
       queryParams.append('limit', limit.toString());
     }
-    
+    if (email) {
+      queryParams.append('email', email);
+    }
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
       }
     });
-    
-    console.log("🔍 DEBUG: MoldInspection.list returning:", response);
     return response;
   },
   
