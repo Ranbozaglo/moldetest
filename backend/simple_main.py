@@ -303,8 +303,12 @@ def get_inspections():
         # Get query parameters
         sort_by = request.args.get('sort', '-created_at')
         limit = request.args.get('limit', 10)
+        email = request.args.get('email')
         
-        print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}")
+        # Check if user is admin
+        is_admin = email == 'rotemiluz53@gmail.com'
+        
+        print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
         
         # Build the query - select ALL fields from inspection table
         query = supabase.table('inspection').select('*')
@@ -322,8 +326,8 @@ def get_inspections():
             else:
                 query = query.order(sort_by)
         
-        # Apply limit
-        if limit:
+        # Apply limit only for non-admin users
+        if limit and not is_admin:
             query = query.limit(int(limit))
 
         print(f"🔍 DEBUG: Executing query...")
@@ -332,7 +336,6 @@ def get_inspections():
         print(f"🔍 DEBUG: Found {len(inspections)} inspections")
 
         # Filter by email if provided
-        email = request.args.get('email')
         if email:
             inspections = [i for i in inspections if i.get('email') == email]
 

@@ -108,17 +108,31 @@ export const MoldInspection = {
   
   findMany: async (filters = {}) => {
     const token = getAuthToken();
-    // Send user's email as a query param for backend filtering
     const user = localStorage.getItem('mth_user');
     let email = '';
+    let isAdmin = false;
+    
     if (user) {
       const userData = JSON.parse(user);
       email = userData.email;
+      isAdmin = userData.role === 'admin' || userData.is_admin;
     }
+    
     const queryParams = new URLSearchParams();
-    if (email) {
+    
+    // Add admin-specific parameters
+    if (isAdmin) {
+      queryParams.append('sort', '-created_at');
+      queryParams.append('limit', '1000');
+    }
+    
+    // Only send email filter for non-admin users
+    // Admin users get ALL inspections without email filtering
+    if (email && !isAdmin) {
       queryParams.append('email', email);
     }
+    // Note: Admin users don't send email parameter to get ALL data
+    
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
@@ -167,14 +181,23 @@ export const MoldInspection = {
   },
   
   list: async (sortBy = '-created_at', limit = 10) => {
-    // Send user's email as a query param for backend filtering
     const token = getAuthToken();
     const user = localStorage.getItem('mth_user');
     let email = '';
+    let isAdmin = false;
+    
     if (user) {
       const userData = JSON.parse(user);
       email = userData.email;
+      isAdmin = userData.role === 'admin' || userData.is_admin;
     }
+    
+    // Use higher limit and ensure proper sort for admin users
+    if (isAdmin) {
+      sortBy = sortBy || '-created_at';
+      limit = limit === 10 ? 1000 : limit; // Use 1000 if default limit
+    }
+    
     const queryParams = new URLSearchParams();
     if (sortBy) {
       queryParams.append('sort', sortBy);
@@ -182,9 +205,14 @@ export const MoldInspection = {
     if (limit) {
       queryParams.append('limit', limit.toString());
     }
-    if (email) {
+    
+    // Only send email filter for non-admin users
+    // Admin users get ALL inspections without email filtering
+    if (email && !isAdmin) {
       queryParams.append('email', email);
     }
+    // Note: Admin users don't send email parameter to get ALL data
+    
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
@@ -195,6 +223,22 @@ export const MoldInspection = {
   
   filter: async (filters = {}, sortBy = '-created_at', limit = 10) => {
     const token = getAuthToken();
+    const user = localStorage.getItem('mth_user');
+    let email = '';
+    let isAdmin = false;
+    
+    if (user) {
+      const userData = JSON.parse(user);
+      email = userData.email;
+      isAdmin = userData.role === 'admin' || userData.is_admin;
+    }
+    
+    // Use higher limit and ensure proper sort for admin users
+    if (isAdmin) {
+      sortBy = sortBy || '-created_at';
+      limit = limit === 10 ? 1000 : limit; // Use 1000 if default limit
+    }
+    
     const queryParams = new URLSearchParams();
     
     // Add filters to query params
@@ -214,6 +258,13 @@ export const MoldInspection = {
     if (limit) {
       queryParams.append('limit', limit.toString());
     }
+    
+    // Only send email filter for non-admin users
+    // Admin users get ALL inspections without email filtering
+    if (email && !isAdmin) {
+      queryParams.append('email', email);
+    }
+    // Note: Admin users don't send email parameter to get ALL data
     
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
       headers: {
