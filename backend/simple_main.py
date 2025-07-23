@@ -585,7 +585,7 @@ def create_sample():
 def llm_summarize():
     """LLM summarization endpoint (mock)"""
     data = request.get_json()
-    text = data.get('text', '')
+    text = data.get('text', '') if data else ''
     
     # Mock LLM response
     summary = f"Summary of inspection: {text[:100]}... (Mock LLM response)"
@@ -594,6 +594,68 @@ def llm_summarize():
         "summary": summary,
         "model": "gpt-4-mock"
     })
+
+@app.route('/api/ocr-gpt', methods=['POST'])
+def ocr_gpt():
+    """OCR-GPT endpoint for image analysis (mock implementation)"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        prompt = data.get('prompt', '')
+        image_urls = data.get('image_urls', [])
+        
+        print(f"🔍 OCR-GPT called with prompt: {prompt[:100]}...")
+        print(f"🔍 OCR-GPT image URLs: {image_urls}")
+        
+        # Mock OCR-GPT analysis response
+        if 'lab' in prompt.lower() or 'analysis' in prompt.lower():
+            content = """Based on the laboratory analysis, the following observations can be made:
+
+**CONCLUSION:**
+The submitted samples show varying levels of mold activity. The analysis indicates the presence of common environmental molds typically found in indoor environments. The concentration levels observed are within ranges that suggest localized moisture issues that should be addressed promptly.
+
+**RECOMMENDATIONS:**
+1. **Immediate Actions:** Address any visible water damage or moisture sources in the tested areas
+2. **Preventive Measures:** Improve ventilation and maintain humidity levels below 60%
+3. **Professional Services:** Consider consultation with a certified mold remediation specialist for affected areas
+4. **Timeline:** Address moisture sources within 24-48 hours to prevent further growth
+5. **Environmental Controls:** Install dehumidifiers and ensure proper HVAC maintenance
+
+Note: This is a preliminary analysis. For comprehensive evaluation, professional inspection is recommended."""
+        else:
+            content = f"""OCR analysis completed for the provided images.
+
+Based on the prompt: "{prompt[:200]}..."
+
+The system has processed {len(image_urls)} image(s) and extracted relevant information. For detailed analysis and professional recommendations, please review the findings and consider consulting with subject matter experts.
+
+This is a mock response - full OCR-GPT functionality requires additional configuration."""
+
+        response = {
+            "content": content,
+            "analysis": content,
+            "usage": {
+                "prompt_tokens": len(prompt.split()) * 1.3,
+                "completion_tokens": len(content.split()),
+                "total_tokens": len(prompt.split()) * 1.3 + len(content.split())
+            },
+            "model": "ocr-gpt-mock",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        print(f"✅ OCR-GPT response generated successfully")
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"❌ Error in OCR-GPT endpoint: {str(e)}")
+        return jsonify({
+            "error": f"OCR-GPT processing failed: {str(e)}",
+            "content": "Error processing request. Please try again or contact support.",
+            "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        }), 500
 
 @app.route('/api/email/send', methods=['POST'])
 def send_email():
@@ -875,6 +937,7 @@ if __name__ == '__main__':
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
     print("   - POST /api/llm/summarize")
+    print("   - POST /api/ocr-gpt")
     print("   - POST /api/email/send")
     print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
     
