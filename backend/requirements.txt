@@ -1,20 +1,24 @@
+# Core backend
 fastapi==0.78.0
 uvicorn==0.17.6
 sqlalchemy==1.4.36
-python-dotenv==0.20.0
+python-dotenv==1.0.1
 pydantic==1.10.2
 python-multipart==0.0.5
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-openai==0.28.1
-requests==2.28.1
+requests==2.31.0
 python-dateutil==2.8.2
 jinja2==3.1.2
-supabase==1.0.3 
+
+# Supabase
+supabase==1.0.3
+
+# Flask (optional if still used)
 flask==2.3.3
 flask-cors==4.0.0
 gunicorn
+
+# Google OCR + Image
 google-cloud-vision==3.4.4
 pillow==9.4.0
-
-
