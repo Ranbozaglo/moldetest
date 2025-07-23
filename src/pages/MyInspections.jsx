@@ -59,7 +59,29 @@ export default function MyInspections() {
                 console.log("🔍 DEBUG: Found inspections with filter:", userInspections);
                 
                 if (userInspections && userInspections.length > 0) {
-                  setInspections(userInspections);
+                  // Parse lab_analysis_images field to handle both column names
+                  const parsedInspections = userInspections.map(inspection => {
+                    let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
+                    
+                    if (labImagesField && typeof labImagesField === 'string') {
+                      try {
+                        inspection.lab_analysis_images = JSON.parse(labImagesField);
+                      } catch (parseError) {
+                        console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
+                        inspection.lab_analysis_images = [];
+                      }
+                    } else if (!labImagesField) {
+                      inspection.lab_analysis_images = [];
+                    } else if (Array.isArray(labImagesField)) {
+                      inspection.lab_analysis_images = labImagesField;
+                    } else {
+                      inspection.lab_analysis_images = [];
+                    }
+                    
+                    return inspection;
+                  });
+                  
+                  setInspections(parsedInspections);
                 } else {
                   // Fallback: Get all inspections and filter manually
                   console.log("🔍 DEBUG: No inspections found with filter, trying manual search...");
@@ -70,7 +92,30 @@ export default function MyInspections() {
                     inspection.email && inspection.email.toLowerCase() === currentUser.email.toLowerCase()
                   );
                   console.log("🔍 DEBUG: Matching inspections after manual filter:", matchingInspections);
-                  setInspections(matchingInspections);
+                  
+                  // Parse lab_analysis_images field to handle both column names
+                  const parsedInspections = matchingInspections.map(inspection => {
+                    let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
+                    
+                    if (labImagesField && typeof labImagesField === 'string') {
+                      try {
+                        inspection.lab_analysis_images = JSON.parse(labImagesField);
+                      } catch (parseError) {
+                        console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
+                        inspection.lab_analysis_images = [];
+                      }
+                    } else if (!labImagesField) {
+                      inspection.lab_analysis_images = [];
+                    } else if (Array.isArray(labImagesField)) {
+                      inspection.lab_analysis_images = labImagesField;
+                    } else {
+                      inspection.lab_analysis_images = [];
+                    }
+                    
+                    return inspection;
+                  });
+                  
+                  setInspections(parsedInspections);
                 }
               } catch (inspectionError) {
                 console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
