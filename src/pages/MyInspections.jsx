@@ -37,7 +37,7 @@ export default function MyInspections() {
   useEffect(() => {
     (async () => {
       try {
-        await requireSupabaseSession('/sign-in');
+        await requireSupabaseSession('/SignIn');
         const fetchUserData = async () => {
           try {
             setUser(currentUser);

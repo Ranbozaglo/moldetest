@@ -45,7 +45,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        await requireSupabaseSession('/sign-in');
+        await requireSupabaseSession('/SignIn');
         checkUser();
       } catch (err) {
         console.error('🔍 DEBUG: Auth check failed:', err);

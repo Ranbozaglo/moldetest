@@ -34,10 +34,10 @@ export default function InspectionDetails() {
   const [error, setError] = useState(null);
   const { user: currentUser } = useAuth();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        await requireSupabaseSession('/sign-in');
+      useEffect(() => {
+      (async () => {
+        try {
+          await requireSupabaseSession('/SignIn');
         const checkUserAndLoadData = async () => {
           try {
             if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
@@ -116,7 +116,7 @@ export default function InspectionDetails() {
 
   const handleLabImageUpload = async (event) => {
     try {
-      await requireSupabaseSession('/sign-in');
+      await requireSupabaseSession('/SignIn');
     } catch (err) {
       alert('You must be logged in to upload files.');
       return;
