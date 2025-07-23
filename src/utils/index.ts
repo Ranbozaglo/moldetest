@@ -2,7 +2,8 @@
 
 
 export function createPageUrl(pageName: string, params?: Record<string, any>) {
-    let url = '/' + pageName.toLowerCase().replace(/ /g, '-');
+    // Keep the original case to match route definitions, but handle spaces
+    let url = '/' + pageName.replace(/ /g, '-');
     
     if (params && Object.keys(params).length > 0) {
         const searchParams = new URLSearchParams();
