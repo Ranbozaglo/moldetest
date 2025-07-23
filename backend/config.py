@@ -30,6 +30,7 @@ def validate_config():
         print("❌ VITE_SUPABASE_ANON_KEY not configured")
         print("   Please add VITE_SUPABASE_ANON_KEY=your_supabase_anon_key to .env file")
         return False
+
     
     print("✅ Supabase configuration validated")
     return True 

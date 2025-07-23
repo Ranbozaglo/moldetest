@@ -41,29 +41,16 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
     try {
       // Call backend API for authentication
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Sign in failed');
-      }
-
-      const userData = await response.json();
+      const response = await User.login(email, password);
       
       // Create user object with token from Flask backend
       const user = {
-        id: userData.user.id,
-        email: userData.user.email,
-        name: userData.user.full_name || email.split('@')[0], // Use full_name from user_profiles
-        is_admin: userData.user.is_admin || userData.user.role === 'admin',
-        role: userData.user.role || 'user',
-        access_token: userData.access_token,
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.full_name || email.split('@')[0], // Use full_name from user_profiles
+        is_admin: response.user.is_admin || response.user.role === 'admin',
+        role: response.user.role || 'user',
+        access_token: response.access_token,
         createdAt: new Date().toISOString()
       };
       
@@ -79,24 +66,11 @@ export const AuthProvider = ({ children }) => {
   const signUp = async (email, password, name) => {
     try {
       // Call backend API for registration
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Sign up failed');
-      }
-
-      const userData = await response.json();
+      const response = await User.register(email, password);
       
       // Create user object
       const user = {
-        id: userData.user_id,
+        id: response.user_id,
         email: email,
         name: name || email.split('@')[0],
         is_admin: email.includes('rotemiluz53@gmail.com'),
