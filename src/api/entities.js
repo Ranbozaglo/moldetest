@@ -105,30 +105,49 @@ export const MoldInspection = {
 
   create: async (data) => {
     const token = getAuthToken();
+    
+    // Debug: Log the inspection data being sent to verify image data
+    console.log("🔍 DEBUG: MoldInspection.create - Full data being sent:", data);
+    console.log("🔍 DEBUG: MoldInspection.create - Visible mold details:", data.visible_mold_details);
+    console.log("🔍 DEBUG: MoldInspection.create - Water damage details:", data.water_damage_details);
+    console.log("🔍 DEBUG: MoldInspection.create - Thermostat image:", data.thermostat_image);
+    
+    const requestBody = {
+      full_name: data.full_name,
+      street_address: data.street_address,
+      unit_number: data.unit_number,
+      city: data.city,
+      state: data.state,
+      zip_code: data.zip_code,
+      property_type: data.property_type,
+      client_type: data.client_type,
+      square_footage: data.square_footage,
+      background_info: data.background_info,
+      has_visible_mold: data.has_visible_mold,
+      visible_mold_details: data.visible_mold_details, // ✅ Fixed: Use correct field name with images
+      has_water_damage: data.has_water_damage,
+      water_damage_details: data.water_damage_details, // ✅ Fixed: Use correct field name with images
+      environmental_data_method: data.environmental_data_method,
+      thermostat_image: data.thermostat_image,
+      temperature: data.temperature,
+      humidity: data.humidity,
+      status: data.status || 'pending',
+      email: data.email,
+      is_sample: data.is_sample || false,
+      created_by: data.created_by, // Pass created_by if present
+      client_status_detail: data.client_status_detail,
+      created_date: data.created_date
+    };
+    
+    console.log("🔍 DEBUG: MoldInspection.create - Request body being sent:", requestBody);
+    
     const response = await apiCall('/inspection', {
       method: 'POST',
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        full_name: data.full_name,
-        street_address: data.street_address,
-        city: data.city,
-        state: data.state,
-        zip_code: data.zip_code,
-        property_type: data.property_type,
-        client_type: data.client_type,
-        square_footage: data.square_footage,
-        has_visible_mold: data.has_visible_mold,
-        mold_locations: data.mold_locations,
-        has_water_damage: data.has_water_damage,
-        water_damage_locations: data.water_damage_locations,
-        status: data.status || 'pending',
-        email: data.email,
-        is_sample: data.is_sample || false,
-        created_by: data.created_by // Pass created_by if present
-      })
+      body: JSON.stringify(requestBody)
     });
     
     // Extract the inspection data from the response

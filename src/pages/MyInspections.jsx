@@ -197,6 +197,11 @@ export default function MyInspections() {
           return `<span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; ${colors[priority]}">${text}</span>`;
       };
 
+      // Debug: Log inspection image data for report generation
+      console.log("🔍 DEBUG: Report generation - inspection.visible_mold_details:", inspection.visible_mold_details);
+      console.log("🔍 DEBUG: Report generation - inspection.water_damage_details:", inspection.water_damage_details);
+      console.log("🔍 DEBUG: Report generation - inspection.thermostat_image:", inspection.thermostat_image);
+      
       const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
         ? `<div style="margin-bottom: 20px;">
             <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
