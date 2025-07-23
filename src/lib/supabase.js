@@ -21,32 +21,45 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Helper function to get the current user's session
+// Helper function to get the current user's session (Flask auth)
 export const getCurrentSession = async () => {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Error getting session:', error);
+    const savedUser = localStorage.getItem('mth_user');
+    if (!savedUser) {
+      console.log('No Flask auth session found');
       return null;
     }
-    return session;
+    
+    const userData = JSON.parse(savedUser);
+    if (!userData.access_token) {
+      console.log('No access token in Flask auth session');
+      return null;
+    }
+    
+    // Return Flask session format compatible with expected usage
+    return {
+      access_token: userData.access_token,
+      user: userData
+    };
   } catch (error) {
-    console.error('Error getting session:', error);
+    console.error('Error getting Flask auth session:', error);
     return null;
   }
 };
 
-// Helper function to get the current user
+// Helper function to get the current user (Flask auth)
 export const getCurrentUser = async () => {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) {
-      console.error('Error getting user:', error);
+    const savedUser = localStorage.getItem('mth_user');
+    if (!savedUser) {
+      console.log('No Flask auth user found');
       return null;
     }
-    return user;
+    
+    const userData = JSON.parse(savedUser);
+    return userData;
   } catch (error) {
-    console.error('Error getting user:', error);
+    console.error('Error getting Flask auth user:', error);
     return null;
   }
 };

@@ -201,12 +201,11 @@ export default function Inspection() {
         submissionData.humidity = parseFloat(formData.humidity);
       }
 
-      // Get Supabase session for created_by
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user || !session.user.email) {
-        throw new Error('Could not get Supabase session or user email.');
+      // Get user email from Flask authentication (already available from component)
+      if (!currentUser || !currentUser.email) {
+        throw new Error('Authentication required. Please log in to submit inspection.');
       }
-      submissionData.created_by = session.user.email;
+      submissionData.created_by = currentUser.email;
 
       // Now log the true final data
       console.log("🔍 DEBUG: Final submission data:", submissionData);

@@ -15,7 +15,7 @@ import { getUrlParam } from "@/utils/urlUtils";
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from "date-fns";
 import { Core } from "@/api/integrations";
-import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
+// Removed requireSupabaseSession - using Flask backend authentication
 
 export default function InspectionDetails() {
   const location = useLocation();
@@ -37,7 +37,7 @@ export default function InspectionDetails() {
       useEffect(() => {
       (async () => {
         try {
-          await requireSupabaseSession('/SignIn');
+          // Skip Supabase session check - using Flask backend authentication
         const checkUserAndLoadData = async () => {
           try {
             if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
@@ -115,13 +115,9 @@ export default function InspectionDetails() {
   };
 
   const handleLabImageUpload = async (event) => {
-    try {
-      await requireSupabaseSession('/SignIn');
-    } catch (err) {
-      alert('You must be logged in to upload files.');
-      return;
-    }
-
+    // Skip Supabase session check - using Flask backend authentication
+    // Auth is handled by the AuthContext and route guards
+    
     const files = event.target.files;
     if (!files || files.length === 0) return;
 

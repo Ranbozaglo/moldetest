@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from '@/contexts/AuthContext';
-import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
+// Removed requireSupabaseSession - using Flask backend authentication
 
 export default function MyInspections() {
   const [inspections, setInspections] = useState([]);
@@ -37,7 +37,7 @@ export default function MyInspections() {
   useEffect(() => {
     (async () => {
       try {
-        await requireSupabaseSession('/SignIn');
+        // Skip Supabase session check - using Flask backend authentication
         const fetchUserData = async () => {
           try {
             setUser(currentUser);

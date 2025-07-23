@@ -22,7 +22,6 @@ import {
   CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { requireSupabaseSession } from '@/lib/supabaseAuthGuard';
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -43,51 +42,49 @@ export default function AdminDashboard() {
   const { user: authUser } = useAuth();
 
   useEffect(() => {
-    console.log('🔍 PROD DEBUG: AdminDashboard useEffect triggered, authUser:', authUser);
+    const isProduction = window.location.hostname !== 'localhost';
+    const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
     
-    (async () => {
-      try {
-        console.log('🔍 PROD DEBUG: AdminDashboard - calling requireSupabaseSession');
-        await requireSupabaseSession('/SignIn');
-        console.log('🔍 PROD DEBUG: AdminDashboard - requireSupabaseSession passed, calling checkUser');
-        checkUser();
-      } catch (err) {
-        console.error('🔍 PROD DEBUG: AdminDashboard - Auth check failed:', err);
-        console.log('🔍 PROD DEBUG: AdminDashboard - Setting loading to false due to auth failure');
-        setLoading(false);
-      }
-    })();
+    console.log(`${logPrefix} AdminDashboard useEffect triggered, authUser:`, authUser);
+    
+    // Skip Supabase session check - we use Flask backend authentication
+    console.log(`${logPrefix} AdminDashboard - Skipping Supabase session check, using Flask auth`);
+    console.log(`${logPrefix} AdminDashboard - Calling checkUser directly`);
+    checkUser();
   }, [authUser]);
 
   const checkUser = async () => {
-    console.log('🔍 PROD DEBUG: AdminDashboard checkUser called, authUser:', authUser);
+    const isProduction = window.location.hostname !== 'localhost';
+    const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
+    
+    console.log(`${logPrefix} AdminDashboard checkUser called, authUser:`, authUser);
     
     try {
       // Use the authenticated user from AuthContext instead of calling User.me()
       if (!authUser) {
-        console.log('🔍 PROD DEBUG: AdminDashboard - No authUser found, redirecting to Welcome');
+        console.log(`${logPrefix} AdminDashboard - No authUser found, redirecting to Welcome`);
         navigate(createPageUrl("Welcome"));
         return;
       }
       
-      console.log('🔍 PROD DEBUG: AdminDashboard - authUser found, checking admin status');
-      console.log('🔍 PROD DEBUG: AdminDashboard - authUser.role:', authUser.role, 'authUser.is_admin:', authUser.is_admin);
+      console.log(`${logPrefix} AdminDashboard - authUser found, checking admin status`);
+      console.log(`${logPrefix} AdminDashboard - authUser.role:`, authUser.role, 'authUser.is_admin:', authUser.is_admin);
       
       // Check if user is admin
       if (authUser.role !== 'admin' && !authUser.is_admin) {
-        console.log('🔍 PROD DEBUG: AdminDashboard - User is not admin, redirecting to Welcome');
+        console.log(`${logPrefix} AdminDashboard - User is not admin, redirecting to Welcome`);
         navigate(createPageUrl("Welcome"));
         return;
       }
       
-      console.log('🔍 PROD DEBUG: AdminDashboard - User is admin, setting user and loading inspections');
+      console.log(`${logPrefix} AdminDashboard - User is admin, setting user and loading inspections`);
       setUser(authUser);
       loadInspections();
     } catch (error) {
-      console.error('🔍 PROD DEBUG: AdminDashboard - Error checking user:', error);
+      console.error(`${logPrefix} AdminDashboard - Error checking user:`, error);
       navigate(createPageUrl("Welcome"));
     } finally {
-      console.log('🔍 PROD DEBUG: AdminDashboard - Setting loading to false');
+      console.log(`${logPrefix} AdminDashboard - Setting loading to false`);
       setLoading(false);
     }
   };
