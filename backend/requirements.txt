@@ -15,6 +15,6 @@ flask==2.3.3
 flask-cors==4.0.0
 gunicorn
 google-cloud-vision==3.4.4
-pillow==9.5.0
+pillow==9.4.0
 
 
