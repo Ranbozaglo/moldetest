@@ -94,7 +94,46 @@ export default function AdminDashboard() {
       console.log("🔍 Loading all inspections...");
       const allInspections = await MoldInspection.list('-created_at', 1000); // Load more inspections
       console.log("🔍 Loaded inspections:", allInspections);
-      setInspections(allInspections);
+      
+      // Parse JSON fields for each inspection (same logic as InspectionDetails)
+      const parsedInspections = allInspections.map(inspection => {
+        // Parse lab_analysis_images if it's a string
+        if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
+          try {
+            inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
+            console.log("🔍 DEBUG: Parsed lab_analysis_images for inspection", inspection.id, ":", inspection.lab_analysis_images);
+          } catch (parseError) {
+            console.error("❌ Error parsing lab_analysis_images JSON for inspection", inspection.id, ":", parseError);
+            inspection.lab_analysis_images = [];
+          }
+        } else if (!inspection.lab_analysis_images) {
+          inspection.lab_analysis_images = [];
+        }
+        
+        // Parse visible_mold_details if it's a string
+        if (inspection.visible_mold_details && typeof inspection.visible_mold_details === 'string') {
+          try {
+            inspection.visible_mold_details = JSON.parse(inspection.visible_mold_details);
+          } catch (parseError) {
+            console.error("❌ Error parsing visible_mold_details JSON for inspection", inspection.id, ":", parseError);
+            inspection.visible_mold_details = [];
+          }
+        }
+        
+        // Parse water_damage_details if it's a string
+        if (inspection.water_damage_details && typeof inspection.water_damage_details === 'string') {
+          try {
+            inspection.water_damage_details = JSON.parse(inspection.water_damage_details);
+          } catch (parseError) {
+            console.error("❌ Error parsing water_damage_details JSON for inspection", inspection.id, ":", parseError);
+            inspection.water_damage_details = [];
+          }
+        }
+        
+        return inspection;
+      });
+      
+      setInspections(parsedInspections);
       setSelectedInspections(new Set());
     } catch (error) {
       console.error("Error loading inspections:", error);
@@ -1297,6 +1336,7 @@ export default function AdminDashboard() {
                         <TableHead>Status</TableHead>
                         <TableHead>Mold</TableHead>
                         <TableHead>Water Damage</TableHead>
+                        <TableHead>Lab Analysis</TableHead>
                         <TableHead>Sample</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Actions</TableHead>
@@ -1383,6 +1423,23 @@ export default function AdminDashboard() {
                             ) : (
                               <Badge variant="outline">No</Badge>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <FlaskConical className="w-4 h-4 text-blue-500" />
+                                  <Badge variant="default" className="text-xs">
+                                    {inspection.lab_analysis_images.length} image{inspection.lab_analysis_images.length > 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <FlaskConical className="w-4 h-4 text-gray-300" />
+                                  <Badge variant="outline" className="text-xs">None</Badge>
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {inspection.is_sample ? (
