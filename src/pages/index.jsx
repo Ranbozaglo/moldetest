@@ -1,37 +1,70 @@
 import Layout from "./Layout.jsx";
 
 import Welcome from "./Welcome";
-
 import Inspection from "./Inspection";
-
 import Sampling from "./Sampling";
-
 import AdminDashboard from "./AdminDashboard";
-
 import InspectionDetails from "./InspectionDetails";
-
 import SamplingGuide from "./SamplingGuide";
-
 import ThankYou from "./ThankYou";
-
 import MyInspections from "./MyInspections";
-
 import SignIn from "./SignIn";
-
 import SignUp from "./SignUp";
 
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext";
 
-// Component to redirect admin users to AdminDashboard
-function AdminRedirect() {
+// Protected Route Component - handles all authentication
+function ProtectedRoute({ children, requireAdmin = false, allowAdmin = true, redirectTo = "/SignIn" }) {
   const { user, loading } = useAuth();
+  const isProduction = window.location.hostname !== 'localhost';
+  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
   
-  console.log('🔍 PROD DEBUG: AdminRedirect - user:', user, 'loading:', loading);
+  console.log(`${logPrefix} ProtectedRoute - user:`, user, 'loading:', loading, 'requireAdmin:', requireAdmin, 'allowAdmin:', allowAdmin);
   
   // Show loading while auth is being determined
   if (loading) {
-    console.log('🔍 PROD DEBUG: AdminRedirect - showing loading spinner');
+    console.log(`${logPrefix} ProtectedRoute - showing loading spinner`);
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>;
+  }
+  
+  // Check if user is authenticated
+  if (!user) {
+    console.log(`${logPrefix} ProtectedRoute - no user found, redirecting to:`, redirectTo);
+    return <Navigate to={redirectTo} replace />;
+  }
+  
+  const isAdmin = user.role === 'admin' || user.is_admin;
+  
+  // If admin access is required but user is not admin
+  if (requireAdmin && !isAdmin) {
+    console.log(`${logPrefix} ProtectedRoute - admin required but user is not admin, redirecting to Welcome`);
+    return <Navigate to="/Welcome" replace />;
+  }
+  
+  // If admin access is not allowed and user is admin
+  if (!allowAdmin && isAdmin) {
+    console.log(`${logPrefix} ProtectedRoute - admin not allowed, redirecting to AdminDashboard`);
+    return <Navigate to="/AdminDashboard" replace />;
+  }
+  
+  // All checks passed, show the protected content
+  console.log(`${logPrefix} ProtectedRoute - access granted, showing protected content`);
+  return children;
+}
+
+// Public Route Component - handles public pages with admin redirect
+function PublicRoute({ children }) {
+  const { user, loading } = useAuth();
+  const isProduction = window.location.hostname !== 'localhost';
+  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
+  
+  console.log(`${logPrefix} PublicRoute - user:`, user, 'loading:', loading);
+  
+  // Show loading while auth is being determined
+  if (loading) {
     return <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>;
@@ -39,115 +72,150 @@ function AdminRedirect() {
   
   // If user is admin, redirect to AdminDashboard
   if (user && (user.role === 'admin' || user.is_admin)) {
-    console.log('🔍 PROD DEBUG: AdminRedirect - redirecting admin to AdminDashboard');
+    console.log(`${logPrefix} PublicRoute - admin user detected, redirecting to AdminDashboard`);
     return <Navigate to="/AdminDashboard" replace />;
   }
   
-  // Otherwise, show the intended page
-  console.log('🔍 PROD DEBUG: AdminRedirect - showing Welcome page');
-  return <Welcome />;
-}
-
-// Component to guard routes for admin users
-function AdminRouteGuard({ children, allowAdmin = false }) {
-  const { user, loading } = useAuth();
-  
-  console.log('🔍 PROD DEBUG: AdminRouteGuard - user:', user, 'loading:', loading, 'allowAdmin:', allowAdmin);
-  
-  // Show loading while auth is being determined
-  if (loading) {
-    console.log('🔍 PROD DEBUG: AdminRouteGuard - showing loading spinner');
-    return <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    </div>;
-  }
-  
-  // Check if user is not authenticated at all
-  if (!user) {
-    console.log('🔍 PROD DEBUG: AdminRouteGuard - no user found, redirecting to SignIn');
-    return <Navigate to="/SignIn" replace />;
-  }
-  
-  // If user is admin and this route doesn't allow admin access, redirect to AdminDashboard
-  if (user && (user.role === 'admin' || user.is_admin) && !allowAdmin) {
-    console.log('🔍 PROD DEBUG: AdminRouteGuard - admin user accessing non-admin route, redirecting to AdminDashboard');
-    return <Navigate to="/AdminDashboard" replace />;
-  }
-  
-  // Otherwise, show the intended component
-  console.log('🔍 PROD DEBUG: AdminRouteGuard - showing protected content');
+  // Show the public content
+  console.log(`${logPrefix} PublicRoute - showing public content`);
   return children;
 }
 
 const PAGES = {
-    
     Welcome: Welcome,
-    
     Inspection: Inspection,
-    
     Sampling: Sampling,
-    
     AdminDashboard: AdminDashboard,
-    
     InspectionDetails: InspectionDetails,
-    
     SamplingGuide: SamplingGuide,
-    
     ThankYou: ThankYou,
-    
     MyInspections: MyInspections,
-    
     SignIn: SignIn,
-    
     SignUp: SignUp,
-    
 }
 
+/**
+ * Get current page from URL with improved validation
+ * @param {string} url - The current URL
+ * @returns {string} The page name or default
+ */
 function _getCurrentPage(url) {
-    if (url.endsWith('/')) {
-        url = url.slice(0, -1);
+    if (!url || typeof url !== 'string') {
+        console.warn('_getCurrentPage: Invalid URL provided:', url);
+        return 'Welcome';
     }
-    let urlLastPart = url.split('/').pop();
+
+    // Clean up the URL
+    let cleanUrl = url;
+    if (cleanUrl.endsWith('/')) {
+        cleanUrl = cleanUrl.slice(0, -1);
+    }
+    
+    // Get the last segment of the path
+    let urlLastPart = cleanUrl.split('/').pop() || '';
+    
+    // Remove query parameters if present
     if (urlLastPart.includes('?')) {
         urlLastPart = urlLastPart.split('?')[0];
     }
+    
+    // Handle empty path (root)
+    if (!urlLastPart) {
+        return 'Welcome';
+    }
 
-    const pageName = Object.keys(PAGES).find(page => page.toLowerCase() === urlLastPart.toLowerCase());
-    return pageName || Object.keys(PAGES)[0];
+    // Find matching page (case-insensitive)
+    const pageName = Object.keys(PAGES).find(page => 
+        page.toLowerCase() === urlLastPart.toLowerCase()
+    );
+    
+    if (pageName) {
+        console.log('🔍 DEBUG: Current page resolved to:', pageName);
+        return pageName;
+    }
+    
+    // Log warning for unrecognized pages
+    console.warn('_getCurrentPage: Unrecognized page:', urlLastPart, 'defaulting to Welcome');
+    return 'Welcome';
 }
 
-// Create a wrapper component that uses useLocation inside the Router context
+// Main Routes Component
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
     
+    console.log('🔍 DEBUG: PagesContent - pathname:', location.pathname, 'currentPage:', currentPage);
+    
     return (
         <Layout currentPageName={currentPage}>
             <Routes>            
-                
-                    <Route path="/" element={<AdminRedirect />} />
-                
-                
-                <Route path="/Welcome" element={<AdminRedirect />} />
-                
-                <Route path="/Inspection" element={<AdminRouteGuard><Inspection /></AdminRouteGuard>} />
-                
-                <Route path="/Sampling" element={<AdminRouteGuard><Sampling /></AdminRouteGuard>} />
-                
-                <Route path="/AdminDashboard" element={<AdminDashboard />} />
-                
-                <Route path="/InspectionDetails" element={<AdminRouteGuard allowAdmin={true}><InspectionDetails /></AdminRouteGuard>} />
-                
-                <Route path="/SamplingGuide" element={<AdminRouteGuard><SamplingGuide /></AdminRouteGuard>} />
-                
-                <Route path="/ThankYou" element={<AdminRouteGuard><ThankYou /></AdminRouteGuard>} />
-                
-                <Route path="/MyInspections" element={<AdminRouteGuard><MyInspections /></AdminRouteGuard>} />
-                
+                {/* Public Routes */}
+                <Route path="/" element={<PublicRoute><Welcome /></PublicRoute>} />
+                <Route path="/Welcome" element={<PublicRoute><Welcome /></PublicRoute>} />
                 <Route path="/SignIn" element={<SignIn />} />
-                
                 <Route path="/SignUp" element={<SignUp />} />
                 
+                {/* Protected Routes - Regular Users Only */}
+                <Route path="/Inspection" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <Inspection />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/Sampling" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <Sampling />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/SamplingGuide" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <SamplingGuide />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/ThankYou" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <ThankYou />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/MyInspections" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <MyInspections />
+                    </ProtectedRoute>
+                } />
+                
+                {/* Admin-Only Routes */}
+                <Route path="/AdminDashboard" element={
+                    <ProtectedRoute requireAdmin={true}>
+                        <AdminDashboard />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/InspectionDetails" element={
+                    <ProtectedRoute requireAdmin={true}>
+                        <InspectionDetails />
+                    </ProtectedRoute>
+                } />
+                
+                {/* 404 Fallback - Improved */}
+                <Route path="*" element={
+                    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+                        <div className="text-center p-8 bg-white rounded-lg shadow-lg">
+                            <h1 className="text-3xl font-bold text-slate-900 mb-4">404 - Page Not Found</h1>
+                            <p className="text-slate-600 mb-6">
+                                The page you're looking for doesn't exist or has been moved.
+                            </p>
+                            <div className="space-y-4">
+                                <Navigate to="/Welcome" replace />
+                                <p className="text-sm text-slate-500">
+                                    Redirecting you to the home page...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                } />
             </Routes>
         </Layout>
     );

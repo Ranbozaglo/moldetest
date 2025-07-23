@@ -18,6 +18,16 @@ SUPABASE_ANON_KEY = os.getenv('VITE_SUPABASE_ANON_KEY', 'your_supabase_anon_key_
 SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key_here')
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES', '30'))
 
+# Google Cloud Vision Configuration
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+
+# OpenAI Configuration
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+# OCR Configuration
+OCR_SUPPORTED_LANGUAGES = ['en', 'he']  # English and Hebrew
+OCR_MAX_IMAGE_SIZE_MB = 10
+
 # Validation
 def validate_config():
     """Validate that required environment variables are set"""
@@ -31,6 +41,33 @@ def validate_config():
         print("   Please add VITE_SUPABASE_ANON_KEY=your_supabase_anon_key to .env file")
         return False
 
-    
     print("✅ Supabase configuration validated")
-    return True 
+    return True
+
+def validate_ocr_config():
+    """Validate OCR-related configuration"""
+    ocr_ready = True
+    
+    if not GOOGLE_APPLICATION_CREDENTIALS:
+        print("⚠️  GOOGLE_APPLICATION_CREDENTIALS not configured")
+        print("   Please add GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json to .env file")
+        ocr_ready = False
+    elif not os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+        print(f"❌ Google Cloud credentials file not found: {GOOGLE_APPLICATION_CREDENTIALS}")
+        ocr_ready = False
+    else:
+        print("✅ Google Cloud credentials file found")
+    
+    if not OPENAI_API_KEY:
+        print("⚠️  OPENAI_API_KEY not configured")
+        print("   Please add OPENAI_API_KEY=your_openai_key to .env file")
+        ocr_ready = False
+    else:
+        print("✅ OpenAI API key configured")
+    
+    if ocr_ready:
+        print("✅ OCR configuration validated - Real Google Vision OCR available")
+    else:
+        print("⚠️  OCR configuration incomplete - Using mock responses")
+    
+    return ocr_ready 

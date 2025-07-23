@@ -206,7 +206,7 @@ export default function SamplingGuide() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div className="space-y-3">
                             <img 
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/5f765e25e_WhatsAppImage2025-05-11at64111AM.jpg"
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/5f765e25e_WhatsAppImage2025-05-11at64111AM.jpg"
                                 alt="Proper Q-tip sampling technique on wall mold"
                                 className="w-full h-48 object-cover rounded-xl border border-slate-200"
                             />
@@ -215,7 +215,7 @@ export default function SamplingGuide() {
                         </div>
                         <div className="space-y-3">
                             <img 
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6011d36e7_WhatsAppImage2023-01-16at54603PM11.jpeg"
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/6011d36e7_WhatsAppImage2023-01-16at54603PM11.jpeg"
                                 alt="Ceiling mold sampling with Q-tip"
                                 className="w-full h-48 object-cover rounded-xl border border-slate-200"
                             />
@@ -224,7 +224,7 @@ export default function SamplingGuide() {
                         </div>
                         <div className="space-y-3">
                             <img 
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/3481aec58_WhatsAppImage2023-02-14at50555PM3.jpeg"
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/3481aec58_WhatsAppImage2023-02-14at50555PM3.jpeg"
                                 alt="Air vent sampling technique"
                                 className="w-full h-48 object-cover rounded-xl border border-slate-200"
                             />
@@ -233,7 +233,7 @@ export default function SamplingGuide() {
                         </div>
                         <div className="space-y-3">
                             <img 
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/d1808efb8_ChatGPTImageJul2202512_29_47PM.png"
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/d1808efb8_ChatGPTImageJul2202512_29_47PM.png"
                                 alt="Properly labeled and bagged sample"
                                 className="w-full h-48 object-contain rounded-xl border border-slate-200" // Updated: object-cover -> object-contain
                             />
@@ -242,7 +242,7 @@ export default function SamplingGuide() {
                         </div>
                         <div className="space-y-3">
                             <img 
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/5df3d80ff_ChatGPTImageJul2202501_45_05PM.png"
+                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/5df3d80ff_ChatGPTImageJul2202501_45_05PM.png"
                                 alt="Shipping label on envelope"
                                 className="w-full h-48 object-cover rounded-xl border border-slate-200"
                             />
