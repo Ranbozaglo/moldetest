@@ -33,17 +33,38 @@ export default function SignIn() {
     try {
       const result = await signIn(email, password);
       if (result.success) {
-        // Redirect based on user role
+        console.log('🔍 DEBUG: Sign in successful, user:', result.user);
+        
+        // Small delay to ensure state is updated properly
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Redirect based on user role with direct paths
         if (result.user.is_admin || result.user.role === 'admin') {
-          navigate(createPageUrl('AdminDashboard'));
+          console.log('🔍 DEBUG: Redirecting admin user to AdminDashboard');
+          try {
+            navigate('/AdminDashboard', { replace: true });
+          } catch (navError) {
+            console.error('🔍 DEBUG: Navigation error to AdminDashboard:', navError);
+            // Fallback navigation
+            window.location.href = '/AdminDashboard';
+          }
         } else {
-          navigate(createPageUrl('Inspection'));
+          console.log('🔍 DEBUG: Redirecting regular user to Inspection');
+          try {
+            navigate('/Inspection', { replace: true });
+          } catch (navError) {
+            console.error('🔍 DEBUG: Navigation error to Inspection:', navError);
+            // Fallback navigation
+            window.location.href = '/Inspection';
+          }
         }
       } else {
+        console.error('🔍 DEBUG: Sign in failed:', result.error);
         setError(result.error || 'Sign in failed');
       }
     } catch (error) {
-      setError('An unexpected error occurred');
+      console.error('🔍 DEBUG: Sign in exception:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

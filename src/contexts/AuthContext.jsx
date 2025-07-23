@@ -40,25 +40,45 @@ export const AuthProvider = ({ children }) => {
 
   const signIn = async (email, password) => {
     try {
+      console.log('🔍 DEBUG: AuthContext signIn called with:', { email });
+      
       // Call backend API for authentication
       const response = await User.login(email, password);
+      console.log('🔍 DEBUG: Backend login response:', response);
+      
+      // Ensure we have the required response structure
+      if (!response || !response.user || !response.access_token) {
+        throw new Error('Invalid response from server');
+      }
       
       // Create user object with token from Flask backend
+      // Check for admin role from multiple sources
+      const isAdminUser = response.user.is_admin || 
+                         response.user.role === 'admin' || 
+                         email === 'rotemiluz53@gmail.com';
+      
+      const userRole = isAdminUser ? 'admin' : (response.user.role || 'user');
+      
       const user = {
         id: response.user.id,
         email: response.user.email,
         name: response.user.full_name || email.split('@')[0], // Use full_name from user_profiles
-        is_admin: response.user.is_admin || response.user.role === 'admin',
-        role: response.user.role || 'user',
+        is_admin: isAdminUser,
+        role: userRole,
         access_token: response.access_token,
         createdAt: new Date().toISOString()
       };
       
+      console.log('🔍 DEBUG: Created user object:', user);
+      
       setUser(user);
       localStorage.setItem('mth_user', JSON.stringify(user));
+      
+      console.log('🔍 DEBUG: User state updated and saved to localStorage');
+      
       return { success: true, user: user };
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error('🔍 DEBUG: Sign in error:', error);
       return { success: false, error: error.message || 'Sign in failed' };
     }
   };

@@ -86,11 +86,7 @@ export default function Welcome() {
                   size="lg" 
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                 >
-                  <img 
-                    src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
-                    alt="Mold Testing Houston Logo" 
-                    className="w-6 h-6 mr-3 object-contain"
-                  />
+               
                   Start NEW Mold Inspection & Testing
                 </Button>
             </motion.div>
