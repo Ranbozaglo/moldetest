@@ -13,13 +13,17 @@ class LLMService:
     
     async def invoke_llm(self, request: LLMRequest) -> LLMResponse:
         """
-        Invoke OpenAI LLM with the given prompt and context
+        Invoke OpenAI LLM with the given prompt (or extracted_text fallback)
         """
         try:
-            # Prepare the prompt with context
-            full_prompt = self._build_prompt(request.prompt, request.context)
-            
-            # Call OpenAI API
+            # Use prompt as-is if provided, otherwise fallback to context['extracted_text']
+            if request.prompt and request.prompt.strip():
+                full_prompt = request.prompt
+            elif request.context and 'extracted_text' in request.context and request.context['extracted_text'].strip():
+                full_prompt = request.context['extracted_text']
+            else:
+                raise Exception("No prompt or extracted_text provided.")
+
             response = await self.client.chat.completions.acreate(
                 model="gpt-4",
                 messages=[
@@ -36,7 +40,6 @@ class LLMService:
                 temperature=0.7
             )
             
-            # Extract response
             content = response.choices[0].message.content
             usage = {
                 "prompt_tokens": response.usage.prompt_tokens,

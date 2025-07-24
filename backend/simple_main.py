@@ -170,6 +170,7 @@ class SimpleOCRIntegration:
                 max_tokens=1500,
                 temperature=0.3
             )
+            print(f"🔍 DEBUG: GPT-4 response: {response}")
             analysis_content = response.choices[0].message.content
             logger.info("✅ GPT-4 lab analysis completed")
             try:
@@ -184,12 +185,12 @@ class SimpleOCRIntegration:
                 conclusion = analysis_content
                 recommendations = "Please review the analysis above and consult with a professional for specific recommendations."
             return {
-                "analysis": formatted_analysis,
                 "conclusion": conclusion,
                 "recommendations": recommendations,
                 "extracted_text": extracted_text,
-                "model": "gpt-4-vision-ocr",
-                "images_processed": len(image_urls)
+                "analysis": formatted_analysis,
+                "model": "gpt-4o-mini",
+                "images_processed": len(image_urls) if image_urls else 0
             }
         except Exception as e:
             logger.error(f"❌ GPT analysis failed: {e}")
@@ -1173,190 +1174,49 @@ def ocr_gpt():
             print("❌ BACKEND OCR: No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
         
-        prompt = data.get('prompt', '')
-        image_urls = data.get('image_urls', [])
         extracted_text = data.get('extracted_text', '')
         
         print("✅ BACKEND OCR: Request data parsed successfully")
-        print(f"🔍 DEBUG: Prompt length: {len(prompt)}")
-        print(f"🔍 DEBUG: Prompt preview: {prompt[:200]}...")
-        print(f"🔍 DEBUG: Image URLs count: {len(image_urls)}")
-        print(f"🔍 DEBUG: Image URLs: {image_urls}")
         print(f"🔍 DEBUG: Extracted text length: {len(extracted_text) if extracted_text else 0}")
         print(f"🔍 DEBUG: OCR service available: {ocr_integration.is_available}")
         print(f"🔍 DEBUG: OCR integration type: {type(ocr_integration)}")
         
-        if not image_urls:
-            print("⚠️ BACKEND OCR: No image URLs provided")
         
-        if not prompt:
-            print("⚠️ BACKEND OCR: No prompt provided")
-        
-        # Use extracted_text as the prompt for GPT analysis
+        # Only use extracted_text for the GPT call. Ignore prompt and image_urls.
         if extracted_text and extracted_text.strip():
-            print(f"🤖 Sending extracted_text to GPT. Preview: {extracted_text[:200]}...")
             try:
                 gpt_result = ocr_integration.analyze_lab_results_with_gpt(extracted_text, image_urls=None)
-                print("✅ GPT-4 analysis completed (from extracted_text)")
-                print(f"📋 Conclusion preview: {gpt_result.get('conclusion', '')[:100]}...")
-                print(f"💡 Recommendations preview: {gpt_result.get('recommendations', '')[:100]}...")
-                response = {
-                    "content": gpt_result["analysis"],
-                    "analysis": gpt_result["analysis"],
-                    "conclusion": gpt_result.get("conclusion", ""),
-                    "recommendations": gpt_result.get("recommendations", ""),
-                    "extracted_text": extracted_text,
-                    "ocr_results": [],
-                    "usage": {
-                        "prompt_tokens": len(extracted_text.split()),
-                        "completion_tokens": len(gpt_result["analysis"].split()),
-                        "total_tokens": len(extracted_text.split()) + len(gpt_result["analysis"].split())
-                    },
-                    "model": "gpt-4-vision-ocr-text-only",
-                    "images_processed": len(image_urls),
-                    "timestamp": datetime.now().isoformat()
-                }
-                print("✅ Real OCR lab analysis completed successfully (from extracted_text)")
-                return jsonify(response)
-            except Exception as gpt_error:
-                logger.error(f"❌ GPT analysis failed from extracted_text: {gpt_error}")
-                print(f"❌ Error in GPT analysis: {gpt_error}")
+            except Exception as e:
+                print(f"❌ Error in analyze_lab_results_with_gpt: {str(e)}")
                 return jsonify({
-                    "error": f"GPT analysis failed from extracted_text: {str(gpt_error)}",
-                    "content": "Manual review required - OCR successful but analysis failed",
-                    "analysis": "Manual review required - OCR successful but analysis failed",
-                    "extracted_text": extracted_text,
-                    "ocr_results": [],
-                    "images_processed": len(image_urls)
-                }), 200
-        else:
-            print("⚠️ BACKEND OCR: No extracted_text provided")
-            return jsonify({
-                "error": "No extracted_text provided in request.",
-                "content": "Manual review required - no extracted text provided",
-                "analysis": "Manual review required - no extracted text provided",
-                "extracted_text": "",
-                "ocr_results": [],
-                "images_processed": len(image_urls)
-            }), 400
-        
-        # Otherwise, proceed with image OCR if image_urls are provided
-        is_lab_analysis = 'lab' in prompt.lower() or 'analysis' in prompt.lower()
-        if is_lab_analysis and image_urls:
-            print("🔬 BACKEND OCR: This is a lab analysis request with images")
-            print(f"🔍 DEBUG: Will process {len(image_urls)} images")
-            if not ocr_integration.vision_client:
-                logger.error("❌ Google Vision API client not initialized")
-                return jsonify({
-                    "error": "Google Vision API client not initialized. Please check your credentials and configuration.",
-                    "content": "Manual review required - Google Vision API not available",
-                    "analysis": "Manual review required - Google Vision API not available"
+                    "error": f"Error in analyze_lab_results_with_gpt: {str(e)}",
+                    "content": "Error processing request. Please try again or contact support.",
+                    "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                    "ocr_available": ocr_integration.is_available
                 }), 500
-            all_extracted_text = []
-            ocr_results = []
-            for i, image_url in enumerate(image_urls):
-                print(f"📸 BACKEND OCR: Processing image {i+1}/{len(image_urls)} with Google Vision API")
-                print(f"🔍 DEBUG: Image URL: {image_url}")
-                try:
-                    ocr_result = ocr_integration.extract_text_from_image_url(image_url)
-                    ocr_results.append(ocr_result)
-                    print(f"✅ BACKEND OCR: Google Vision API call completed for image {i+1}")
-                    print(f"🔍 DEBUG: OCR result keys: {list(ocr_result.keys())}")
-                except Exception as img_error:
-                    logger.error(f"❌ BACKEND OCR: Google Vision API call failed for image {i+1}: {img_error}")
-                    print(f"❌ BACKEND OCR: Google Vision API error for image {i+1}: {img_error}")
-                    ocr_results.append({"error": str(img_error), "extracted_text": ""})
-                if 'extracted_text' in ocr_result and ocr_result['extracted_text']:
-                    all_extracted_text.append(ocr_result['extracted_text'])
-                    print(f"✅ Google Vision API extracted {len(ocr_result['extracted_text'])} characters from image {i+1}")
-                else:
-                    print(f"⚠️ Google Vision API returned no text for image {i+1}")
-            combined_text = "\n\n".join(all_extracted_text)
-            if combined_text.strip():
-                gpt_prompt = f"Analyze the following laboratory report text and provide conclusions and recommendations:\n{combined_text}"
-                print(f"🤖 Sending extracted text to GPT. Prompt preview: {gpt_prompt[:200]}...")
-                try:
-                    gpt_result = ocr_integration.analyze_lab_results_with_gpt(combined_text, image_urls=None)
-                    print("✅ GPT-4 analysis completed (from images)")
-                    print(f"📋 Conclusion preview: {gpt_result.get('conclusion', '')[:100]}...")
-                    print(f"💡 Recommendations preview: {gpt_result.get('recommendations', '')[:100]}...")
-                    response = {
-                        "content": gpt_result["analysis"],
-                        "analysis": gpt_result["analysis"],
-                        "conclusion": gpt_result.get("conclusion", ""),
-                        "recommendations": gpt_result.get("recommendations", ""),
-                        "extracted_text": combined_text,
-                        "ocr_results": ocr_results,
-                        "usage": {
-                            "prompt_tokens": len(combined_text.split()) + len(prompt.split()),
-                            "completion_tokens": len(gpt_result["analysis"].split()),
-                            "total_tokens": len(combined_text.split()) + len(prompt.split()) + len(gpt_result["analysis"].split())
-                        },
-                        "model": "gpt-4-vision-ocr-text-only",
-                        "images_processed": len(image_urls),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    print("✅ Real OCR lab analysis completed successfully (from images)")
-                    return jsonify(response)
-                except Exception as gpt_error:
-                    logger.error(f"❌ GPT analysis failed after successful OCR: {gpt_error}")
-                    print(f"❌ Error in GPT analysis: {gpt_error}")
-                    return jsonify({
-                        "error": f"GPT analysis failed after successful OCR: {str(gpt_error)}",
-                        "content": "Manual review required - OCR successful but analysis failed",
-                        "analysis": "Manual review required - OCR successful but analysis failed",
-                        "extracted_text": combined_text,
-                        "ocr_results": ocr_results,
-                        "images_processed": len(image_urls)
-                    }), 200
-            else:
-                print("⚠️ Google Vision API returned no text from any images")
-                fallback_obj = {
-                    "conclusion": "No text could be extracted from the provided images. Please ensure the images are clear and contain readable text.",
-                    "recommendations": "Please provide higher quality images or check the lab report for legibility."
-                }
-                content_json = json.dumps(fallback_obj)
-                response = {
-                    "content": content_json,
-                    "analysis": content_json,
-                    "conclusion": fallback_obj["conclusion"],
-                    "recommendations": fallback_obj["recommendations"],
-                    "usage": {
-                        "prompt_tokens": len(prompt.split()),
-                        "completion_tokens": len(content_json.split()),
-                        "total_tokens": len(prompt.split()) + len(content_json.split())
-                    },
-                    "model": "ocr-gpt-lab-prompt-only",
-                    "images_processed": 0,
-                    "ocr_available": ocr_integration.is_available,
-                    "timestamp": datetime.now().isoformat()
-                }
-                print(f"✅ OCR-GPT fallback response generated successfully (no extracted text)")
-                return jsonify(response)
-        else:
-            print("⚠️ No images provided and no extracted text available (lab analysis mode)")
-            fallback_obj = {
-                "conclusion": "No images or extracted text were provided for OCR. Please upload lab analysis images or provide extracted text for a full AI-powered analysis.",
-                "recommendations": "Please provide lab analysis images or extracted text to receive detailed recommendations."
-            }
-            content_json = json.dumps(fallback_obj)
-            response = {
-                "content": content_json,
-                "analysis": content_json,
-                "conclusion": fallback_obj["conclusion"],
-                "recommendations": fallback_obj["recommendations"],
-                "usage": {
-                    "prompt_tokens": len(prompt.split()),
-                    "completion_tokens": len(content_json.split()),
-                    "total_tokens": len(prompt.split()) + len(content_json.split())
-                },
-                "model": "ocr-gpt-lab-prompt-only",
-                "images_processed": 0,
-                "ocr_available": ocr_integration.is_available,
-                "timestamp": datetime.now().isoformat()
-            }
-            print(f"✅ OCR-GPT fallback response generated successfully (no images or extracted text)")
-            return jsonify(response)
+            
+        analysis_text = gpt_result.get("analysis") or ""
+        conclusion_text = gpt_result.get("conclusion") or ""
+        recommendations_text = gpt_result.get("recommendations") or ""
+
+        response = {
+            "content": analysis_text,
+            "analysis": analysis_text,
+            "conclusion": conclusion_text,
+            "recommendations": recommendations_text,
+            "extracted_text": extracted_text,
+            "ocr_results": [],
+            "usage": {
+                "prompt_tokens": len(extracted_text.split()),
+                "completion_tokens": len(analysis_text.split()),
+                "total_tokens": len(extracted_text.split()) + len(analysis_text.split())
+            },
+            "model": "gpt-4-vision-ocr-text-only",
+            "images_processed": 0,
+            "timestamp": datetime.now().isoformat()
+        }
+        return jsonify(response)
+
     except Exception as e:
         print(f"❌ Error in OCR-GPT endpoint: {str(e)}")
         logger.error(f"OCR-GPT endpoint error: {str(e)}", exc_info=True)

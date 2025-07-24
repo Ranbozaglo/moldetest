@@ -21,6 +21,70 @@ export default function InspectionDetails() {
   const location = useLocation();
   const inspectionId = getUrlParam(location.search, 'id');
 
+  // Function to clean and filter extracted text for mold-related content
+  const cleanExtractedText = (extractedText) => {
+    if (!extractedText || typeof extractedText !== 'string') {
+      return '';
+    }
+
+    const lines = extractedText.split('\n');
+    const relevantLines = [];
+    let foundDirectExamination = false;
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Start collecting from "DIRECT MICROSCOPIC EXAMINATION"
+      if (trimmedLine.toUpperCase().includes('DIRECT MICROSCOPIC EXAMINATION')) {
+        foundDirectExamination = true;
+        relevantLines.push(trimmedLine);
+        continue;
+      }
+
+      // Only process lines after finding the start marker
+      if (!foundDirectExamination) {
+        continue;
+      }
+
+      // Include lines with mold-related keywords
+      const lowerLine = trimmedLine.toLowerCase();
+      const hasMoldKeywords = 
+        lowerLine.includes('mold') ||
+        lowerLine.includes('spore') ||
+        lowerLine.includes('species') ||
+        lowerLine.includes('hyphae') ||
+        lowerLine.includes('fungi') ||
+        lowerLine.includes('fungal') ||
+        /\b[1-4]\+\b/.test(trimmedLine) || // Ratings like "1+", "2+", "3+", "4+"
+        /\b[1-4]\s*\+\s*\b/.test(trimmedLine); // Ratings with spaces like "1 +"
+
+      if (hasMoldKeywords && trimmedLine.length > 0) {
+        relevantLines.push(trimmedLine);
+      }
+    }
+
+    return relevantLines.join('\n');
+  };
+
+  // Function to filter out irrelevant/noisy lines from OCR text
+  const applyAutoFilters = (text) => {
+    if (!text || typeof text !== 'string') return '';
+    const nonInformativePhrases = [
+      'date of report', 'www.', 'page', 'client:', 'c/o:', 're:', 'date of receipt', 'lab id-version'
+    ];
+    return text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => {
+        if (line.length < 5) return false;
+        if (/^[\d\W]+$/.test(line)) return false; // Only numbers or punctuation
+        const lower = line.toLowerCase();
+        if (nonInformativePhrases.some(phrase => lower.includes(phrase))) return false;
+        return true;
+      })
+      .join('\n');
+  };
+
   const [inspection, setInspection] = useState(null);
   const [samples, setSamples] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +97,7 @@ export default function InspectionDetails() {
   const [processingImages, setProcessingImages] = useState(false);
   const [error, setError] = useState(null);
   const [labImageErrors, setLabImageErrors] = useState({});
+  const [selectedLabImages, setSelectedLabImages] = useState([]);
   const { user: currentUser } = useAuth();
 
   // Debug useEffect to track inspection state changes
@@ -137,6 +202,9 @@ export default function InspectionDetails() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    // Store selected images for preview
+    setSelectedLabImages(Array.from(files));
+
     // Validate that we have an inspection ID
     if (!inspectionId) {
       alert('Error: No inspection ID found. Please refresh the page and try again.');
@@ -203,14 +271,16 @@ export default function InspectionDetails() {
         
           if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
             console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
+            // Apply auto-filters to remove noisy lines
+            const filteredText = applyAutoFilters(ocrResult.extracted_text);
             processedFiles.push({
               filename: file.name,
-              extracted_text: ocrResult.extracted_text,
+              extracted_text: filteredText,
               confidence: ocrResult.confidence
             });
             
             // Combine all extracted text for analysis
-            allExtractedText += `\n\n=== ${file.name} ===\n${ocrResult.extracted_text}`;
+            allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
             
           } else {
             const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
@@ -243,17 +313,32 @@ export default function InspectionDetails() {
       }
       
       console.log(`✅ OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
-      console.log("🔍 DEBUG: Combined extracted text length:", allExtractedText.length);
+      // Clean the extracted text to filter only mold-related content
+      let cleanedExtractedText = cleanExtractedText(allExtractedText);
+      console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
+      console.log("🔍 DEBUG: Cleaned extracted text length:", cleanedExtractedText.length);
+
+      // Remove any template/instructional lines from the cleanedExtractedText
+      const instructionKeywords = [
+        "please analyze", "conclusion", "recommendations", "return your response", "make the analysis", "- summarize", "- assess", "- evaluate", "- compare", "- consider", "- immediate actions", "- preventive measures", "- professional services", "- timeline", "- environmental controls", "- follow-up testing"
+      ];
+      cleanedExtractedText = cleanedExtractedText
+        .split('\n')
+        .filter(line => {
+          const lower = line.toLowerCase();
+          return !instructionKeywords.some(keyword => lower.includes(keyword));
+        })
+        .join('\n');
       
-      // Step 2: Generate analysis from all extracted text (no image URLs needed)
-      console.log("🔍 STEP 2: Generating analysis from extracted text...");
+      // Step 2: Generate analysis from cleaned extracted text (no image URLs needed)
+      console.log("🔍 STEP 2: Generating analysis from cleaned extracted text...");
       
       try {
         // Construct the full prompt to send to the backend
-        const contextLines = `Analyze this laboratory mold analysis report text and provide professional conclusions and recommendations.\n\nContext:\n- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}\n- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)\n- Client type: ${inspection.client_type}\n- Text extracted from ${processedFiles.length} lab report image(s)\n`;
-        const extractedTextSection = `\nEXTRACTED TEXT FROM LAB REPORTS:\n${allExtractedText}\n`;
+        // const contextLines = `Analyze this laboratory mold analysis report text and provide professional conclusions and recommendations.\n\nContext:\n- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}\n- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)\n- Client type: ${inspection.client_type}\n- Text extracted from ${processedFiles.length} lab report image(s)\n`;
+        const extractedTextSection = `\nEXTRACTED TEXT FROM LAB REPORTS:\n${cleanedExtractedText}\n`;
         const instructions = `\nPlease analyze the lab results and provide:\n\n1. **CONCLUSION** (2-3 paragraphs):\n   - Summarize the lab findings and extracted text\n   - Assess the mold levels and types found\n   - Evaluate health and safety implications\n   - Compare to normal/acceptable levels\n   - Consider the property context and client type\n\n2. **RECOMMENDATIONS** (detailed list):\n   - Immediate actions needed (if any)\n   - Preventive measures\n   - Professional services recommended\n   - Timeline for any required actions\n   - Environmental controls to implement\n   - Follow-up testing recommendations\n\nMake the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.\n\nReturn your response in this exact JSON format:\n{\n  \"conclusion\": \"Your detailed conclusion here...\",\n  \"recommendations\": \"Your detailed recommendations here...\"\n}\n`;
-        const analysisPrompt = contextLines + extractedTextSection + instructions;
+        const analysisPrompt =  extractedTextSection + instructions;
 
         // Send the constructed prompt as the 'prompt' field to the backend
         const analysisResult = await Core.InvokeLLM(analysisPrompt);
@@ -266,51 +351,55 @@ export default function InspectionDetails() {
         let recommendations = "";
 
         if (analysisResult.conclusion && analysisResult.recommendations) {
-          console.log("🔍 DEBUG: Using structured response from backend");
           conclusion = analysisResult.conclusion;
           recommendations = analysisResult.recommendations;
-        } else {
+        } else if (typeof analysisResult.content === 'string') {
           // Try to parse content as JSON only if it looks like JSON
-          if (typeof analysisResult.content === 'string' && analysisResult.content.trim().startsWith('{')) {
+          if (analysisResult.content.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult.content);
               conclusion = parsedResult.conclusion || analysisResult.content;
               recommendations = parsedResult.recommendations || "";
-              console.log("🔍 DEBUG: Parsed JSON from content field");
             } catch (parseError) {
-              console.warn("⚠️ Failed to parse analysis as JSON, using raw content:", parseError);
               conclusion = analysisResult.content;
               recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
             }
           } else {
-            // Content is not JSON, use as-is
-            conclusion = analysisResult.content;
-            recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+            // Content is not JSON, try to split by known keywords
+            const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
+            if (split.length > 1) {
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
+              recommendations = split[1].trim();
+            } else {
+              conclusion = analysisResult.content;
+              recommendations = "";
+            }
           }
+        } else {
+          // Content is not JSON, use as-is
+          conclusion = analysisResult.content;
+          recommendations = "";
         }
 
-        console.log("📋 OCR ANALYSIS: Final analysis results parsed");
-        console.log("🔍 DEBUG: Conclusion length:", conclusion?.length || 0);
-        console.log("🔍 DEBUG: Recommendations length:", recommendations?.length || 0);
-      
-        // Step 3: Update inspection with generated analysis (no image URLs saved)
-        console.log("💾 OCR ANALYSIS: Saving analysis to database...");
-        console.log("🔍 DEBUG: Updating inspection ID:", inspectionId);
-        
-        const updateResult = await MoldInspection.update(inspectionId, {
-          conclusion: conclusion,
-          recommendations: recommendations
-      });
-
-        console.log("✅ OCR ANALYSIS: Analysis saved successfully to database!");
-        console.log("🔍 DEBUG: Database update result:", updateResult);
-        
-        // Update local state immediately
+        // Update local state immediately so the textareas show the response
         setInspection(prev => ({
           ...prev,
           conclusion: conclusion,
           recommendations: recommendations
         }));
+
+        // Save lab images and report content to the database
+        let labImagesToSave = inspection.lab_analysis_images || [];
+        // If new images were just uploaded, update the array
+        if (selectedLabImages && selectedLabImages.length > 0) {
+          // Only save the file names for now, or you can adjust to save URLs if available
+          labImagesToSave = selectedLabImages.map(file => file.name);
+        }
+        await MoldInspection.update(inspectionId, {
+          lab_analysis_images: labImagesToSave,
+          conclusion: conclusion,
+          recommendations: recommendations
+        });
         
         console.log("✅ Analysis complete! OCR processed files and generated analysis without storing image URLs.");
         
@@ -323,12 +412,6 @@ export default function InspectionDetails() {
       const totalProcessed = files.length;
       const totalSuccessful = processedFiles.length;
       const totalSkipped = skippedFiles.length;
-      
-      const successMessage = totalSkipped === 0 
-        ? `Successfully processed ${totalSuccessful} lab image(s) with OCR and generated analysis!`
-        : `Successfully processed ${totalSuccessful} out of ${totalProcessed} files with OCR. ${totalSkipped} files were skipped. Analysis generated from processed files.`;
-      
-      alert(successMessage);
       
     } catch (error) {
       console.error("❌ Error in lab image upload process:", error);
@@ -369,9 +452,14 @@ export default function InspectionDetails() {
 
 
       
+      // Clean the extracted text to filter only mold-related content
+      const cleanedExtractedText = cleanExtractedText(allExtractedText);
+      console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
+      console.log("🔍 DEBUG: Cleaned extracted text length:", cleanedExtractedText.length);
+      
       // Call the OCR-GPT backend
       console.log("📡 ANALYZE AI: Making API call to InvokeLLM...");
-      const analysisResult = await InvokeLLM(allExtractedText);
+      const analysisResult = await InvokeLLM(cleanedExtractedText);
       
       console.log("✅ ANALYZE AI: Received response from OCR-GPT!");
       console.log("🔍 DEBUG: OCR-GPT analysis result:", analysisResult);
@@ -886,6 +974,23 @@ export default function InspectionDetails() {
 
         {/* Right Column - Lab Analysis & Report */}
         <div className="space-y-6">
+          {/* Lab Image Preview Section */}
+          {selectedLabImages.length > 0 && (
+            <div className="mb-4">
+              <Label>Selected Lab Images (Preview):</Label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: 8 }}>
+                {selectedLabImages.map((file, idx) => {
+                  const url = URL.createObjectURL(file);
+                  return (
+                    <div key={idx} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 4, background: '#fafafa' }}>
+                      <img src={url} alt={file.name} style={{ maxWidth: 120, maxHeight: 120, objectFit: 'contain', display: 'block' }} />
+                      <div style={{ fontSize: 12, marginTop: 4, wordBreak: 'break-all' }}>{file.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {/* Lab Analysis Upload */}
           <Card>
             <CardHeader>
@@ -1134,33 +1239,7 @@ export default function InspectionDetails() {
                 </div>
               )}
 
-              {processingImages && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-5 h-5 animate-spin text-yellow-600" />
-                    <div>
-                      <span className="text-yellow-800 font-medium">Processing uploaded images...</span>
-                      <p className="text-yellow-700 text-sm mt-1">
-                        Images are being processed and will appear in the lab analysis section shortly.
-                      </p>
-                      {uploadProgress > 0 && (
-                        <div className="mt-2">
-                          <div className="bg-yellow-200 rounded-full h-2">
-                            <div 
-                              className="bg-yellow-600 h-2 rounded-full transition-all duration-300" 
-                              style={{width: `${uploadProgress}%`}}
-                            ></div>
-                          </div>
-                          <p className="text-yellow-700 text-xs mt-1">
-                            {uploadedCount} of {totalFiles} files processed
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
+              
               {generatingAnalysis && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">
@@ -1204,9 +1283,11 @@ export default function InspectionDetails() {
                 <Label htmlFor="conclusion">Conclusion</Label>
                 <Textarea
                   id="conclusion"
-                  value={inspection.conclusion || ""}
-                  onChange={(e) => setInspection({...inspection, conclusion: e.target.value})}
-                  placeholder="Professional conclusion based on lab analysis..."
+                  value={
+                    (inspection.conclusion || "") 
+                  }
+                  onChange={e => setInspection({ ...inspection, conclusion: e.target.value })}
+                  placeholder="Professional conclusion and recommendations based on lab analysis..."
                   className="min-h-32 mt-2"
                 />
               </div>
@@ -1216,7 +1297,7 @@ export default function InspectionDetails() {
                 <Textarea
                   id="recommendations"
                   value={inspection.recommendations || ""}
-                  onChange={(e) => setInspection({...inspection, recommendations: e.target.value})}
+                  onChange={e => setInspection({ ...inspection, recommendations: e.target.value })}
                   placeholder="Detailed recommendations for the client..."
                   className="min-h-32 mt-2"
                 />
