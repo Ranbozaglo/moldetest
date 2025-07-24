@@ -49,11 +49,12 @@ const convertToWebP = async (file) => {
 };
 
 export const Core = {
-  InvokeLLM: async (prompt, file_urls = []) => {
+  InvokeLLM: async (prompt) => {
     console.log('🚀 CORE API: InvokeLLM called!');
     console.log('🔍 DEBUG: Prompt length:', prompt?.length || 0);
-    console.log('🔍 DEBUG: File URLs count:', file_urls?.length || 0);
-    console.log('🔍 DEBUG: File URLs:', file_urls);
+    console.log('🔍 DEBUG: Prompt start:', prompt?.substring(0, 200));
+    console.log('🔍 DEBUG: Prompt end:', prompt?.substring(prompt.length - 200));
+  
     
     try {
       // Check if we're in a build environment
@@ -77,15 +78,12 @@ export const Core = {
       console.log('✅ CORE API: API URL determined:', apiUrl);
       console.log('🔍 DEBUG: Base API URL:', baseApiUrl);
       
-      const requestData = {
-        prompt: prompt,
-        image_urls: file_urls || []
-      };
-      
-      console.log('📦 CORE API: Preparing request data...');
-      console.log('🔍 DEBUG: Request payload:', requestData);
-      console.log('🔍 DEBUG: Request payload size:', JSON.stringify(requestData).length);
-      
+      // Send the extracted text under the correct field
+      const requestData = { extracted_text: prompt };
+      console.log('📦 CORE API: Preparing JSON extracted_text payload...');
+      console.log('🔍 DEBUG: extracted_text payload length:', prompt.length);
+      console.log('🔍 DEBUG: extracted_text payload end:', prompt.substring(prompt.length - 200));
+       
       console.log('📡 CORE API: Making HTTP request...');
       const response = await fetch(apiUrl, {
         method: 'POST',

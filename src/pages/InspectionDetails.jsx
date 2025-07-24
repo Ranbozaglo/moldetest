@@ -100,37 +100,22 @@ export default function InspectionDetails() {
       const inspectionData = await MoldInspection.filter({ id: inspectionId });
       if (inspectionData && inspectionData.length > 0) {
         const inspection = inspectionData[0];
-        console.log("🔍 DEBUG: Loaded inspection data:", inspection);
-        console.log("🔍 DEBUG: lab_analysis_images type:", typeof inspection.lab_analysis_images);
-        console.log("🔍 DEBUG: lab_analysis_images value:", inspection.lab_analysis_images);
-        
-        // Ensure lab_analysis_images is always an array (handle both lab_analysis_images and mold_images columns)
-        console.log("🔍 DEBUG: Raw lab_analysis_images from API:", inspection.lab_analysis_images);
-        console.log("🔍 DEBUG: Raw mold_images from API:", inspection.mold_images);
-        
+
+  
         let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
-        console.log("🔍 DEBUG: Selected lab images field:", labImagesField);
         
         if (labImagesField && typeof labImagesField === 'string') {
           try {
             inspection.lab_analysis_images = JSON.parse(labImagesField);
-            console.log("🔍 DEBUG: Parsed legacy JSON lab images:", inspection.lab_analysis_images);
           } catch (parseError) {
-            console.error("❌ Error parsing lab images JSON:", parseError);
             inspection.lab_analysis_images = [];
           }
         } else if (Array.isArray(labImagesField)) {
-          console.log("🔍 DEBUG: Using PostgreSQL array lab images:", labImagesField);
           inspection.lab_analysis_images = labImagesField;
         } else {
           // Only default to empty array if truly no data exists
           inspection.lab_analysis_images = [];
-          console.log("🔍 DEBUG: No lab images found, defaulting to empty array");
         }
-        
-        console.log("🔍 DEBUG: Final lab_analysis_images array:", inspection.lab_analysis_images);
-        console.log("🔍 DEBUG: About to set inspection state - conclusion:", inspection.conclusion);
-        console.log("🔍 DEBUG: About to set inspection state - recommendations:", inspection.recommendations);
         
         setInspection(inspection);
         
@@ -264,51 +249,15 @@ export default function InspectionDetails() {
       console.log("🔍 STEP 2: Generating analysis from extracted text...");
       
       try {
-        // Create analysis prompt with the extracted text
-        const analysisPrompt = `
-Analyze this laboratory mold analysis report text and provide professional conclusions and recommendations.
+        // Construct the full prompt to send to the backend
+        const contextLines = `Analyze this laboratory mold analysis report text and provide professional conclusions and recommendations.\n\nContext:\n- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}\n- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)\n- Client type: ${inspection.client_type}\n- Text extracted from ${processedFiles.length} lab report image(s)\n`;
+        const extractedTextSection = `\nEXTRACTED TEXT FROM LAB REPORTS:\n${allExtractedText}\n`;
+        const instructions = `\nPlease analyze the lab results and provide:\n\n1. **CONCLUSION** (2-3 paragraphs):\n   - Summarize the lab findings and extracted text\n   - Assess the mold levels and types found\n   - Evaluate health and safety implications\n   - Compare to normal/acceptable levels\n   - Consider the property context and client type\n\n2. **RECOMMENDATIONS** (detailed list):\n   - Immediate actions needed (if any)\n   - Preventive measures\n   - Professional services recommended\n   - Timeline for any required actions\n   - Environmental controls to implement\n   - Follow-up testing recommendations\n\nMake the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.\n\nReturn your response in this exact JSON format:\n{\n  \"conclusion\": \"Your detailed conclusion here...\",\n  \"recommendations\": \"Your detailed recommendations here...\"\n}\n`;
+        const analysisPrompt = contextLines + extractedTextSection + instructions;
 
-Context:
-- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}
-- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)
-- Client type: ${inspection.client_type}
-- Text extracted from ${processedFiles.length} lab report image(s)
+        // Send the constructed prompt as the 'prompt' field to the backend
+        const analysisResult = await Core.InvokeLLM(analysisPrompt);
 
-EXTRACTED TEXT FROM LAB REPORTS:
-${allExtractedText}
-
-Please analyze the lab results and provide:
-
-1. **CONCLUSION** (2-3 paragraphs):
-   - Summarize the lab findings and extracted text
-   - Assess the mold levels and types found
-   - Evaluate health and safety implications
-   - Compare to normal/acceptable levels
-   - Consider the property context and client type
-
-2. **RECOMMENDATIONS** (detailed list):
-   - Immediate actions needed (if any)
-   - Preventive measures
-   - Professional services recommended
-   - Timeline for any required actions
-   - Environmental controls to implement
-   - Follow-up testing recommendations
-
-Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here...",
-  "recommendations": "Your detailed recommendations here..."
-}
-`;
-
-        console.log("🤖 OCR ANALYSIS: Calling OCR-GPT backend with extracted text...");
-        console.log("🔍 DEBUG: Analysis prompt length:", analysisPrompt.length);
-        
-                 // Call the OCR-GPT backend with text-based analysis (no image URLs)
-         const analysisResult = await InvokeLLM(analysisPrompt, []); // Empty image array since we have text
-        
         console.log("✅ OCR ANALYSIS: Received analysis from backend!");
         console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
@@ -321,14 +270,20 @@ Return your response in this exact JSON format:
           conclusion = analysisResult.conclusion;
           recommendations = analysisResult.recommendations;
         } else {
-          // Try to parse content as JSON
-          try {
-            const parsedResult = JSON.parse(analysisResult.content);
-            conclusion = parsedResult.conclusion || analysisResult.content;
-            recommendations = parsedResult.recommendations || "";
-            console.log("🔍 DEBUG: Parsed JSON from content field");
-        } catch (parseError) {
-            console.warn("⚠️ Failed to parse analysis as JSON, using raw content:", parseError);
+          // Try to parse content as JSON only if it looks like JSON
+          if (typeof analysisResult.content === 'string' && analysisResult.content.trim().startsWith('{')) {
+            try {
+              const parsedResult = JSON.parse(analysisResult.content);
+              conclusion = parsedResult.conclusion || analysisResult.content;
+              recommendations = parsedResult.recommendations || "";
+              console.log("🔍 DEBUG: Parsed JSON from content field");
+            } catch (parseError) {
+              console.warn("⚠️ Failed to parse analysis as JSON, using raw content:", parseError);
+              conclusion = analysisResult.content;
+              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+            }
+          } else {
+            // Content is not JSON, use as-is
             conclusion = analysisResult.content;
             recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
           }
@@ -412,55 +367,11 @@ Return your response in this exact JSON format:
         throw new Error('Inspection data not loaded');
       }
 
-      console.log("✅ ANALYZE AI: Validation passed");
-      console.log("🔍 DEBUG: Generating OCR analysis for inspection ID:", inspectionId);
-      console.log("🔍 DEBUG: Image URL:", imageUrl);
-      console.log("🔍 DEBUG: Inspection address:", `${inspection.street_address}, ${inspection.city}, ${inspection.state}`);
 
-      // Use OCR-GPT backend to analyze the uploaded image
-      const ocrPrompt = `
-Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
-
-Context:
-- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}
-- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)
-- Client type: ${inspection.client_type}
-- Focus on health and safety implications
-- Provide actionable recommendations
-
-Please analyze the lab results shown in this image and provide:
-
-1. **CONCLUSION** (2-3 paragraphs):
-   - Summarize the lab findings and extracted text
-   - Assess the mold levels and types found
-   - Evaluate health and safety implications
-   - Compare to normal/acceptable levels
-   - Consider the property context and client type
-
-2. **RECOMMENDATIONS** (detailed list):
-   - Immediate actions needed (if any)
-   - Preventive measures
-   - Professional services recommended
-   - Timeline for any required actions
-   - Environmental controls to implement
-   - Follow-up testing recommendations
-
-Make the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here...",
-  "recommendations": "Your detailed recommendations here..."
-}
-`;
-
-      console.log("🤖 ANALYZE AI: Calling OCR-GPT backend...");
-      console.log("🔍 DEBUG: OCR prompt length:", ocrPrompt.length);
-      console.log("🔍 DEBUG: Image URLs being sent:", [imageUrl]);
       
       // Call the OCR-GPT backend
       console.log("📡 ANALYZE AI: Making API call to InvokeLLM...");
-      const analysisResult = await InvokeLLM(ocrPrompt, [imageUrl]);
+      const analysisResult = await InvokeLLM(allExtractedText);
       
       console.log("✅ ANALYZE AI: Received response from OCR-GPT!");
       console.log("🔍 DEBUG: OCR-GPT analysis result:", analysisResult);
@@ -987,10 +898,6 @@ Return your response in this exact JSON format:
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Debug: Log lab analysis images state */}
-              {console.log("🔍 DEBUG: Rendering lab analysis section with images:", inspection.lab_analysis_images)}
-              {console.log("🔍 DEBUG: Images array length:", inspection.lab_analysis_images ? inspection.lab_analysis_images.length : 'undefined')}
-              {console.log("🔍 DEBUG: Images array type:", typeof inspection.lab_analysis_images)}
               
               {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
