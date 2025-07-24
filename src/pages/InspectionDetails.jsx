@@ -208,14 +208,14 @@ export default function InspectionDetails() {
         
         try {
           console.log(`📡 OCR: Making Google Vision API call for file: ${file.name}`);
-          
+        
           // Process file directly with OCR (bytes only, no upload)
           const ocrResult = await ProcessLabImageWithOCR(file);
           console.log("🔍 DEBUG: OCR processing result:", ocrResult);
           console.log("🔍 DEBUG: OCR result keys:", Object.keys(ocrResult || {}));
           console.log("🔍 DEBUG: OCR valid:", ocrResult?.valid);
           console.log("🔍 DEBUG: OCR extracted text length:", ocrResult?.extracted_text?.length || 0);
-          
+        
           if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
             console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
             processedFiles.push({
@@ -235,7 +235,7 @@ export default function InspectionDetails() {
               file: file.name, 
               reason: `Google Vision API failed: ${errorMessage}` 
             });
-          }
+        }
         } catch (ocrError) {
           console.error(`❌ OCR: Unexpected error processing ${file.name}:`, ocrError);
           console.error("🔍 DEBUG: Error stack:", ocrError.stack);
@@ -311,7 +311,7 @@ Return your response in this exact JSON format:
         
         console.log("✅ OCR ANALYSIS: Received analysis from backend!");
         console.log("🔍 DEBUG: Analysis result:", analysisResult);
-
+      
         // Parse the response to extract conclusion and recommendations
         let conclusion = "";
         let recommendations = "";
@@ -337,7 +337,7 @@ Return your response in this exact JSON format:
         console.log("📋 OCR ANALYSIS: Final analysis results parsed");
         console.log("🔍 DEBUG: Conclusion length:", conclusion?.length || 0);
         console.log("🔍 DEBUG: Recommendations length:", recommendations?.length || 0);
-
+      
         // Step 3: Update inspection with generated analysis (no image URLs saved)
         console.log("💾 OCR ANALYSIS: Saving analysis to database...");
         console.log("🔍 DEBUG: Updating inspection ID:", inspectionId);
@@ -345,7 +345,7 @@ Return your response in this exact JSON format:
         const updateResult = await MoldInspection.update(inspectionId, {
           conclusion: conclusion,
           recommendations: recommendations
-        });
+      });
 
         console.log("✅ OCR ANALYSIS: Analysis saved successfully to database!");
         console.log("🔍 DEBUG: Database update result:", updateResult);
@@ -1045,17 +1045,17 @@ Return your response in this exact JSON format:
                       {inspection.lab_analysis_images.map((imageUrl, index) => (
                         <div key={index} className="relative group">
                           {!labImageErrors[index] ? (
-                            <img
-                              src={imageUrl}
-                              alt={`Lab Analysis Results ${index + 1}`}
-                              className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
-                              onClick={() => {
-                                // Open image in new tab for full view
-                                window.open(imageUrl, '_blank');
-                              }}
-                              title="Click to view full size"
-                              onError={(e) => {
-                                console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
+                          <img
+                            src={imageUrl}
+                            alt={`Lab Analysis Results ${index + 1}`}
+                            className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                            onClick={() => {
+                              // Open image in new tab for full view
+                              window.open(imageUrl, '_blank');
+                            }}
+                            title="Click to view full size"
+                            onError={(e) => {
+                              console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
                                 // Prevent further error propagation
                                 e.preventDefault();
                                 
@@ -1065,16 +1065,16 @@ Return your response in this exact JSON format:
                                   newErrors[index] = true;
                                   return newErrors;
                                 });
-                              }}
-                            />
+                            }}
+                          />
                           ) : (
                             <div className="w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center">
-                              <div className="text-center">
-                                <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                                <p className="text-slate-500 text-sm">Image failed to load</p>
+                            <div className="text-center">
+                              <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                              <p className="text-slate-500 text-sm">Image failed to load</p>
                                 <p className="text-slate-400 text-xs mt-1">Image {index + 1}</p>
-                              </div>
                             </div>
+                          </div>
                           )}
                           
                           {/* Image overlay with zoom icon */}
