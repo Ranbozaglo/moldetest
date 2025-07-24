@@ -563,6 +563,34 @@ def login():
         print(f"🔍 DEBUG: Database error: {e}")
         return jsonify({"error": "Database error"}), 500
 
+@app.route('/api/auth/validate', methods=['GET'])
+def validate_token():
+    """Token validation endpoint"""
+    print(f"🔍 DEBUG: Token validation request received")
+    
+    # Get Authorization header
+    auth_header = request.headers.get('Authorization')
+    print(f"🔍 DEBUG: Auth header: {auth_header}")
+    
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print(f"🔍 DEBUG: Missing or invalid Authorization header")
+        return jsonify({"error": "Authorization header required"}), 401
+    
+    token = auth_header.split(' ')[1]
+    print(f"🔍 DEBUG: Extracted token: {token[:10]}...")
+    
+    # For this simple implementation, we'll consider any non-empty token as valid
+    # In a production system, you would validate the JWT token properly
+    if len(token) > 10:  # Basic validation - token should be reasonably long
+        print(f"🔍 DEBUG: Token validation successful")
+        return jsonify({
+            "valid": True,
+            "message": "Token is valid"
+        }), 200
+    else:
+        print(f"🔍 DEBUG: Token validation failed - token too short")
+        return jsonify({"error": "Invalid token"}), 401
+
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     """User registration endpoint"""
@@ -1802,6 +1830,7 @@ if __name__ == '__main__':
     print("📚 API endpoints:")
     print("   - POST /api/auth/login")
     print("   - POST /api/auth/register")
+    print("   - GET  /api/auth/validate")
     print("   - GET  /api/inspection")
     print("   - POST /api/inspection")
     print("   - GET  /api/inspection/<int:inspection_id>")

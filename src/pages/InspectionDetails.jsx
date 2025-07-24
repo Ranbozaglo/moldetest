@@ -32,6 +32,7 @@ export default function InspectionDetails() {
   const [totalFiles, setTotalFiles] = useState(0);
   const [processingImages, setProcessingImages] = useState(false);
   const [error, setError] = useState(null);
+  const [labImageErrors, setLabImageErrors] = useState({});
   const { user: currentUser } = useAuth();
 
   // Debug useEffect to track inspection state changes
@@ -86,6 +87,12 @@ export default function InspectionDetails() {
       console.log("🔍 DEBUG: Reloading inspection data due to inspectionId change");
       loadInspectionData();
     }
+    
+    // Cleanup function to reset image errors when inspection changes
+    return () => {
+      console.log("🔍 DEBUG: InspectionDetails - resetting lab image errors for inspection change");
+      setLabImageErrors({});
+    };
   }, [inspectionId]);
 
   const loadInspectionData = async () => {
@@ -1037,31 +1044,38 @@ Return your response in this exact JSON format:
                     <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {inspection.lab_analysis_images.map((imageUrl, index) => (
                         <div key={index} className="relative group">
-                          <img
-                            src={imageUrl}
-                            alt={`Lab Analysis Results ${index + 1}`}
-                            className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
-                            onClick={() => {
-                              // Open image in new tab for full view
-                              window.open(imageUrl, '_blank');
-                            }}
-                            title="Click to view full size"
-                            onError={(e) => {
-                              console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
-                              e.target.style.display = 'none';
-                              e.target.nextElementSibling.style.display = 'flex';
-                            }}
-                          />
-                          {/* Fallback for failed images */}
-                          <div 
-                            className="hidden w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center"
-                            style={{display: 'none'}}
-                          >
-                            <div className="text-center">
-                              <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                              <p className="text-slate-500 text-sm">Image failed to load</p>
+                          {!labImageErrors[index] ? (
+                            <img
+                              src={imageUrl}
+                              alt={`Lab Analysis Results ${index + 1}`}
+                              className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                              onClick={() => {
+                                // Open image in new tab for full view
+                                window.open(imageUrl, '_blank');
+                              }}
+                              title="Click to view full size"
+                              onError={(e) => {
+                                console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
+                                // Prevent further error propagation
+                                e.preventDefault();
+                                
+                                // Use React state instead of direct DOM manipulation
+                                setLabImageErrors(prev => {
+                                  const newErrors = { ...prev };
+                                  newErrors[index] = true;
+                                  return newErrors;
+                                });
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center">
+                              <div className="text-center">
+                                <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                <p className="text-slate-500 text-sm">Image failed to load</p>
+                                <p className="text-slate-400 text-xs mt-1">Image {index + 1}</p>
+                              </div>
                             </div>
-                          </div>
+                          )}
                           
                           {/* Image overlay with zoom icon */}
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">

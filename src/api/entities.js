@@ -59,6 +59,22 @@ const apiCall = async (endpoint, options = {}) => {
         errorData
       });
       
+      // Handle authentication errors specifically
+      if (response.status === 401 || response.status === 403) {
+        console.log(`${logPrefix} Authentication error detected, clearing session`);
+        
+        // Clear localStorage to force re-login
+        localStorage.removeItem('mth_user');
+        
+        // Reload the page to trigger authentication flow
+        setTimeout(() => {
+          if (window.location.pathname !== '/SignIn' && window.location.pathname !== '/Welcome') {
+            console.log(`${logPrefix} Redirecting to sign in due to auth error`);
+            window.location.href = '/SignIn';
+          }
+        }, 1000);
+      }
+      
       throw new Error(errorMessage);
     }
     

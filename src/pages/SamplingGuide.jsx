@@ -18,6 +18,8 @@ export default function SamplingGuide() {
     const [sampleImages, setSampleImages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+    const [imageErrors, setImageErrors] = useState({});
+    const [logoErrors, setLogoErrors] = useState({});
 
     useEffect(() => {
         const id = getInspectionIdFromUrl(location.search);
@@ -36,6 +38,13 @@ export default function SamplingGuide() {
             loadSampleImages(); // Still load sample images for guide
             setLoading(false);
         }
+        
+        // Cleanup function to reset image errors if component unmounts
+        return () => {
+            console.log("🔍 DEBUG: SamplingGuide component unmounting, cleaning up state");
+            setImageErrors({});
+            setLogoErrors({});
+        };
     }, [location.search, navigate]);
 
     const loadInspectionData = async (id) => {
@@ -302,6 +311,40 @@ export default function SamplingGuide() {
             }
         }
     };
+
+    // Logo component with proper error handling
+    const LogoImage = ({ size = "w-8 h-8", logoId = "default", fallbackText = "MTH" }) => {
+        return (
+            <>
+                {!logoErrors[logoId] ? (
+                    <img 
+                        src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                        alt="Mold Testing Houston Logo" 
+                        className={`${size} object-contain`}
+                        onError={(e) => {
+                            console.log(`🔍 DEBUG: Logo load error for ${logoId}`);
+                            // Prevent further error propagation
+                            e.preventDefault();
+                            
+                            // Use functional update to avoid race conditions
+                            setLogoErrors(prev => {
+                                const newErrors = { ...prev };
+                                newErrors[logoId] = true;
+                                return newErrors;
+                            });
+                        }}
+                        onLoad={() => {
+                            console.log(`🔍 DEBUG: Logo loaded successfully for ${logoId}`);
+                        }}
+                    />
+                ) : (
+                    <div className={`${size} bg-amber-200 rounded flex items-center justify-center text-xs text-amber-700 font-bold ${logoId === 'disclaimer-small' ? 'flex-shrink-0 mt-1' : ''}`}>
+                        {fallbackText}
+                    </div>
+                )}
+            </>
+        );
+    };
     
     if (loading) {
         return <div className="text-center p-12">Loading Collection Guide...</div>
@@ -343,15 +386,7 @@ export default function SamplingGuide() {
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                     <div className="text-center mb-8">
                         <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
-                                alt="Mold Testing Houston Logo" 
-                                className="w-8 h-8 object-contain"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.parentElement.innerHTML = '<div class="w-8 h-8 bg-amber-200 rounded flex items-center justify-center text-xs text-amber-700 font-bold">MTH</div>';
-                                }}
-                            />
+                            <LogoImage size="w-8 h-8" logoId="disclaimer-main" fallbackText="MTH" />
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">Important Disclaimer</h1>
                         <p className="text-lg text-slate-600">
@@ -361,15 +396,7 @@ export default function SamplingGuide() {
 
                     <div className="glass-effect p-8 rounded-2xl mb-8 border-2 border-amber-200">
                         <div className="flex items-start gap-3 mb-6">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
-                                alt="Mold Testing Houston Logo" 
-                                className="w-6 h-6 text-amber-600 flex-shrink-0 mt-1 object-contain"
-                                onError={(e) => {
-                                    e.target.style.display = 'none';
-                                    e.target.parentElement.innerHTML = '<div class="w-6 h-6 bg-amber-200 rounded flex items-center justify-center text-xs text-amber-700 font-bold flex-shrink-0 mt-1">MTH</div><h2 class="text-xl font-bold text-slate-900">Disclaimer</h2>';
-                                }}
-                            />
+                            <LogoImage size="w-6 h-6" logoId="disclaimer-small" fallbackText="MTH" />
                             <h2 className="text-xl font-bold text-slate-900">Disclaimer</h2>
                         </div>
                         
@@ -455,19 +482,37 @@ export default function SamplingGuide() {
                     {sampleImages.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                             {sampleImages.map((sample, index) => (
-                                <div key={index} className="space-y-3">
-                                    <img 
-                                        src={sample.sample_image}
-                                        alt={`Sample collection at ${sample.location}`}
-                                        className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.nextElementSibling.style.display = 'block';
-                                        }}
-                                    />
-                                    <div className="w-full h-48 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 text-sm" style={{display: 'none'}}>
-                                        Image temporarily unavailable
-                                    </div>
+                                <div key={sample.id || index} className="space-y-3">
+                                    {!imageErrors[sample.id || index] ? (
+                                        <img 
+                                            src={sample.sample_image}
+                                            alt={`Sample collection at ${sample.location}`}
+                                            className="w-full h-48 object-cover rounded-xl border border-slate-200"
+                                            onError={(e) => {
+                                                console.log(`🔍 DEBUG: Image load error for sample ${index}:`, sample.sample_image);
+                                                // Prevent further error propagation
+                                                e.preventDefault();
+                                                
+                                                // Use functional update to avoid race conditions
+                                                setImageErrors(prev => {
+                                                    const newErrors = { ...prev };
+                                                    newErrors[sample.id || index] = true;
+                                                    return newErrors;
+                                                });
+                                            }}
+                                            onLoad={() => {
+                                                console.log(`🔍 DEBUG: Image loaded successfully for sample ${index}:`, sample.sample_image);
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-48 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 text-sm">
+                                            <div className="text-center">
+                                                <FlaskConical className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                                                <p>Image temporarily unavailable</p>
+                                                <p className="text-xs mt-1">Sample: {sample.name}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                     <p className="text-sm text-slate-600 font-medium">{sample.location}</p>
                                     <p className="text-xs text-slate-500">{sample.description}</p>
                                 </div>
