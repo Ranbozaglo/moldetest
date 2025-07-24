@@ -43,11 +43,11 @@
   VITE_APP_ENV = "production"
   VITE_API_BASE_URL = "https://moldetest.onrender.com/api"
   VITE_SUPABASE_URL = "https://opjgytjlebfnhjzarvyy.supabase.co"
-  VITE_SUPABASE_ANON_KEY = "your_correct_anon_key_here"
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wamd5dGpsZWJmbmhqemFydnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1ODMzMzYsImV4cCI6MjA2ODE1OTMzNn0.SN7VpDUtsInqW_AUmP7fNaVKTgRkIZAJcyyVXlT8gJc"
 
 # Environment variables for development
 [context.deploy-preview.environment]
   VITE_APP_ENV = "preview"
   VITE_API_BASE_URL = "http://localhost:5000/api"
   VITE_SUPABASE_URL = "https://opjgytjlebfnhjzarvyy.supabase.co"
-  VITE_SUPABASE_ANON_KEY = "your_correct_anon_key_here" 
+  VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wamd5dGpsZWJmbmhqemFydnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1ODMzMzYsImV4cCI6MjA2ODE1OTMzNn0.SN7VpDUtsInqW_AUmP7fNaVKTgRkIZAJcyyVXlT8gJc" 

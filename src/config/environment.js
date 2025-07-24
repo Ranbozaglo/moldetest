@@ -35,7 +35,7 @@ export const ENVIRONMENT_CONFIG = {
     FRONTEND_URL: 'https://mold-testing.netlify.app',
     ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://opjgytjlebfnhjzarvyy.supabase.co',
-    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'your_correct_anon_key_here',
+    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     DEBUG: false,
     LOG_LEVEL: 'error'
   },
@@ -45,7 +45,7 @@ export const ENVIRONMENT_CONFIG = {
     FRONTEND_URL: 'http://localhost:5173',
     ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://opjgytjlebfnhjzarvyy.supabase.co',
-    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || 'your_correct_anon_key_here',
+    SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     DEBUG: true,
     LOG_LEVEL: 'debug'
   }
