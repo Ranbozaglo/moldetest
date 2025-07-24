@@ -67,54 +67,167 @@ export default function SamplingGuide() {
         }
     };
 
+    // Test function to verify storage access
+    const testStorageAccess = async () => {
+        try {
+            console.log("🧪 STORAGE TEST: Testing direct access to storage URL");
+            const testUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads";
+            
+            // Try to fetch the directory listing (this might not work but worth testing)
+            try {
+                const response = await fetch(testUrl);
+                console.log("🧪 STORAGE TEST: Response status:", response.status);
+                console.log("🧪 STORAGE TEST: Response headers:", Object.fromEntries(response.headers.entries()));
+            } catch (fetchError) {
+                console.log("🧪 STORAGE TEST: Direct fetch failed (expected):", fetchError.message);
+            }
+            
+            // Test the Supabase client configuration
+            console.log("🧪 STORAGE TEST: Supabase client URL:", supabase.supabaseUrl);
+            console.log("🧪 STORAGE TEST: Testing with Supabase client...");
+            
+            // Test if we can list buckets
+            const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+            if (bucketsError) {
+                console.error("🧪 STORAGE TEST: Error listing buckets:", bucketsError);
+            } else {
+                console.log("🧪 STORAGE TEST: Available buckets:", buckets?.map(b => b.name));
+            }
+            
+        } catch (testError) {
+            console.error("🧪 STORAGE TEST: Test failed:", testError);
+        }
+    };
+
     const loadSampleImages = async () => {
         try {
             console.log("🔍 DEBUG: Loading sample images from Supabase storage bucket");
+            console.log("🔍 DEBUG: Expected storage URL format:", "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads");
             
-            // Load all images from mold.images bucket in uploads folder
-            const files = await listSupabaseStorageFiles('mold.images', 'uploads');
-            console.log("🔍 DEBUG: Found files in mold.images/uploads:", files);
+            // Run storage test first
+            await testStorageAccess();
             
-            // Filter for images that contain "samples" in their name and are image files
-            const sampleFiles = files.filter(file => {
-                const fileName = file.name.toLowerCase();
-                const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+            // First, let's try to test if we can access the bucket at all
+            console.log("🔍 DEBUG: Testing bucket access...");
+            
+            try {
+                // Try to list all files in the uploads folder first
+                const files = await listSupabaseStorageFiles('mold.images', 'uploads');
+                console.log("✅ DEBUG: Successfully accessed mold.images bucket");
+                console.log("🔍 DEBUG: Found files in mold.images/uploads:", files);
+                console.log("🔍 DEBUG: Total files found:", files?.length || 0);
+                
+                if (!files || files.length === 0) {
+                    console.log("⚠️ DEBUG: No files found in mold.images/uploads folder");
+                    console.log("🔍 DEBUG: Trying to list files from root of mold.images bucket...");
+                    
+                    // Try listing from root
+                    const rootFiles = await listSupabaseStorageFiles('mold.images', '');
+                    console.log("🔍 DEBUG: Files in mold.images root:", rootFiles);
+                }
+                
+                // Show all files and their properties for debugging
+                if (files && files.length > 0) {
+                    files.forEach((file, index) => {
+                        console.log(`🔍 DEBUG: File ${index + 1}:`, {
+                            name: file.name,
+                            size: file.metadata?.size,
+                            type: file.metadata?.mimetype,
+                            lastModified: file.updated_at
+                        });
+                        
+                        // Test the public URL for each file
+                        const { data: urlData } = supabase.storage
+                            .from('mold.images')
+                            .getPublicUrl(`uploads/${file.name}`);
+                        console.log(`🔍 DEBUG: File ${index + 1} public URL:`, urlData.publicUrl);
+                    });
+                }
+                
+                // Filter for images that contain "samples" in their name and are image files
+                const sampleFiles = files?.filter(file => {
+                    const fileName = file.name.toLowerCase();
+                    const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+                                   fileName.endsWith('.png') || fileName.endsWith('.webp') || 
+                                   fileName.endsWith('.gif');
+                    const isSampleImage = fileName.includes('samples') || fileName.includes('sample');
+                    
+                    console.log("🔍 DEBUG: Checking file:", fileName, "isImage:", isImage, "isSampleImage:", isSampleImage);
+                    return isImage && isSampleImage;
+                }) || [];
+                
+                console.log("🔍 DEBUG: Filtered sample files:", sampleFiles);
+                console.log("🔍 DEBUG: Number of sample files found:", sampleFiles.length);
+                
+                if (sampleFiles.length === 0) {
+                    console.log("⚠️ DEBUG: No files with 'sample' in name found");
+                    console.log("🔍 DEBUG: Trying with all image files instead...");
+                    
+                    // If no sample files, try with all image files
+                    const allImageFiles = files?.filter(file => {
+                        const fileName = file.name.toLowerCase();
+                        return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
                                fileName.endsWith('.png') || fileName.endsWith('.webp') || 
                                fileName.endsWith('.gif');
-                const isSampleImage = fileName.includes('samples') || fileName.includes('sample');
+                    }) || [];
+                    
+                    console.log("🔍 DEBUG: All image files found:", allImageFiles.length);
+                    
+                    if (allImageFiles.length > 0) {
+                        // Use first few images as examples
+                        const sampleImagesWithUrls = allImageFiles.map((file, index) => {
+                            const { data: urlData } = supabase.storage
+                                .from('mold.images')
+                                .getPublicUrl(`uploads/${file.name}`);
+                            
+                            return {
+                                id: `sample_${index}`,
+                                sample_image: urlData.publicUrl,
+                                location: `Example Location ${index + 1}`,
+                                description: `Example image (${file.name}) for sampling reference`,
+                                name: file.name
+                            };
+                        }).slice(0, 6); // Limit to 6 images for display
+                        
+                        console.log("✅ DEBUG: Using all image files as samples:", sampleImagesWithUrls);
+                        setSampleImages(sampleImagesWithUrls);
+                        return;
+                    }
+                }
                 
-                console.log("🔍 DEBUG: Checking file:", fileName, "isImage:", isImage, "isSampleImage:", isSampleImage);
-                return isImage && isSampleImage;
-            });
-            
-            console.log("🔍 DEBUG: Filtered sample files:", sampleFiles);
-            
-            // Convert to format expected by the component with public URLs
-            const sampleImagesWithUrls = sampleFiles.map((file, index) => {
-                const { data: urlData } = supabase.storage
-                    .from('mold.images')
-                    .getPublicUrl(`uploads/${file.name}`);
+                // Convert to format expected by the component with public URLs
+                const sampleImagesWithUrls = sampleFiles.map((file, index) => {
+                    const { data: urlData } = supabase.storage
+                        .from('mold.images')
+                        .getPublicUrl(`uploads/${file.name}`);
+                    
+                    console.log(`🔍 DEBUG: Creating sample image ${index + 1} with URL:`, urlData.publicUrl);
+                    
+                    // Extract a readable location name from the filename
+                    const baseName = file.name.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '');
+                    const locationName = baseName
+                        .replace(/samples?/gi, '') // Remove "sample" or "samples"
+                        .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+                        .replace(/\d+/g, '') // Remove numbers
+                        .trim()
+                        .replace(/\s+/g, ' ') || `Sample Location ${index + 1}`;
+                    
+                    return {
+                        id: `sample_${index}`,
+                        sample_image: urlData.publicUrl,
+                        location: locationName.charAt(0).toUpperCase() + locationName.slice(1), // Capitalize first letter
+                        description: `Example sample image (${file.name}) showing proper collection technique`,
+                        name: file.name
+                    };
+                }).slice(0, 6); // Limit to 6 images for display
                 
-                // Extract a readable location name from the filename
-                const baseName = file.name.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '');
-                const locationName = baseName
-                    .replace(/samples?/gi, '') // Remove "sample" or "samples"
-                    .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
-                    .replace(/\d+/g, '') // Remove numbers
-                    .trim()
-                    .replace(/\s+/g, ' ') || `Sample Location ${index + 1}`;
+                console.log("✅ DEBUG: Final sample images with URLs:", sampleImagesWithUrls);
+                setSampleImages(sampleImagesWithUrls);
                 
-                return {
-                    id: `sample_${index}`,
-                    sample_image: urlData.publicUrl,
-                    location: locationName.charAt(0).toUpperCase() + locationName.slice(1), // Capitalize first letter
-                    description: `Example sample image (${file.name}) showing proper collection technique`,
-                    name: file.name
-                };
-            }).slice(0, 6); // Limit to 6 images for display
-            
-            console.log("🔍 DEBUG: Sample images with URLs:", sampleImagesWithUrls);
-            setSampleImages(sampleImagesWithUrls);
+            } catch (storageError) {
+                console.error("❌ Storage access error:", storageError);
+                throw storageError;
+            }
             
         } catch (error) {
             console.error("❌ Failed to load sample images from storage:", error);
