@@ -300,7 +300,7 @@ export const AuthProvider = ({ children }) => {
     }
     
     return false;
-  };
+  }, []);
 
   // Debug helper function
   const debugAuthState = () => {
