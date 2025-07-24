@@ -79,125 +79,48 @@ export default function SamplingGuide() {
 
 
     const loadSampleImages = async () => {
-        console.log("🔍 DEBUG: Starting loadSampleImages function");
         setLoading(true);
-        
         try {
-            // Multiple bucket strategies - try different approaches
-            const bucketStrategies = [
-                { bucket: 'sample', path: '', description: 'sample bucket root' },
-                { bucket: 'sample', path: 'uploads', description: 'sample bucket uploads folder' },
-                { bucket: 'mold.images', path: 'uploads', description: 'mold.images bucket uploads folder' },
-                { bucket: 'mold.images', path: '', description: 'mold.images bucket root' }
-            ];
-            
-            for (const strategy of bucketStrategies) {
-                console.log(`🔍 DEBUG: Trying strategy: ${strategy.description}`);
-                
-                try {
-                    const { data: files, error } = await supabase.storage
-                        .from(strategy.bucket)
-                        .list(strategy.path, { limit: 100 });
-                    
-                    if (error) {
-                        console.log(`⚠️ DEBUG: Strategy failed - ${strategy.description}:`, error.message);
-                        continue;
-                    }
-                    
-                    console.log(`✅ DEBUG: Successfully accessed ${strategy.description}`);
-                    console.log("🔍 DEBUG: Found files:", files?.length || 0, files?.map(f => f.name));
-                    
-                    if (files && files.length > 0) {
-                        // Filter for image files
-                        const imageFiles = files.filter(file => {
-                            const fileName = file.name.toLowerCase();
-                            return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
-                                   fileName.endsWith('.png') || fileName.endsWith('.webp') || 
-                                   fileName.endsWith('.gif');
-                        });
-                        
-                        console.log("🔍 DEBUG: Image files found:", imageFiles.length, imageFiles.map(f => f.name));
-                        
-                        if (imageFiles.length > 0) {
-                            // Convert to sample format
-                            const sampleImagesWithUrls = imageFiles.map((file, index) => {
-                                const filePath = strategy.path ? `${strategy.path}/${file.name}` : file.name;
-                                const { data: urlData } = supabase.storage
-                                    .from(strategy.bucket)
-                                    .getPublicUrl(filePath);
-                                
-                                console.log(`🔍 DEBUG: Creating sample ${index + 1} from file:`, file.name, "URL:", urlData.publicUrl);
-                                
-                                return {
-                                    id: `sample_${index}`,
-                                    sample_image: urlData.publicUrl,
-                                    location: `Sample Location ${index + 1}`,
-                                    description: `Sample collection example (${file.name})`,
-                                    name: file.name
-                                };
-                            }).slice(0, 6);
-                            
-                            console.log("✅ DEBUG: Successfully created sample images:", sampleImagesWithUrls.length);
-                            setSampleImages(sampleImagesWithUrls);
-                            setLoading(false);
-                            return; // Success! Exit the function
-                        }
-                    }
-                    
-                    console.log(`⚠️ DEBUG: No image files found in ${strategy.description}`);
-                } catch (strategyError) {
-                    console.log(`❌ DEBUG: Error with strategy ${strategy.description}:`, strategyError.message);
-                }
+            // Only look in the root of the 'sample' bucket
+            const { data: files, error } = await supabase.storage
+                .from('sample')
+                .list('', { limit: 100 });
+
+            if (error) {
+                console.error("❌ Error fetching files from sample bucket:", error.message);
+                setSampleImages([]);
+                setLoading(false);
+                return;
             }
-            
-            // If we get here, no strategy worked - try fallback
-            console.log("⚠️ DEBUG: All bucket strategies failed, trying fallback methods");
-            
-            // Fallback 1: Try to use a known working image
-            const fallbackImageUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg";
-            try {
-                const response = await fetch(fallbackImageUrl);
-                if (response.ok) {
-                    console.log("✅ DEBUG: Fallback image accessible, using it");
-                    setSampleImages([{
-                        id: 'fallback_sample',
-                        sample_image: fallbackImageUrl,
-                        location: 'Sample Collection Example',
-                        description: 'Example sample collection technique',
-                        name: 'Samples1.jpeg'
-                    }]);
+
+            if (files && files.length > 0) {
+                const imageFiles = files.filter(file => {
+                    const fileName = file.name.toLowerCase();
+                    return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ||
+                        fileName.endsWith('.png') || fileName.endsWith('.webp') ||
+                        fileName.endsWith('.gif');
+                });
+
+                if (imageFiles.length > 0) {
+                    const sampleImagesWithUrls = imageFiles.map((file, index) => ({
+                        id: `sample_${index}`,
+                        sample_image: `https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/${file.name}`,
+                        location: `Sample Location ${index + 1}`,
+                        description: `Sample collection example (${file.name})`,
+                        name: file.name
+                    })).slice(0, 6);
+
+                    setSampleImages(sampleImagesWithUrls);
                     setLoading(false);
                     return;
                 }
-            } catch (fallbackError) {
-                console.log("❌ DEBUG: Fallback image test failed:", fallbackError.message);
             }
-            
-            // Fallback 2: Try database
-            try {
-                console.log("🔄 DEBUG: Trying database fallback...");
-                const samples = await Sample.findMany({});
-                const samplesWithImages = samples.filter(sample => 
-                    sample.sample_image && 
-                    sample.sample_image.trim() !== '' &&
-                    sample.location && 
-                    sample.description
-                ).slice(0, 6);
-                
-                if (samplesWithImages.length > 0) {
-                    console.log("✅ DEBUG: Using database samples:", samplesWithImages.length);
-                    setSampleImages(samplesWithImages);
-                } else {
-                    console.log("⚠️ DEBUG: No samples found in database either");
-                    setSampleImages([]);
-                }
-            } catch (dbError) {
-                console.error("❌ DEBUG: Database fallback failed:", dbError);
-                setSampleImages([]);
-            }
-            
+
+            // No images found
+            console.log("❌ No images found in sample bucket root.");
+            setSampleImages([]);
         } catch (error) {
-            console.error("❌ DEBUG: Fatal error in loadSampleImages:", error);
+            console.error("❌ Fatal error in loadSampleImages:", error);
             setSampleImages([]);
         } finally {
             setLoading(false);
