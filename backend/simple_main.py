@@ -814,6 +814,18 @@ def update_inspection(inspection_id):
     
     print(f"🔍 DEBUG: Updating inspection {inspection_id} with data:", data)
     
+    # Debug lab_analysis_images specifically to track the array issue
+    if 'lab_analysis_images' in data:
+        print(f"🔍 DEBUG: lab_analysis_images field details:")
+        print(f"  - Type: {type(data['lab_analysis_images'])}")
+        print(f"  - Value: {repr(data['lab_analysis_images'])}")
+        if isinstance(data['lab_analysis_images'], str):
+            print(f"  - String length: {len(data['lab_analysis_images'])}")
+            print(f"  - First 100 chars: {data['lab_analysis_images'][:100]}")
+        elif isinstance(data['lab_analysis_images'], list):
+            print(f"  - Array length: {len(data['lab_analysis_images'])}")
+            print(f"  - Array items: {data['lab_analysis_images']}")
+    
     try:
         # Build update data dynamically based on what's provided
         update_data = {}
@@ -835,10 +847,27 @@ def update_inspection(inspection_id):
         # Handle image fields using correct database column names
         if 'lab_analysis_images' in data:
             if isinstance(data['lab_analysis_images'], list):
-                update_data['lab_analysis_images'] = data['lab_analysis_images']  # Store as PostgreSQL array
-                print(f"🔍 DEBUG: Storing lab_analysis_images as PostgreSQL array: {len(data['lab_analysis_images'])} images")
-            else:
+                # Already a list, store directly as PostgreSQL array
                 update_data['lab_analysis_images'] = data['lab_analysis_images']
+                print(f"🔍 DEBUG: Storing lab_analysis_images as PostgreSQL array: {len(data['lab_analysis_images'])} images")
+            elif isinstance(data['lab_analysis_images'], str):
+                try:
+                    # Parse JSON string back to array (from frontend JSON.stringify)
+                    parsed_images = json.loads(data['lab_analysis_images'])
+                    if isinstance(parsed_images, list):
+                        update_data['lab_analysis_images'] = parsed_images
+                        print(f"🔍 DEBUG: Parsed lab_analysis_images JSON string to PostgreSQL array: {len(parsed_images)} images")
+                    else:
+                        print(f"⚠️ WARNING: lab_analysis_images parsed but not a list: {type(parsed_images)}")
+                        update_data['lab_analysis_images'] = []
+                except json.JSONDecodeError as e:
+                    print(f"❌ ERROR: Failed to parse lab_analysis_images JSON: {e}")
+                    print(f"🔍 DEBUG: Raw data['lab_analysis_images']: {repr(data['lab_analysis_images'])}")
+                    update_data['lab_analysis_images'] = []
+            else:
+                # Handle null/None case
+                update_data['lab_analysis_images'] = data['lab_analysis_images']
+                print(f"🔍 DEBUG: Setting lab_analysis_images to: {data['lab_analysis_images']}")
         
         if 'visible_mold_details' in data:
             # Map visible_mold_details to mold_locations database column
