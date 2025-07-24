@@ -8,6 +8,7 @@ import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
 import { getInspectionIdFromUrl } from '@/utils/urlUtils';
 import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { listSupabaseStorageFiles, supabase } from '@/lib/supabase';
 
 export default function SamplingGuide() {
     const location = useLocation();
@@ -68,24 +69,73 @@ export default function SamplingGuide() {
 
     const loadSampleImages = async () => {
         try {
-            console.log("🔍 DEBUG: Loading sample images for examples");
-            // Load sample images that have been uploaded by other users as examples
-            // Filter to get samples with images that can serve as good examples
-            const samples = await Sample.findMany({});
+            console.log("🔍 DEBUG: Loading sample images from Supabase storage bucket");
             
-            // Filter samples that have images and are good examples
-            const samplesWithImages = samples.filter(sample => 
-                sample.sample_image && 
-                sample.sample_image.trim() !== '' &&
-                sample.location && 
-                sample.description
-            ).slice(0, 6); // Get up to 6 example images
+            // Load all images from mold.images bucket in uploads folder
+            const files = await listSupabaseStorageFiles('mold.images', 'uploads');
+            console.log("🔍 DEBUG: Found files in mold.images/uploads:", files);
             
-            console.log("🔍 DEBUG: Loaded sample images:", samplesWithImages);
-            setSampleImages(samplesWithImages);
+            // Filter for images that contain "samples" in their name and are image files
+            const sampleFiles = files.filter(file => {
+                const fileName = file.name.toLowerCase();
+                const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+                               fileName.endsWith('.png') || fileName.endsWith('.webp') || 
+                               fileName.endsWith('.gif');
+                const isSampleImage = fileName.includes('samples') || fileName.includes('sample');
+                
+                console.log("🔍 DEBUG: Checking file:", fileName, "isImage:", isImage, "isSampleImage:", isSampleImage);
+                return isImage && isSampleImage;
+            });
+            
+            console.log("🔍 DEBUG: Filtered sample files:", sampleFiles);
+            
+            // Convert to format expected by the component with public URLs
+            const sampleImagesWithUrls = sampleFiles.map((file, index) => {
+                const { data: urlData } = supabase.storage
+                    .from('mold.images')
+                    .getPublicUrl(`uploads/${file.name}`);
+                
+                // Extract a readable location name from the filename
+                const baseName = file.name.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '');
+                const locationName = baseName
+                    .replace(/samples?/gi, '') // Remove "sample" or "samples"
+                    .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+                    .replace(/\d+/g, '') // Remove numbers
+                    .trim()
+                    .replace(/\s+/g, ' ') || `Sample Location ${index + 1}`;
+                
+                return {
+                    id: `sample_${index}`,
+                    sample_image: urlData.publicUrl,
+                    location: locationName.charAt(0).toUpperCase() + locationName.slice(1), // Capitalize first letter
+                    description: `Example sample image (${file.name}) showing proper collection technique`,
+                    name: file.name
+                };
+            }).slice(0, 6); // Limit to 6 images for display
+            
+            console.log("🔍 DEBUG: Sample images with URLs:", sampleImagesWithUrls);
+            setSampleImages(sampleImagesWithUrls);
+            
         } catch (error) {
-            console.error("Failed to load sample images:", error);
-            setSampleImages([]); // Set empty array on error
+            console.error("❌ Failed to load sample images from storage:", error);
+            console.log("🔄 Falling back to database samples...");
+            
+            // Fallback to original method if storage fails
+            try {
+                const samples = await Sample.findMany({});
+                const samplesWithImages = samples.filter(sample => 
+                    sample.sample_image && 
+                    sample.sample_image.trim() !== '' &&
+                    sample.location && 
+                    sample.description
+                ).slice(0, 6);
+                
+                console.log("🔍 DEBUG: Fallback - loaded database samples:", samplesWithImages);
+                setSampleImages(samplesWithImages);
+            } catch (fallbackError) {
+                console.error("❌ Fallback also failed:", fallbackError);
+                setSampleImages([]); // Set empty array on error
+            }
         }
     };
     

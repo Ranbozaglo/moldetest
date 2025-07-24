@@ -520,8 +520,28 @@ export default function AdminDashboard() {
         </div>`;
     }
     
-    // Generate recommendations based on findings
-    const generateRecommendations = () => {
+    // Use AI-generated recommendations if available, otherwise generate based on findings
+    const getRecommendationsHtml = () => {
+        // First, check if we have AI-generated recommendations from lab analysis
+        if (inspection.recommendations && inspection.recommendations.trim().length > 0) {
+            console.log("🔍 DEBUG: Admin report using AI-generated recommendations:", inspection.recommendations);
+            // Format the AI recommendations as HTML, preserving line breaks
+            const formattedRecommendations = inspection.recommendations
+                .split('\n')
+                .filter(line => line.trim().length > 0)
+                .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
+                .join('');
+            
+            return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
+              <h4 style="color: #059669; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                🤖 AI-Generated Recommendations (Based on Lab Analysis)
+              </h4>
+              ${formattedRecommendations}
+            </div>`;
+        }
+        
+        // Fallback to generic recommendations if no AI recommendations available
+        console.log("🔍 DEBUG: Admin report no AI recommendations found, using generic recommendations");
         const recommendations = [];
         
         if (inspection.has_visible_mold) {
@@ -560,30 +580,35 @@ export default function AdminDashboard() {
             });
         }
         
-        return recommendations;
+        const recommendationsHtml = recommendations.map(rec => `
+          <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${rec.priority === 'high' ? '#dc2626' : rec.priority === 'medium' ? '#ea580c' : '#059669'}; margin-top: 6px; flex-shrink: 0;"></div>
+            <div>
+              <p style="font-weight: bold; color: #374151; margin: 0 0 4px 0; font-size: 14px;">
+                ${rec.icon} ${rec.title}
+              </p>
+              <p style="color: #6b7280; margin: 0; font-size: 13px; line-height: 1.4;">
+                ${rec.description}
+              </p>
+            </div>
+          </div>
+        `).join('');
+        
+        return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
+          <h4 style="color: #059669; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+            📋 General Recommendations
+          </h4>
+          ${recommendationsHtml}
+        </div>`;
     };
     
-    const recommendationsHtml = generateRecommendations().map(rec => `
-      <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${rec.priority === 'high' ? '#dc2626' : rec.priority === 'medium' ? '#ea580c' : '#059669'}; margin-top: 6px; flex-shrink: 0;"></div>
-        <div>
-          <p style="font-weight: bold; color: #374151; margin: 0 0 4px 0; font-size: 14px;">
-            ${rec.icon} ${rec.title}
-          </p>
-          <p style="color: #6b7280; margin: 0; font-size: 13px; line-height: 1.4;">
-            ${rec.description}
-          </p>
-        </div>
-      </div>
-    `).join('');
+    const recommendationsHtml = getRecommendationsHtml();
     
     const recommendationsSection = `<div style="margin-bottom: 20px;">
       <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-        📋 Initial Recommendations
+        📋 Recommendations
       </h3>
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
-        ${recommendationsHtml}
-      </div>
+      ${recommendationsHtml}
     </div>`;
     
     const samplesHtml = samples && samples.length > 0
