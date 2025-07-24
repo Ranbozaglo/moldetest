@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
 import { getInspectionIdFromUrl } from '@/utils/urlUtils';
-import { ArrowRight, FlaskConical, Beaker, ShieldQuestion, MapPin, Paintbrush, Archive, Repeat, CheckCircle } from 'lucide-react';
+import { ArrowRight, FlaskConical, Beaker, MapPin, Paintbrush, Archive, Repeat, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { listSupabaseStorageFiles, supabase } from '@/lib/supabase';
 
@@ -76,213 +76,106 @@ export default function SamplingGuide() {
         }
     };
 
-    // Test function to verify storage access
-    const testStorageAccess = async () => {
-        try {
-            console.log("🧪 STORAGE TEST: Testing direct access to storage URL");
-            const testUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/";
-            
-            // Test the specific image URL you provided (now from root path)
-            const specificImageUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg";
-            console.log("🧪 STORAGE TEST: Testing specific image:", specificImageUrl);
-            
-            try {
-                const imageResponse = await fetch(specificImageUrl);
-                console.log("🧪 STORAGE TEST: Specific image response status:", imageResponse.status);
-                console.log("🧪 STORAGE TEST: Specific image content type:", imageResponse.headers.get('content-type'));
-                console.log("🧪 STORAGE TEST: Specific image size:", imageResponse.headers.get('content-length'));
-                
-                if (imageResponse.ok) {
-                    console.log("✅ STORAGE TEST: Specific image is accessible!");
-                    
-                    // Create a test image directly
-                    const testSampleImage = {
-                        id: 'test_sample',
-                        sample_image: specificImageUrl,
-                        location: 'Test Sample Location',
-                        description: 'Direct test image (Samples1.jpeg)',
-                        name: 'Samples1.jpeg'
-                    };
-                    
-                    console.log("🧪 STORAGE TEST: Created test sample image:", testSampleImage);
-                    
-                    // Set this as a fallback if nothing else works
-                    window.testSampleImage = testSampleImage;
-                }
-            } catch (imageError) {
-                console.error("🧪 STORAGE TEST: Specific image test failed:", imageError);
-            }
-            
-            // Test the Supabase client configuration
-            console.log("🧪 STORAGE TEST: Supabase client URL:", supabase.supabaseUrl);
-            console.log("🧪 STORAGE TEST: Testing with Supabase client...");
-            
-            // Test if we can list buckets
-            const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-            if (bucketsError) {
-                console.error("🧪 STORAGE TEST: Error listing buckets:", bucketsError);
-            } else {
-                console.log("🧪 STORAGE TEST: Available buckets:", buckets?.map(b => b.name));
-            }
-            
-        } catch (testError) {
-            console.error("🧪 STORAGE TEST: Test failed:", testError);
-        }
-    };
+
 
     const loadSampleImages = async () => {
+        console.log("🔍 DEBUG: Starting loadSampleImages function");
+        setLoading(true);
+        
         try {
-            console.log("🔍 DEBUG: Loading sample images from Supabase storage bucket");
-            console.log("🔍 DEBUG: Expected storage URL format:", "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/");
+            // Multiple bucket strategies - try different approaches
+            const bucketStrategies = [
+                { bucket: 'sample', path: '', description: 'sample bucket root' },
+                { bucket: 'sample', path: 'uploads', description: 'sample bucket uploads folder' },
+                { bucket: 'mold.images', path: 'uploads', description: 'mold.images bucket uploads folder' },
+                { bucket: 'mold.images', path: '', description: 'mold.images bucket root' }
+            ];
             
-            // Run storage test first
-            await testStorageAccess();
-            
-            // First, let's try to test if we can access the bucket at all
-            console.log("🔍 DEBUG: Testing bucket access...");
-            
-            try {
-                // Fetch all files from the root path of 'sample' bucket
-                console.log("🔍 DEBUG: Fetching files from sample bucket root path...");
-                const { data: files, error } = await supabase.storage.from('sample').list('', { limit: 100 });
+            for (const strategy of bucketStrategies) {
+                console.log(`🔍 DEBUG: Trying strategy: ${strategy.description}`);
                 
-                if (error) {
-                    console.error("❌ DEBUG: Error fetching files from sample bucket:", error);
-                    throw error;
-                }
-                console.log("✅ DEBUG: Successfully accessed sample bucket");
-                console.log("🔍 DEBUG: Found files in sample bucket root:", files);
-                console.log("🔍 DEBUG: Total files found:", files?.length || 0);
-                
-                if (!files || files.length === 0) {
-                    console.log("⚠️ DEBUG: No files found in sample bucket root");
-                    console.log("🔍 DEBUG: Sample bucket appears to be empty");
-                }
-                
-                // Show all files and their properties for debugging
-                if (files && files.length > 0) {
-                    files.forEach((file, index) => {
-                        console.log(`🔍 DEBUG: File ${index + 1}:`, {
-                            name: file.name,
-                            size: file.metadata?.size,
-                            type: file.metadata?.mimetype,
-                            lastModified: file.updated_at
-                        });
-                        
-                        // Test the public URL for each file
-                        const { data: urlData } = supabase.storage
-                            .from('sample')
-                            .getPublicUrl(file.name);
-                        console.log(`🔍 DEBUG: File ${index + 1} public URL:`, urlData.publicUrl);
-                    });
-                }
-                
-                // Filter for images that contain "samples" in their name and are image files (FIXED: case insensitive)
-                const sampleFiles = files?.filter(file => {
-                    const fileName = file.name.toLowerCase();
-                    const originalFileName = file.name; // Keep original for logging
-                    const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
+                try {
+                    const { data: files, error } = await supabase.storage
+                        .from(strategy.bucket)
+                        .list(strategy.path, { limit: 100 });
+                    
+                    if (error) {
+                        console.log(`⚠️ DEBUG: Strategy failed - ${strategy.description}:`, error.message);
+                        continue;
+                    }
+                    
+                    console.log(`✅ DEBUG: Successfully accessed ${strategy.description}`);
+                    console.log("🔍 DEBUG: Found files:", files?.length || 0, files?.map(f => f.name));
+                    
+                    if (files && files.length > 0) {
+                        // Filter for image files
+                        const imageFiles = files.filter(file => {
+                            const fileName = file.name.toLowerCase();
+                            return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
                                    fileName.endsWith('.png') || fileName.endsWith('.webp') || 
                                    fileName.endsWith('.gif');
-                    const isSampleImage = fileName.includes('samples') || fileName.includes('sample');
-                    
-                    console.log("🔍 DEBUG: Checking file:", originalFileName, "→", fileName, "isImage:", isImage, "isSampleImage:", isSampleImage);
-                    return isImage && isSampleImage;
-                }) || [];
-                
-                console.log("🔍 DEBUG: Filtered sample files:", sampleFiles);
-                console.log("🔍 DEBUG: Number of sample files found:", sampleFiles.length);
-                
-                // EMERGENCY FALLBACK: If no sample files found, show ALL image files temporarily
-                if (sampleFiles.length === 0) {
-                    console.log("⚠️ DEBUG: No files with 'sample' in name found, showing ALL images for debugging");
-                    
-                    const allImageFiles = files?.filter(file => {
-                        const fileName = file.name.toLowerCase();
-                        const isImage = fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || 
-                                       fileName.endsWith('.png') || fileName.endsWith('.webp') || 
-                                       fileName.endsWith('.gif');
+                        });
                         
-                        console.log("🔍 DEBUG: All images check - file:", file.name, "isImage:", isImage);
-                        return isImage;
-                    }) || [];
-                    
-                    console.log("🔍 DEBUG: All image files found:", allImageFiles.length);
-                    
-                    if (allImageFiles.length > 0) {
-                        console.log("🔍 DEBUG: All image file names:", allImageFiles.map(f => f.name));
+                        console.log("🔍 DEBUG: Image files found:", imageFiles.length, imageFiles.map(f => f.name));
                         
-                        // Use all images as samples for now
-                        const allImagesAsSamples = allImageFiles.map((file, index) => {
-                            const { data: urlData } = supabase.storage
-                                .from('sample')
-                                .getPublicUrl(file.name);
+                        if (imageFiles.length > 0) {
+                            // Convert to sample format
+                            const sampleImagesWithUrls = imageFiles.map((file, index) => {
+                                const filePath = strategy.path ? `${strategy.path}/${file.name}` : file.name;
+                                const { data: urlData } = supabase.storage
+                                    .from(strategy.bucket)
+                                    .getPublicUrl(filePath);
+                                
+                                console.log(`🔍 DEBUG: Creating sample ${index + 1} from file:`, file.name, "URL:", urlData.publicUrl);
+                                
+                                return {
+                                    id: `sample_${index}`,
+                                    sample_image: urlData.publicUrl,
+                                    location: `Sample Location ${index + 1}`,
+                                    description: `Sample collection example (${file.name})`,
+                                    name: file.name
+                                };
+                            }).slice(0, 6);
                             
-                            console.log(`🔍 DEBUG: Creating sample ${index + 1} from file:`, file.name, "URL:", urlData.publicUrl);
-                            
-                            return {
-                                id: `all_image_${index}`,
-                                sample_image: urlData.publicUrl,
-                                location: `Image ${index + 1}: ${file.name}`,
-                                description: `Available image (${file.name}) - using as sample example`,
-                                name: file.name
-                            };
-                        }).slice(0, 6);
-                        
-                        console.log("✅ DEBUG: Using all images as samples:", allImagesAsSamples);
-                        setSampleImages(allImagesAsSamples);
-                        return;
-                    } else {
-                        // Ultimate fallback - use the specific image we know exists
-                        console.log("🚨 DEBUG: No images found via API, using direct URL test");
-                        if (window.testSampleImage) {
-                            console.log("✅ DEBUG: Using test sample image from direct URL test");
-                            setSampleImages([window.testSampleImage]);
-                            return;
+                            console.log("✅ DEBUG: Successfully created sample images:", sampleImagesWithUrls.length);
+                            setSampleImages(sampleImagesWithUrls);
+                            setLoading(false);
+                            return; // Success! Exit the function
                         }
                     }
+                    
+                    console.log(`⚠️ DEBUG: No image files found in ${strategy.description}`);
+                } catch (strategyError) {
+                    console.log(`❌ DEBUG: Error with strategy ${strategy.description}:`, strategyError.message);
                 }
-                
-                // Convert to format expected by the component with public URLs
-                const sampleImagesWithUrls = sampleFiles.map((file, index) => {
-                    const { data: urlData } = supabase.storage
-                        .from('sample')
-                        .getPublicUrl(file.name);
-                    
-                    console.log(`🔍 DEBUG: Creating sample image ${index + 1} with URL:`, urlData.publicUrl);
-                    
-                    // Extract a readable location name from the filename
-                    const baseName = file.name.replace(/\.(jpg|jpeg|png|webp|gif)$/i, '');
-                    const locationName = baseName
-                        .replace(/samples?/gi, '') // Remove "sample" or "samples"
-                        .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
-                        .replace(/\d+/g, '') // Remove numbers
-                        .trim()
-                        .replace(/\s+/g, ' ') || `Sample Location ${index + 1}`;
-                    
-                    return {
-                        id: `sample_${index}`,
-                        sample_image: urlData.publicUrl,
-                        location: locationName.charAt(0).toUpperCase() + locationName.slice(1), // Capitalize first letter
-                        description: `Example sample image (${file.name}) showing proper collection technique`,
-                        name: file.name
-                    };
-                }).slice(0, 6); // Limit to 6 images for display
-                
-                console.log("✅ DEBUG: Final sample images with URLs:", sampleImagesWithUrls);
-                setSampleImages(sampleImagesWithUrls);
-                
-            } catch (storageError) {
-                console.error("❌ Storage access error:", storageError);
-                throw storageError;
             }
             
-        } catch (error) {
-            console.error("❌ Failed to load sample images from storage:", error);
-            console.log("🔄 Falling back to database samples...");
+            // If we get here, no strategy worked - try fallback
+            console.log("⚠️ DEBUG: All bucket strategies failed, trying fallback methods");
             
-            // Fallback to original method if storage fails
+            // Fallback 1: Try to use a known working image
+            const fallbackImageUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg";
             try {
+                const response = await fetch(fallbackImageUrl);
+                if (response.ok) {
+                    console.log("✅ DEBUG: Fallback image accessible, using it");
+                    setSampleImages([{
+                        id: 'fallback_sample',
+                        sample_image: fallbackImageUrl,
+                        location: 'Sample Collection Example',
+                        description: 'Example sample collection technique',
+                        name: 'Samples1.jpeg'
+                    }]);
+                    setLoading(false);
+                    return;
+                }
+            } catch (fallbackError) {
+                console.log("❌ DEBUG: Fallback image test failed:", fallbackError.message);
+            }
+            
+            // Fallback 2: Try database
+            try {
+                console.log("🔄 DEBUG: Trying database fallback...");
                 const samples = await Sample.findMany({});
                 const samplesWithImages = samples.filter(sample => 
                     sample.sample_image && 
@@ -291,24 +184,23 @@ export default function SamplingGuide() {
                     sample.description
                 ).slice(0, 6);
                 
-                console.log("🔍 DEBUG: Fallback - loaded database samples:", samplesWithImages);
-                setSampleImages(samplesWithImages);
-            } catch (fallbackError) {
-                console.error("❌ Fallback also failed:", fallbackError);
-                
-                // FINAL FAILSAFE: Use the specific image we know exists
-                console.log("🚨 FINAL FAILSAFE: Using known working image URL");
-                const knownWorkingImage = {
-                    id: 'failsafe_sample',
-                    sample_image: 'https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg',
-                    location: 'Sample Collection Example',
-                    description: 'Example sample image (Samples1.jpeg) showing proper collection technique',
-                    name: 'Samples1.jpeg'
-                };
-                
-                console.log("✅ FINAL FAILSAFE: Setting known working image:", knownWorkingImage);
-                setSampleImages([knownWorkingImage]);
+                if (samplesWithImages.length > 0) {
+                    console.log("✅ DEBUG: Using database samples:", samplesWithImages.length);
+                    setSampleImages(samplesWithImages);
+                } else {
+                    console.log("⚠️ DEBUG: No samples found in database either");
+                    setSampleImages([]);
+                }
+            } catch (dbError) {
+                console.error("❌ DEBUG: Database fallback failed:", dbError);
+                setSampleImages([]);
             }
+            
+        } catch (error) {
+            console.error("❌ DEBUG: Fatal error in loadSampleImages:", error);
+            setSampleImages([]);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -448,7 +340,7 @@ export default function SamplingGuide() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                 <div className="text-center mb-12">
                     <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <ShieldQuestion className="w-8 h-8 text-blue-600" />
+                        <img src="/logos.png" alt="Logo" className="w-8 h-8 object-contain" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Guide: Collecting Swab Samples</h1>
                     <p className="text-lg text-slate-600">

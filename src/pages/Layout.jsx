@@ -2,7 +2,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, ShieldCheck, FileText, LogOut, User } from "lucide-react";
+import { Home, FileText, LogOut, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Layout({ children, currentPageName }) {

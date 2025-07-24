@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User } from '@/api/entities';
 
 const AuthContext = createContext();
@@ -14,6 +14,9 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const intervalRef = useRef(null);
+  const lastValidationRef = useRef(null);
+  const initializationRef = useRef(false);
 
   // Helper function to check if token is expired
   const isTokenExpired = (userData) => {
@@ -25,10 +28,18 @@ export const AuthProvider = ({ children }) => {
     return tokenAge > maxAge;
   };
 
-  // Helper function to validate token with server
-  const validateTokenWithServer = async (userData) => {
+  // Helper function to validate token with server (with throttling)
+  const validateTokenWithServer = useCallback(async (userData) => {
+    // Throttle validation calls - don't validate more than once every 10 minutes
+    const now = Date.now();
+    if (lastValidationRef.current && (now - lastValidationRef.current) < 10 * 60 * 1000) {
+      console.log('🔍 AUTH DEBUG: Skipping token validation - too recent');
+      return true;
+    }
+
     try {
-      console.log('🔍 PROD DEBUG: Validating token with server...');
+      console.log('🔍 AUTH DEBUG: Validating token with server...');
+      lastValidationRef.current = now;
       
       // Make a simple API call to validate the token
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest.onrender.com/api'}/auth/validate`, {
@@ -40,47 +51,51 @@ export const AuthProvider = ({ children }) => {
       });
       
       if (response.ok) {
-        console.log('🔍 PROD DEBUG: Token validation successful');
+        console.log('🔍 AUTH DEBUG: Token validation successful');
         return true;
       } else {
-        console.log('🔍 PROD DEBUG: Token validation failed:', response.status);
+        console.log('🔍 AUTH DEBUG: Token validation failed:', response.status);
         return false;
       }
     } catch (error) {
-      console.error('🔍 PROD DEBUG: Token validation error:', error);
+      console.error('🔍 AUTH DEBUG: Token validation error:', error);
       return false;
     }
-  };
+  }, []);
 
+  // Initialize auth only once on mount
   useEffect(() => {
+    if (initializationRef.current) return;
+    initializationRef.current = true;
+
     const initializeAuth = async () => {
-      console.log('🔍 PROD DEBUG: AuthProvider initializing...');
+      console.log('🔍 AUTH DEBUG: AuthProvider initializing (once only)...');
       
       // Check for existing user session in localStorage
       const savedUser = localStorage.getItem('mth_user');
-      console.log('🔍 PROD DEBUG: Saved user from localStorage:', savedUser ? 'exists' : 'not found');
+      console.log('🔍 AUTH DEBUG: Saved user from localStorage:', savedUser ? 'exists' : 'not found');
       
       if (savedUser) {
         try {
           const userData = JSON.parse(savedUser);
-          console.log('🔍 PROD DEBUG: Parsed user data:', userData);
+          console.log('🔍 AUTH DEBUG: Parsed user data:', userData);
           
           // Check if token is expired based on timestamp
           if (isTokenExpired(userData)) {
-            console.log('🔍 PROD DEBUG: Token expired based on timestamp, clearing session');
+            console.log('🔍 AUTH DEBUG: Token expired based on timestamp, clearing session');
             localStorage.removeItem('mth_user');
             setLoading(false);
             return;
           }
           
-          // Validate token with server (optional - only do this occasionally to avoid too many requests)
+          // Only validate token if it hasn't been validated recently (reduce API calls)
           const shouldValidateToken = !userData.lastValidated || 
-                                     (Date.now() - new Date(userData.lastValidated).getTime()) > (60 * 60 * 1000); // 1 hour
+                                     (Date.now() - new Date(userData.lastValidated).getTime()) > (2 * 60 * 60 * 1000); // 2 hours
           
           if (shouldValidateToken) {
             const isValid = await validateTokenWithServer(userData);
             if (!isValid) {
-              console.log('🔍 PROD DEBUG: Server token validation failed, clearing session');
+              console.log('🔍 AUTH DEBUG: Server token validation failed, clearing session');
               localStorage.removeItem('mth_user');
               setLoading(false);
               return;
@@ -94,30 +109,43 @@ export const AuthProvider = ({ children }) => {
           // Update admin role for specific emails if needed
           const adminEmails = ['rotemiluz53@gmail.com'];
           if (adminEmails.includes(userData.email) && userData.role !== 'admin') {
-            console.log('🔍 PROD DEBUG: Updating admin role for:', userData.email);
+            console.log('🔍 AUTH DEBUG: Updating admin role for:', userData.email);
             userData.role = 'admin';
             userData.is_admin = true;
             localStorage.setItem('mth_user', JSON.stringify(userData));
           }
           
-          console.log('🔍 PROD DEBUG: Setting user state:', userData);
+          console.log('🔍 AUTH DEBUG: Setting user state:', userData);
           setUser(userData);
         } catch (error) {
-          console.error('🔍 PROD DEBUG: Error parsing saved user:', error);
+          console.error('🔍 AUTH DEBUG: Error parsing saved user:', error);
           localStorage.removeItem('mth_user');
         }
       }
       
-      console.log('🔍 PROD DEBUG: AuthProvider loading complete, setting loading to false');
+      console.log('🔍 AUTH DEBUG: AuthProvider loading complete, setting loading to false');
       setLoading(false);
     };
     
     initializeAuth();
+  }, []); // Empty dependency array - run only once
+
+  // Set up periodic token validation separately
+  useEffect(() => {
+    // Clear any existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    // Only set up interval if user is logged in
+    if (!user) return;
+
+    console.log('🔍 AUTH DEBUG: Setting up periodic token validation for user:', user.email);
     
-    // Set up periodic token validation (every 30 minutes)
-    const tokenCheckInterval = setInterval(async () => {
+    // Set up periodic token validation (every 2 hours - reduced frequency)
+    intervalRef.current = setInterval(async () => {
       const savedUser = localStorage.getItem('mth_user');
-      if (savedUser && user) {
+      if (savedUser) {
         try {
           const userData = JSON.parse(savedUser);
           
@@ -127,29 +155,32 @@ export const AuthProvider = ({ children }) => {
           const warningAge = 22 * 60 * 60 * 1000; // 22 hours (2 hours before expiration)
           
           if (tokenAge > maxAge) {
-            console.log('🔍 PROD DEBUG: Token expired during periodic check, logging out');
+            console.log('🔍 AUTH DEBUG: Token expired during periodic check, logging out');
             signOut();
           } else if (tokenAge > warningAge) {
-            console.log('🔍 PROD DEBUG: Token approaching expiration, validating with server');
+            console.log('🔍 AUTH DEBUG: Token approaching expiration, validating with server');
             const isValid = await validateTokenWithServer(userData);
             if (!isValid) {
-              console.log('🔍 PROD DEBUG: Token validation failed during periodic check, logging out');
+              console.log('🔍 AUTH DEBUG: Token validation failed during periodic check, logging out');
               signOut();
             }
           }
         } catch (error) {
-          console.error('🔍 PROD DEBUG: Error during periodic token check:', error);
+          console.error('🔍 AUTH DEBUG: Error during periodic token check:', error);
         }
       }
-    }, 30 * 60 * 1000); // 30 minutes
+    }, 2 * 60 * 60 * 1000); // 2 hours (reduced from 30 minutes)
     
-    // Cleanup interval on unmount
+    // Cleanup interval on user change or unmount
     return () => {
-      clearInterval(tokenCheckInterval);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  }, [user]);
+  }, [user?.id, validateTokenWithServer]); // Only depend on user ID, not full user object
 
-  const signIn = async (email, password) => {
+  const signIn = useCallback(async (email, password) => {
     try {
       const isProduction = window.location.hostname !== 'localhost';
       const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
@@ -206,9 +237,9 @@ export const AuthProvider = ({ children }) => {
       });
       return { success: false, error: error.message || 'Sign in failed' };
     }
-  };
+  }, []);
 
-  const signUp = async (email, password, name) => {
+  const signUp = useCallback(async (email, password, name) => {
     try {
       // Call backend API for registration
       const response = await User.register(email, password);
@@ -230,16 +261,16 @@ export const AuthProvider = ({ children }) => {
       console.error('Sign up error:', error);
       return { success: false, error: error.message || 'Sign up failed' };
     }
-  };
+  }, []);
 
-  const signOut = () => {
+  const signOut = useCallback(() => {
     console.log('🔍 PROD DEBUG: signOut called - clearing user state and localStorage');
     setUser(null);
     localStorage.removeItem('mth_user');
-  };
+  }, []);
 
   // Function to refresh the user session
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     console.log('🔍 PROD DEBUG: Refreshing user session...');
     const savedUser = localStorage.getItem('mth_user');
     
@@ -296,7 +327,8 @@ export const AuthProvider = ({ children }) => {
     return { user, loading, savedUser, tokenStatus, currentUrl: window.location.href };
   };
 
-  const value = {
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
     user,
     loading,
     signIn,
@@ -304,13 +336,24 @@ export const AuthProvider = ({ children }) => {
     signOut,
     refreshSession,
     debugAuthState
-  };
+  }), [user, loading, signIn, signUp, signOut, refreshSession, debugAuthState]);
 
-  // Debug log when auth state changes
-  console.log('🔍 PROD DEBUG: AuthContext value update - user:', user ? `${user.email} (${user.role})` : 'null', 'loading:', loading);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      console.log('🔍 AUTH DEBUG: AuthProvider unmounting, cleaned up intervals');
+    };
+  }, []);
+
+  // Debug log when auth state changes (reduced frequency)
+  console.log('🔍 AUTH DEBUG: AuthContext value update - user:', user ? `${user.email} (${user.role})` : 'null', 'loading:', loading);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
