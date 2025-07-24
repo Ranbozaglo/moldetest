@@ -79,51 +79,38 @@ export default function SamplingGuide() {
 
 
     const loadSampleImages = async () => {
+        console.log("[SamplingGuide] loadSampleImages called");
         setLoading(true);
         try {
-            // Only look in the root of the 'sample' bucket
-            const { data: files, error } = await supabase.storage
-                .from('sample')
-                .list('', { limit: 100 });
+            // Use the provided static sample image URLs
+            const staticSampleImages = [
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples9.jpeg",
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples8.jpeg",
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples7.jpeg",
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples6.jpeg",
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples4.jpeg",
+                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Sample1.jpeg"
+            ];
 
-            if (error) {
-                console.error("❌ Error fetching files from sample bucket:", error.message);
-                setSampleImages([]);
-                setLoading(false);
-                return;
-            }
+            console.log(`[SamplingGuide] Static sample image URLs:`, staticSampleImages);
 
-            if (files && files.length > 0) {
-                const imageFiles = files.filter(file => {
-                    const fileName = file.name.toLowerCase();
-                    return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') ||
-                        fileName.endsWith('.png') || fileName.endsWith('.webp') ||
-                        fileName.endsWith('.gif');
-                });
+            const sampleImagesWithUrls = staticSampleImages.map((url, index) => ({
+                id: `static_sample_${index}`,
+                sample_image: url,
+                location: `Sample Location ${index + 1}`,
+                description: `Sample collection example (Sample ${index + 1})`,
+                name: url.split('/').pop()
+            }));
 
-                if (imageFiles.length > 0) {
-                    const sampleImagesWithUrls = imageFiles.map((file, index) => ({
-                        id: `sample_${index}`,
-                        sample_image: `https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/${file.name}`,
-                        location: `Sample Location ${index + 1}`,
-                        description: `Sample collection example (${file.name})`,
-                        name: file.name
-                    })).slice(0, 6);
+            console.log(`[SamplingGuide] sampleImagesWithUrls:`, sampleImagesWithUrls);
 
-                    setSampleImages(sampleImagesWithUrls);
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            // No images found
-            console.log("❌ No images found in sample bucket root.");
-            setSampleImages([]);
+            setSampleImages(sampleImagesWithUrls);
         } catch (error) {
-            console.error("❌ Fatal error in loadSampleImages:", error);
+            console.error("[SamplingGuide] Fatal error in loadSampleImages:", error);
             setSampleImages([]);
         } finally {
             setLoading(false);
+            console.log("[SamplingGuide] loadSampleImages finished");
         }
     };
 
