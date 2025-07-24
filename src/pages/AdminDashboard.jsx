@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
@@ -1025,7 +1025,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
               <img 
-                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
                 alt="Mold Testing Houston Logo" 
                 className="w-8 h-8 object-contain"
               />
