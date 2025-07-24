@@ -544,10 +544,59 @@ if (typeof window !== 'undefined') {
   console.log('🔍 PROD DEBUG: Try: debugBackend.testHealth(), debugBackend.testLogin(), debugBackend.checkEnv(), debugBackend.checkAuth()');
 }
 
+// Email Templates entity
+export const EmailTemplate = {
+  getAll: async () => {
+    const token = getAuthToken();
+    const response = await apiCall('/api/email-templates', {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.templates;
+  },
+  
+  getByType: async (templateType) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/api/email-templates/${templateType}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response.template;
+  },
+  
+  update: async (templateType, data) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/api/email-templates/${templateType}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response;
+  },
+  
+  reset: async (templateType) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/api/email-templates/${templateType}/reset`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    return response;
+  }
+};
+
 // Default export for backward compatibility
 export default {
   MoldInspection,
   Sample,
   User,
-  EmailService
+  EmailService,
+  EmailTemplate
 };

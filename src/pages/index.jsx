@@ -4,6 +4,7 @@ import Welcome from "./Welcome";
 import Inspection from "./Inspection";
 import Sampling from "./Sampling";
 import AdminDashboard from "./AdminDashboard";
+import EmailSettings from "./EmailSettings";
 import InspectionDetails from "./InspectionDetails";
 import SamplingGuide from "./SamplingGuide";
 import ThankYou from "./ThankYou";
@@ -86,6 +87,7 @@ const PAGES = {
     Inspection: Inspection,
     Sampling: Sampling,
     AdminDashboard: AdminDashboard,
+    EmailSettings: EmailSettings,
     InspectionDetails: InspectionDetails,
     SamplingGuide: SamplingGuide,
     ThankYou: ThankYou,
@@ -190,6 +192,12 @@ function PagesContent() {
                 <Route path="/AdminDashboard" element={
                     <ProtectedRoute requireAdmin={true}>
                         <AdminDashboard />
+                    </ProtectedRoute>
+                } />
+                
+                <Route path="/EmailSettings" element={
+                    <ProtectedRoute requireAdmin={true}>
+                        <EmailSettings />
                     </ProtectedRoute>
                 } />
                 

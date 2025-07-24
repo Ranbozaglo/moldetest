@@ -70,5 +70,15 @@ class Sample(Base):
     results = Column(Text)  # JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class EmailTemplate(Base):
+    __tablename__ = "email_templates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, unique=True, index=True)  # lab_received, report_ready, review_request
+    subject = Column(String)
+    body = Column(Text)  # HTML content from rich text editor
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 # Create tables
 Base.metadata.create_all(bind=engine) 

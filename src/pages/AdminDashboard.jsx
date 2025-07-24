@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { EmailService } from "@/api/entities";
+import { EmailService, EmailTemplate } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -148,6 +148,35 @@ export default function AdminDashboard() {
       console.error("Error loading inspections:", error);
       alert("Failed to load inspections. Please refresh the page.");
     }
+  };
+
+  // Helper function to process email template placeholders
+  const processEmailTemplate = (template, inspection) => {
+    const displayNum = getDisplayNumber(inspection);
+    const placeholders = {
+      '{{client_name}}': inspection.full_name || 'Valued Customer',
+      '{{inspection_number}}': displayNum || inspection.id,
+      '{{property_address}}': `${inspection.street_address}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}`,
+      '{{received_date}}': new Date().toLocaleDateString(),
+      '{{report_date}}': new Date().toLocaleDateString(),
+      '{{report_link}}': `${window.location.origin}${createPageUrl("MyInspections")}`,
+      '{{review_link}}': 'https://g.page/r/moldtestinghouston/review'
+    };
+
+    let processedSubject = template.subject;
+    let processedBody = template.body;
+
+    // Replace placeholders in both subject and body
+    Object.entries(placeholders).forEach(([placeholder, value]) => {
+      const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
+      processedSubject = processedSubject.replace(regex, value);
+      processedBody = processedBody.replace(regex, value);
+    });
+
+    return {
+      subject: processedSubject,
+      body: processedBody
+    };
   };
   
   const getDisplayNumber = (inspection) => {
@@ -743,25 +772,14 @@ export default function AdminDashboard() {
     setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
     
     try {
-      const displayNum = getDisplayNumber(inspection);
-      const firstName = inspection.full_name.split(' ')[0];
+      // Get the email template
+      const template = await EmailTemplate.getByType('lab_received');
+      const processedEmail = processEmailTemplate(template, inspection);
       
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; font-size: 16px; color: #000000;">
-          <p>Hi ${firstName},</p>
-          <p>Just a quick update, your mold test samples have been received by our lab and are now being processed.</p>
-          <p>Our team is reviewing the findings and preparing your personalized report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
-          <p>You can track the status of your report here: <a href="${window.location.origin}${createPageUrl("MyInspections")}" style="color: #1e40af; text-decoration: underline;">Track My Report</a></p>
-          <p>We'll notify you the moment your report is ready.</p>
-          <p>Thank you for trusting Mold Testing Houston with your health and home!</p>
-          <br>
-          <p>Warm regards,</p>
-          <p><strong>Mold Testing Houston</strong></p>
-        </div>
-      `;
-
       // Mock email service since specific methods don't exist
-      console.log(`Mock: Sending lab received email for inspection ${inspection.id}`);
+      console.log(`Sending lab received email for inspection ${inspection.id}`);
+      console.log(`Subject: ${processedEmail.subject}`);
+      console.log(`Body: ${processedEmail.body}`);
       
       // Update inspection status to 'in_progress'
       await MoldInspection.update(inspection.id, { 
@@ -792,7 +810,6 @@ export default function AdminDashboard() {
     
     try {
       const displayNum = getDisplayNumber(inspection);
-      const firstName = inspection.full_name.split(' ')[0];
       
       // Step 1: Generate and upload the report
       setDownloadStatus({ type: 'info', message: `Generating and storing report for ${displayNum}...` });
@@ -805,30 +822,14 @@ export default function AdminDashboard() {
       setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
       setTimeout(() => setDownloadStatus(null), 3000);
 
-      // Step 2: Construct the new email body
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; font-size: 16px; color: #000000;">
-          <p>Hi ${firstName},</p>
-          <p>Your lab results and mold inspection report are now ready to view in your secure portal.</p>
-          <p>This report includes:</p>
-          <ul style="padding-left: 20px; margin-top: 0; margin-bottom: 16px;">
-            <li>Lab-verified analysis of your samples</li>
-            <li>Mold types identified and spore levels</li>
-            <li>Professional interpretation and next steps (if needed)</li>
-          </ul>
-          <p>🔗 <strong>View your report now by visiting your portal:</strong><br>
-          👉 <a href="${window.location.origin}${createPageUrl("MyInspections")}" style="color: #1e40af; text-decoration: underline;">Access Your Report</a></p>
-          <p>If you have any questions or need further guidance, feel free to reply, we're happy to help.</p>
-          <p>Thanks again for choosing Mold Testing Houston!</p>
-          <br>
-          <p>Best,</p>
-          <p><strong>Mold Testing Houston</strong></p>
-        </div>
-      `;
+      // Step 2: Get the email template and process it
+      const template = await EmailTemplate.getByType('report_ready');
+      const processedEmail = processEmailTemplate(template, inspection);
 
       // Step 3: Send the email notification
-      // Mock email service since specific methods don't exist
-      console.log(`Mock: Sending report ready email for inspection ${inspection.id}`);
+      console.log(`Sending report ready email for inspection ${inspection.id}`);
+      console.log(`Subject: ${processedEmail.subject}`);
+      console.log(`Body: ${processedEmail.body}`);
       
       // Step 4: Update the inspection record
       await MoldInspection.update(inspection.id, { 
@@ -858,25 +859,13 @@ export default function AdminDashboard() {
     setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
     
     try {
-      const displayNum = getDisplayNumber(inspection);
-      const firstName = inspection.full_name.split(' ')[0];
+      // Get the email template and process it
+      const template = await EmailTemplate.getByType('review_request');
+      const processedEmail = processEmailTemplate(template, inspection);
       
-      const emailBody = `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; font-size: 16px; color: #000000;">
-          <p>Hi ${firstName},</p>
-          <p>Thank you again for trusting Mold Testing Houston with your mold testing needs. We hope your experience was smooth, informative, and gave you peace of mind.</p>
-          <p>If you found our service helpful, would you mind leaving us a quick Google review? It helps others find reliable help when they need it most, and we'd truly appreciate it!</p>
-          <p>⭐️ <strong>Leave a review here:</strong><br>
-          👉 <a href="https://g.page/r/CYI0lXIHJ-W-EBE/review" style="color: #1e40af; text-decoration: underline;">Leave Your Review</a></p>
-          <p>Thanks again, and if you ever need further assistance or follow-up, we're just a message away.</p>
-          <br>
-          <p>All the best,</p>
-          <p><strong>Mold Testing Houston</strong></p>
-        </div>
-      `;
-      
-      // Mock email service since specific methods don't exist
-      console.log(`Mock: Sending review request email for inspection ${inspection.id}`);
+      console.log(`Sending review request email for inspection ${inspection.id}`);
+      console.log(`Subject: ${processedEmail.subject}`);
+      console.log(`Body: ${processedEmail.body}`);
       
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
       setTimeout(() => {
@@ -1026,6 +1015,14 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Button 
+              onClick={() => navigate('/EmailSettings')} 
+              variant="outline" 
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <Mail className="w-4 h-4" />
+              Email Settings
+            </Button>
             <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2">
               <RefreshCw className="w-4 h-4" />
               Refresh
