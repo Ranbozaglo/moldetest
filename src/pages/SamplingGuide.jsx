@@ -71,10 +71,10 @@ export default function SamplingGuide() {
     const testStorageAccess = async () => {
         try {
             console.log("🧪 STORAGE TEST: Testing direct access to storage URL");
-            const testUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/uploads";
+            const testUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/";
             
-            // Test the specific image URL you provided
-            const specificImageUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/uploads/Samples1.jpeg";
+            // Test the specific image URL you provided (now from root path)
+            const specificImageUrl = "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg";
             console.log("🧪 STORAGE TEST: Testing specific image:", specificImageUrl);
             
             try {
@@ -124,7 +124,7 @@ export default function SamplingGuide() {
     const loadSampleImages = async () => {
         try {
             console.log("🔍 DEBUG: Loading sample images from Supabase storage bucket");
-            console.log("🔍 DEBUG: Expected storage URL format:", "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/uploads");
+            console.log("🔍 DEBUG: Expected storage URL format:", "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/");
             
             // Run storage test first
             await testStorageAccess();
@@ -133,19 +133,21 @@ export default function SamplingGuide() {
             console.log("🔍 DEBUG: Testing bucket access...");
             
             try {
-                // Try to list all files in the uploads folder first
-                const files = await listSupabaseStorageFiles('sample', 'uploads');
+                // Fetch all files from the root path of 'sample' bucket
+                console.log("🔍 DEBUG: Fetching files from sample bucket root path...");
+                const { data: files, error } = await supabase.storage.from('sample').list('', { limit: 100 });
+                
+                if (error) {
+                    console.error("❌ DEBUG: Error fetching files from sample bucket:", error);
+                    throw error;
+                }
                 console.log("✅ DEBUG: Successfully accessed sample bucket");
-                console.log("🔍 DEBUG: Found files in sample/uploads:", files);
+                console.log("🔍 DEBUG: Found files in sample bucket root:", files);
                 console.log("🔍 DEBUG: Total files found:", files?.length || 0);
                 
                 if (!files || files.length === 0) {
-                    console.log("⚠️ DEBUG: No files found in sample/uploads folder");
-                    console.log("🔍 DEBUG: Trying to list files from root of sample bucket...");
-                    
-                    // Try listing from root
-                    const rootFiles = await listSupabaseStorageFiles('sample', '');
-                    console.log("🔍 DEBUG: Files in sample root:", rootFiles);
+                    console.log("⚠️ DEBUG: No files found in sample bucket root");
+                    console.log("🔍 DEBUG: Sample bucket appears to be empty");
                 }
                 
                 // Show all files and their properties for debugging
@@ -161,7 +163,7 @@ export default function SamplingGuide() {
                         // Test the public URL for each file
                         const { data: urlData } = supabase.storage
                             .from('sample')
-                            .getPublicUrl(`uploads/${file.name}`);
+                            .getPublicUrl(file.name);
                         console.log(`🔍 DEBUG: File ${index + 1} public URL:`, urlData.publicUrl);
                     });
                 }
@@ -205,7 +207,7 @@ export default function SamplingGuide() {
                         const allImagesAsSamples = allImageFiles.map((file, index) => {
                             const { data: urlData } = supabase.storage
                                 .from('sample')
-                                .getPublicUrl(`uploads/${file.name}`);
+                                .getPublicUrl(file.name);
                             
                             console.log(`🔍 DEBUG: Creating sample ${index + 1} from file:`, file.name, "URL:", urlData.publicUrl);
                             
@@ -236,7 +238,7 @@ export default function SamplingGuide() {
                 const sampleImagesWithUrls = sampleFiles.map((file, index) => {
                     const { data: urlData } = supabase.storage
                         .from('sample')
-                        .getPublicUrl(`uploads/${file.name}`);
+                        .getPublicUrl(file.name);
                     
                     console.log(`🔍 DEBUG: Creating sample image ${index + 1} with URL:`, urlData.publicUrl);
                     
@@ -289,7 +291,7 @@ export default function SamplingGuide() {
                 console.log("🚨 FINAL FAILSAFE: Using known working image URL");
                 const knownWorkingImage = {
                     id: 'failsafe_sample',
-                    sample_image: 'https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/uploads/Samples1.jpeg',
+                    sample_image: 'https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample/Samples1.jpeg',
                     location: 'Sample Collection Example',
                     description: 'Example sample image (Samples1.jpeg) showing proper collection technique',
                     name: 'Samples1.jpeg'
