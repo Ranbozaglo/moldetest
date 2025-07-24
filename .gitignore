@@ -23,6 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment and credentials
 .env
+gcloud-key.json
+*-key.json
+*.json.key
+
+# Python virtual environment
 venv/
 

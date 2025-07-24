@@ -50,7 +50,10 @@ const convertToWebP = async (file) => {
 
 export const Core = {
   InvokeLLM: async (prompt, file_urls = []) => {
-    console.log('🔍 DEBUG: InvokeLLM called with:', { prompt, file_urls });
+    console.log('🚀 CORE API: InvokeLLM called!');
+    console.log('🔍 DEBUG: Prompt length:', prompt?.length || 0);
+    console.log('🔍 DEBUG: File URLs count:', file_urls?.length || 0);
+    console.log('🔍 DEBUG: File URLs:', file_urls);
     
     try {
       // Check if we're in a build environment
@@ -67,18 +70,23 @@ export const Core = {
       }
 
       // Connect to the OCR-GPT backend API using dynamic configuration
+      console.log('🌐 CORE API: Getting API URL...');
       const baseApiUrl = getBaseApiUrl();
       const apiUrl = `${baseApiUrl}/api/ocr-gpt`;
       
-      console.log('🔍 DEBUG: Calling OCR-GPT backend at:', apiUrl);
+      console.log('✅ CORE API: API URL determined:', apiUrl);
+      console.log('🔍 DEBUG: Base API URL:', baseApiUrl);
       
       const requestData = {
         prompt: prompt,
         image_urls: file_urls || []
       };
       
-      console.log('🔍 DEBUG: Request data:', requestData);
+      console.log('📦 CORE API: Preparing request data...');
+      console.log('🔍 DEBUG: Request payload:', requestData);
+      console.log('🔍 DEBUG: Request payload size:', JSON.stringify(requestData).length);
       
+      console.log('📡 CORE API: Making HTTP request...');
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -87,12 +95,22 @@ export const Core = {
         body: JSON.stringify(requestData)
       });
       
+      console.log('📨 CORE API: Received HTTP response');
+      console.log('🔍 DEBUG: Response status:', response.status);
+      console.log('🔍 DEBUG: Response status text:', response.statusText);
+      console.log('🔍 DEBUG: Response OK:', response.ok);
+      
       if (!response.ok) {
-        throw new Error(`OCR-GPT API error: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ CORE API: HTTP error response body:', errorText);
+        throw new Error(`OCR-GPT API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
       
+      console.log('📋 CORE API: Parsing JSON response...');
       const result = await response.json();
-      console.log('🔍 DEBUG: OCR-GPT API response:', result);
+      console.log('✅ CORE API: JSON parsed successfully');
+      console.log('🔍 DEBUG: Response keys:', Object.keys(result));
+      console.log('🔍 DEBUG: Full API response:', result);
       
       return {
         content: result.analysis || result.content || result.response || 'No analysis content received',
@@ -404,6 +422,175 @@ Return your response in this exact JSON format:
       console.error('❌ AnalyzeLabResults error:', error);
       throw error;
     }
+  },
+
+  ProcessLabImageWithOCR: async (file) => {
+    console.log('🔍 DEBUG: ProcessLabImageWithOCR called with file:', file.name);
+    
+    try {
+      // Check if we're in a build environment  
+      if (typeof window === 'undefined') {
+        return {
+          valid: false,
+          extracted_text: "",
+          confidence: "unknown",
+          error: "Build environment detected",
+          message: "OCR processing not available in build environment. Manual review required."
+        };
+      }
+
+      const baseApiUrl = getBaseApiUrl();
+      const apiUrl = `${baseApiUrl}/api/validate-lab-image-file`;
+      
+      console.log('📡 PROCESS OCR: Making OCR processing request to:', apiUrl);
+      
+      // Create FormData to send file
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData // Don't set Content-Type header - let browser set it with boundary
+      });
+      
+      console.log('📨 PROCESS OCR: Received response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ PROCESS OCR: HTTP error response:', errorText);
+        throw new Error(`OCR processing API error: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ PROCESS OCR: Processing result:', result);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ ProcessLabImageWithOCR error:', error);
+      
+      // Return structured error response instead of throwing
+      return {
+        valid: false,
+        extracted_text: "",
+        confidence: "unknown",
+        error: error.message,
+        message: `Google Vision API call failed: ${error.message}. Manual review required.`
+      };
+    }
+  },
+
+  ValidateLabImageFile: async (file) => {
+    console.log('🔍 DEBUG: ValidateLabImageFile called with file:', file.name);
+    
+    try {
+      // Check if we're in a build environment
+      if (typeof window === 'undefined') {
+        return {
+          valid: false,
+          extracted_text: "",
+          confidence: "unknown",
+          error: "Build environment detected", 
+          message: "File validation not available in build environment. Manual review required."
+        };
+      }
+
+      const baseApiUrl = getBaseApiUrl();
+      const apiUrl = `${baseApiUrl}/api/validate-lab-image-file`;
+      
+      console.log('📡 VALIDATE FILE: Making validation request to:', apiUrl);
+      
+      // Create FormData to send file
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData // Don't set Content-Type header - let browser set it with boundary
+      });
+      
+      console.log('📨 VALIDATE FILE: Received response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ VALIDATE FILE: HTTP error response:', errorText);
+        throw new Error(`File validation API error: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ VALIDATE FILE: Validation result:', result);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ ValidateLabImageFile error:', error);
+      
+      // Return structured error response instead of throwing
+      return {
+        valid: false,
+        extracted_text: "",
+        confidence: "unknown", 
+        error: error.message,
+        message: `Google Vision API call failed: ${error.message}. Manual review required.`
+      };
+    }
+  },
+
+  ValidateLabImage: async (imageUrl) => {
+    console.log('🔍 DEBUG: ValidateLabImage called with URL:', imageUrl);
+    
+    try {
+      // Check if we're in a build environment
+      if (typeof window === 'undefined') {
+        return {
+          valid: false,
+          extracted_text: "",
+          confidence: "unknown",
+          error: "Build environment detected",
+          message: "Image validation not available in build environment. Manual review required."
+        };
+      }
+
+      const baseApiUrl = getBaseApiUrl();
+      const apiUrl = `${baseApiUrl}/api/validate-lab-image`;
+      
+      console.log('📡 VALIDATE: Making validation request to:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_url: imageUrl
+        })
+      });
+      
+      console.log('📨 VALIDATE: Received response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ VALIDATE: HTTP error response:', errorText);
+        throw new Error(`Validation API error: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('✅ VALIDATE: Validation result:', result);
+      
+      return result;
+      
+    } catch (error) {
+      console.error('❌ ValidateLabImage error:', error);
+      
+      // Return structured error response instead of throwing
+      return {
+        valid: false,
+        extracted_text: "",
+        confidence: "unknown",
+        error: error.message, 
+        message: `Google Vision API call failed: ${error.message}. Manual review required.`
+      };
+    }
   }
 };
 
@@ -415,7 +602,10 @@ export const UploadLabAnalysisImage = Core.UploadLabAnalysisImage;
 export const GenerateImage = Core.GenerateImage;
 export const ExtractDataFromUploadedFile = Core.ExtractDataFromUploadedFile;
 export const ProcessImageWithOCR = Core.ProcessImageWithOCR;
+export const ProcessLabImageWithOCR = Core.ProcessLabImageWithOCR;
 export const AnalyzeLabResults = Core.AnalyzeLabResults;
+export const ValidateLabImageFile = Core.ValidateLabImageFile;
+export const ValidateLabImage = Core.ValidateLabImage;
 
 
 

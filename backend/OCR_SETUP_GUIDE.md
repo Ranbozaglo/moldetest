@@ -14,9 +14,19 @@ The backend now supports **real Google Cloud Vision OCR** for analyzing lab test
 - OpenAI account with API access
 - Backend `.env` file configuration
 
-## 🔧 Step 1: Create .env File
+## 🔧 Step 1: Easy Setup with gcloud-key.json (Recommended)
 
-Create `backend/.env` with the following content:
+The simplest way to configure Google Cloud Vision is to:
+
+1. **Download your service account key** from Google Cloud Console
+2. **Rename it to `gcloud-key.json`**
+3. **Place it in the project root directory** (same level as package.json)
+
+The backend will automatically detect and use this file!
+
+### Alternative: Manual .env Configuration
+
+If you prefer to specify a custom path, create `backend/.env`:
 
 ```env
 # Supabase Configuration (Required)
@@ -36,6 +46,8 @@ OPENAI_API_KEY=your_openai_api_key_here
 # Google Cloud Project (Optional)
 GOOGLE_CLOUD_PROJECT=your_project_id_here
 ```
+
+> **💡 Note**: If both `gcloud-key.json` and `GOOGLE_APPLICATION_CREDENTIALS` are present, the environment variable takes priority.
 
 ## 🌐 Step 2: Setup Google Cloud Vision
 
@@ -82,7 +94,19 @@ GOOGLE_CLOUD_PROJECT=your_project_id_here
 
 ## ✅ Step 4: Test Configuration
 
-### 4.1 Start Backend
+### 4.1 Quick Authentication Test (Recommended)
+```bash
+cd backend
+python test_gcloud_auth.py
+```
+
+This test will:
+- ✅ Verify `gcloud-key.json` exists and is valid
+- ✅ Test Google Cloud Vision API connectivity  
+- ✅ Validate backend configuration
+- ✅ Confirm OCR is ready to use
+
+### 4.2 Start Backend
 ```bash
 cd backend
 python simple_main.py

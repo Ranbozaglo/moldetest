@@ -97,17 +97,26 @@ export default function AdminDashboard() {
       
       // Parse JSON fields for each inspection (same logic as InspectionDetails)
       const parsedInspections = allInspections.map(inspection => {
-        // Parse lab_analysis_images if it's a string
-        if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
+        // Ensure lab_analysis_images is always an array (handle both lab_analysis_images and mold_images columns)
+        console.log("🔍 DEBUG: Raw data for inspection", inspection.id, "- lab_analysis_images:", inspection.lab_analysis_images, "- mold_images:", inspection.mold_images);
+        
+        let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
+        
+        if (labImagesField && typeof labImagesField === 'string') {
           try {
-            inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
-            console.log("🔍 DEBUG: Parsed lab_analysis_images for inspection", inspection.id, ":", inspection.lab_analysis_images);
+            inspection.lab_analysis_images = JSON.parse(labImagesField);
+            console.log("🔍 DEBUG: Parsed legacy JSON lab images for inspection", inspection.id, ":", inspection.lab_analysis_images);
           } catch (parseError) {
-            console.error("❌ Error parsing lab_analysis_images JSON for inspection", inspection.id, ":", parseError);
+            console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
             inspection.lab_analysis_images = [];
           }
-        } else if (!inspection.lab_analysis_images) {
+        } else if (Array.isArray(labImagesField)) {
+          console.log("🔍 DEBUG: Using PostgreSQL array lab images for inspection", inspection.id, ":", labImagesField);
+          inspection.lab_analysis_images = labImagesField;
+        } else {
+          // Only default to empty array if truly no data exists
           inspection.lab_analysis_images = [];
+          console.log("🔍 DEBUG: No lab images found for inspection", inspection.id, ", defaulting to empty array");
         }
         
         // Parse visible_mold_details if it's a string

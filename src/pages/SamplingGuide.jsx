@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { MoldInspection } from '@/api/entities';
+import { MoldInspection, Sample } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { createPageUrl } from '@/utils';
 import { getDisplayNumber, validateInspection } from '@/utils/inspectionUtils';
@@ -14,6 +14,7 @@ export default function SamplingGuide() {
     const navigate = useNavigate();
     const [inspectionId, setInspectionId] = useState(null);
     const [inspectionData, setInspectionData] = useState(null);
+    const [sampleImages, setSampleImages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
 
@@ -26,10 +27,12 @@ export default function SamplingGuide() {
         if (id && id.trim() !== '') {
             setInspectionId(id);
             loadInspectionData(id);
+            loadSampleImages(); // Load sample images for examples
         } else {
             console.error("No inspection ID found in URL parameters");
             console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
             // Instead of showing an alert, show a user-friendly error page
+            loadSampleImages(); // Still load sample images for guide
             setLoading(false);
         }
     }, [location.search, navigate]);
@@ -60,6 +63,29 @@ export default function SamplingGuide() {
             setInspectionData(null);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadSampleImages = async () => {
+        try {
+            console.log("🔍 DEBUG: Loading sample images for examples");
+            // Load sample images that have been uploaded by other users as examples
+            // Filter to get samples with images that can serve as good examples
+            const samples = await Sample.findMany({});
+            
+            // Filter samples that have images and are good examples
+            const samplesWithImages = samples.filter(sample => 
+                sample.sample_image && 
+                sample.sample_image.trim() !== '' &&
+                sample.location && 
+                sample.description
+            ).slice(0, 6); // Get up to 6 example images
+            
+            console.log("🔍 DEBUG: Loaded sample images:", samplesWithImages);
+            setSampleImages(samplesWithImages);
+        } catch (error) {
+            console.error("Failed to load sample images:", error);
+            setSampleImages([]); // Set empty array on error
         }
     };
     
@@ -107,6 +133,10 @@ export default function SamplingGuide() {
                                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
                                 alt="Mold Testing Houston Logo" 
                                 className="w-8 h-8 object-contain"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.parentElement.innerHTML = '<div class="w-8 h-8 bg-amber-200 rounded flex items-center justify-center text-xs text-amber-700 font-bold">MTH</div>';
+                                }}
                             />
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">Important Disclaimer</h1>
@@ -121,6 +151,10 @@ export default function SamplingGuide() {
                                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
                                 alt="Mold Testing Houston Logo" 
                                 className="w-6 h-6 text-amber-600 flex-shrink-0 mt-1 object-contain"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.parentElement.innerHTML = '<div class="w-6 h-6 bg-amber-200 rounded flex items-center justify-center text-xs text-amber-700 font-bold flex-shrink-0 mt-1">MTH</div><h2 class="text-xl font-bold text-slate-900">Disclaimer</h2>';
+                                }}
                             />
                             <h2 className="text-xl font-bold text-slate-900">Disclaimer</h2>
                         </div>
@@ -201,55 +235,40 @@ export default function SamplingGuide() {
                 <div className="glass-effect p-8 rounded-2xl mb-8">
                     <h2 className="text-2xl font-bold text-slate-900 mb-6">Sample Collection Examples</h2>
                     <p className="text-slate-600 mb-6">
-                        Here are examples of proper sample collection technique. Notice the use of disposable gloves and proper Q-tip positioning.
+                        Here are examples of proper sample collection technique from previous inspections. Notice the use of disposable gloves and proper sampling positioning.
                     </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/5f765e25e_WhatsAppImage2025-05-11at64111AM.jpg"
-                                alt="Proper Q-tip sampling technique on wall mold"
-                                className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                            />
-                            <p className="text-sm text-slate-600 font-medium">Wall Surface Sampling</p>
-                            <p className="text-xs text-slate-500">Shows proper Q-tip angle and glove use on wall mold growth</p>
+                    
+                    {sampleImages.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {sampleImages.map((sample, index) => (
+                                <div key={index} className="space-y-3">
+                                    <img 
+                                        src={sample.sample_image}
+                                        alt={`Sample collection at ${sample.location}`}
+                                        className="w-full h-48 object-cover rounded-xl border border-slate-200"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                            e.target.nextElementSibling.style.display = 'block';
+                                        }}
+                                    />
+                                    <div className="w-full h-48 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 text-sm" style={{display: 'none'}}>
+                                        Image temporarily unavailable
+                                    </div>
+                                    <p className="text-sm text-slate-600 font-medium">{sample.location}</p>
+                                    <p className="text-xs text-slate-500">{sample.description}</p>
+                                </div>
+                            ))}
                         </div>
-                        <div className="space-y-3">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/6011d36e7_WhatsAppImage2023-01-16at54603PM11.jpeg"
-                                alt="Ceiling mold sampling with Q-tip"
-                                className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                            />
-                            <p className="text-sm text-slate-600 font-medium">Ceiling Sampling</p>
-                            <p className="text-xs text-slate-500">Demonstrates sampling technique on ceiling mold growth</p>
+                    ) : (
+                        <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                            <FlaskConical className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                            <p className="text-slate-600 font-medium mb-2">No Sample Examples Available Yet</p>
+                            <p className="text-sm text-slate-500 max-w-md mx-auto">
+                                Sample collection examples will appear here as other users complete their inspections. 
+                                Follow the step-by-step instructions above for proper collection technique.
+                            </p>
                         </div>
-                        <div className="space-y-3">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/3481aec58_WhatsAppImage2023-02-14at50555PM3.jpeg"
-                                alt="Air vent sampling technique"
-                                className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                            />
-                            <p className="text-sm text-slate-600 font-medium">Air Vent Sampling</p>
-                            <p className="text-xs text-slate-500">Shows how to sample from air vents and HVAC components</p>
-                        </div>
-                        <div className="space-y-3">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/d1808efb8_ChatGPTImageJul2202512_29_47PM.png"
-                                alt="Properly labeled and bagged sample"
-                                className="w-full h-48 object-contain rounded-xl border border-slate-200" // Updated: object-cover -> object-contain
-                            />
-                            <p className="text-sm text-slate-600 font-medium">Labeling and Bagging</p>
-                            <p className="text-xs text-slate-500">Ensure each bag is clearly labeled with the location before sealing.</p>
-                        </div>
-                        <div className="space-y-3">
-                            <img 
-                                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/base44-prod/public/5df3d80ff_ChatGPTImageJul2202501_45_05PM.png"
-                                alt="Shipping label on envelope"
-                                className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                            />
-                            <p className="text-sm text-slate-600 font-medium">Shipping Label Example</p>
-                            <p className="text-xs text-slate-500">Example of properly addressed shipping label for Mold Testing Houston</p>
-                        </div>
-                    </div>
+                    )}
                 </div>
 
                 {hasVisibleMold && (

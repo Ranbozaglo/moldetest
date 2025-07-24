@@ -47,30 +47,67 @@ class SimpleOCRIntegration:
         self.openai_client = None
         self.is_available = False
         
-        if GOOGLE_VISION_AVAILABLE and GOOGLE_APPLICATION_CREDENTIALS and OPENAI_API_KEY:
-            try:
-                # Initialize Google Cloud Vision
-                self.vision_client = vision.ImageAnnotatorClient()
-                
-                # Initialize OpenAI
-                openai.api_key = OPENAI_API_KEY
-                self.openai_client = openai
-                
-                self.is_available = True
-                logger.info("✅ OCR integration initialized successfully")
-            except Exception as e:
-                logger.error(f"❌ Failed to initialize OCR: {e}")
-                self.is_available = False
-        else:
-            logger.warning("⚠️  OCR not available - missing dependencies or configuration")
+        print("🔍 INIT: Starting OCR integration initialization...")
+        print(f"🔍 INIT: GOOGLE_VISION_AVAILABLE = {GOOGLE_VISION_AVAILABLE}")
+        print(f"🔍 INIT: GOOGLE_APPLICATION_CREDENTIALS = {GOOGLE_APPLICATION_CREDENTIALS}")
+        print(f"🔍 INIT: OPENAI_API_KEY configured = {bool(OPENAI_API_KEY)}")
+        
+        # Check each condition individually for better debugging
+        if not GOOGLE_VISION_AVAILABLE:
+            print("❌ INIT: Google Vision libraries not available")
+            print("   Install with: pip install google-cloud-vision")
+            return
+            
+        if not GOOGLE_APPLICATION_CREDENTIALS:
+            print("❌ INIT: GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
+            print("   Please set GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/credentials.json")
+            return
+            
+        if not OPENAI_API_KEY:
+            print("❌ INIT: OPENAI_API_KEY environment variable not set")
+            print("   Please set OPENAI_API_KEY=your_openai_key")
+            return
+        
+        print("✅ INIT: All prerequisites met, attempting initialization...")
+        
+        try:
+            # Initialize Google Cloud Vision
+            print(f"🔍 INIT: Initializing Google Cloud Vision with credentials: {GOOGLE_APPLICATION_CREDENTIALS}")
+            
+            # Ensure the credentials file exists
+            if not os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+                raise Exception(f"Google Cloud credentials file not found: {GOOGLE_APPLICATION_CREDENTIALS}")
+            
+            print("✅ INIT: Credentials file exists, creating Vision client...")
+            
+            # Initialize the Vision client - it will automatically use the GOOGLE_APPLICATION_CREDENTIALS env var
+            self.vision_client = vision.ImageAnnotatorClient()
+            print("✅ INIT: Google Vision ImageAnnotatorClient created successfully")
+            
+            # Initialize OpenAI (using new client format)
+            print("🔍 INIT: Initializing OpenAI client...")
+            from openai import OpenAI
+            self.openai_client = OpenAI(api_key=OPENAI_API_KEY)
+            print("✅ INIT: OpenAI client created successfully")
+            
+            self.is_available = True
+            print("✅ INIT: OCR integration initialized successfully!")
+            logger.info("✅ OCR integration initialized successfully")
+        except Exception as e:
+            print(f"❌ INIT: Failed to initialize OCR: {e}")
+            print(f"❌ INIT: Error type: {type(e).__name__}")
+            print(f"❌ INIT: Error details: {str(e)}")
+            logger.error(f"❌ Failed to initialize OCR: {e}")
+            self.is_available = False
     
     def extract_text_from_image_url(self, image_url: str):
         """Extract text from image URL using Google Cloud Vision"""
-        if not self.is_available:
-            return {"error": "OCR service not available", "extracted_text": ""}
-        
         try:
             logger.info(f"🔍 Extracting text from image: {image_url}")
+            
+            # Ensure Vision client is available
+            if not self.vision_client:
+                raise Exception("Google Vision API client not initialized. Please check your credentials and configuration.")
             
             # Download image from URL
             response = requests.get(image_url, timeout=30)
@@ -82,17 +119,19 @@ class SimpleOCRIntegration:
             # Configure text detection with language hints
             image_context = vision.ImageContext(language_hints=OCR_SUPPORTED_LANGUAGES)
             
-            # Perform text detection
+            # Perform text detection with Google Vision API
+            logger.info(f"🔍 Making Google Vision API text_detection call for image: {image_url}")
             response = self.vision_client.text_detection(image=image, image_context=image_context)
             texts = response.text_annotations
             
             if response.error.message:
+                logger.error(f"❌ Google Vision API returned error: {response.error.message}")
                 raise Exception(f"Google Vision API error: {response.error.message}")
             
             # Extract full text
             extracted_text = texts[0].description if texts else ""
             
-            logger.info(f"✅ Extracted {len(extracted_text)} characters from image")
+            logger.info(f"✅ Google Vision API successfully extracted {len(extracted_text)} characters from image")
             
             return {
                 "extracted_text": extracted_text,
@@ -101,13 +140,13 @@ class SimpleOCRIntegration:
             }
             
         except Exception as e:
-            logger.error(f"❌ OCR extraction failed: {e}")
+            logger.error(f"❌ Google Vision API call failed: {e}")
             return {"error": str(e), "extracted_text": ""}
     
     def analyze_lab_results_with_gpt(self, extracted_text: str, image_urls: list):
         """Analyze extracted lab text using GPT-4"""
-        if not self.is_available or not extracted_text.strip():
-            return self.get_mock_lab_analysis()
+        if not extracted_text.strip():
+            raise Exception("No extracted text provided for analysis. Manual review required.")
         
         try:
             prompt = f"""
@@ -116,35 +155,66 @@ You are a professional mold inspection expert analyzing laboratory test results.
 EXTRACTED TEXT FROM LAB IMAGES:
 {extracted_text}
 
-Please provide a comprehensive analysis including:
+Please analyze the laboratory results and provide a comprehensive professional assessment.
 
-1. **SAMPLE IDENTIFICATION**: What samples were tested and their sources
-2. **MOLD TYPES DETECTED**: List specific mold species found with their concentrations
-3. **HEALTH ASSESSMENT**: Risk levels and health implications 
-4. **RECOMMENDATIONS**: Immediate actions and long-term prevention strategies
-5. **PROFESSIONAL OPINION**: Overall assessment and next steps
+Return your response as a JSON object with exactly these two fields:
 
-Format your response professionally as it will be included in a client report.
-Be specific about mold types, concentrations, and actionable recommendations.
-If the text is unclear or incomplete, note what additional information would be helpful.
+{{
+  "conclusion": "Your detailed conclusion here (2-3 paragraphs covering sample identification, mold types detected, concentrations found, health assessment, and overall findings)",
+  "recommendations": "Your detailed recommendations here (specific actionable steps including immediate actions, preventive measures, professional services needed, timeline, environmental controls, and follow-up testing)"
+}}
+
+Be specific about:
+- Mold species and concentrations if mentioned in the lab results
+- Health implications and risk levels
+- Actionable next steps with timelines
+- Professional services that may be needed
+
+If the extracted text is unclear, note what additional information would be helpful in your analysis.
 """
 
-            response = self.openai_client.ChatCompletion.create(
+            # Use the pre-initialized OpenAI client
+            response = self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are a certified mold inspection expert providing professional laboratory analysis."},
+                    {"role": "system", "content": "You are a certified mold inspection expert providing professional laboratory analysis. Return your response as a JSON object with 'conclusion' and 'recommendations' fields."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=1500,
                 temperature=0.3
             )
             
-            analysis = response.choices[0].message.content
+            analysis_content = response.choices[0].message.content
             
             logger.info("✅ GPT-4 lab analysis completed")
             
+            # Try to parse the JSON response
+            try:
+                import json
+                analysis_json = json.loads(analysis_content)
+                conclusion = analysis_json.get("conclusion", "")
+                recommendations = analysis_json.get("recommendations", "")
+                
+                # Format the response for frontend consumption
+                formatted_analysis = f"""**CONCLUSION**
+
+{conclusion}
+
+**RECOMMENDATIONS**
+
+{recommendations}"""
+                
+            except json.JSONDecodeError:
+                # If JSON parsing fails, use raw content
+                logger.warning("⚠️ GPT response was not valid JSON, using raw content")
+                formatted_analysis = analysis_content
+                conclusion = analysis_content
+                recommendations = "Please review the analysis above and consult with a professional for specific recommendations."
+            
             return {
-                "analysis": analysis,
+                "analysis": formatted_analysis,
+                "conclusion": conclusion,
+                "recommendations": recommendations,
                 "extracted_text": extracted_text,
                 "model": "gpt-4-vision-ocr",
                 "images_processed": len(image_urls)
@@ -152,30 +222,59 @@ If the text is unclear or incomplete, note what additional information would be 
             
         except Exception as e:
             logger.error(f"❌ GPT analysis failed: {e}")
-            return self.get_mock_lab_analysis()
+            raise Exception(f"GPT analysis failed after successful OCR: {str(e)}. Manual review required.")
     
-    def get_mock_lab_analysis(self):
-        """Fallback mock analysis when OCR is not available"""
-        return {
-            "analysis": """**LABORATORY ANALYSIS SUMMARY**
 
-**SAMPLE IDENTIFICATION:**
-Multiple samples analyzed from indoor environment locations.
 
-**FINDINGS:**
-The laboratory analysis indicates the presence of common environmental mold species. Detailed identification requires professional interpretation of the uploaded laboratory results.
+# Debug JSON credentials file before initializing OCR
+print("\n🔍 DEBUG: Checking for gcloud-key.json in project root...")
+project_root = os.path.dirname(os.path.dirname(__file__))
+gcloud_key_path = os.path.join(project_root, 'gcloud-key.json')
+print(f"🔍 DEBUG: Project root path: {project_root}")
+print(f"🔍 DEBUG: Looking for gcloud-key.json at: {gcloud_key_path}")
+print(f"🔍 DEBUG: File exists: {os.path.exists(gcloud_key_path)}")
 
-**RECOMMENDATIONS:**
-1. **Immediate Actions:** Address any visible moisture sources in tested areas
-2. **Professional Review:** Have a certified mold inspector review the complete laboratory report
-3. **Environmental Controls:** Maintain humidity levels below 60% and ensure proper ventilation
-4. **Timeline:** Address moisture issues within 24-48 hours to prevent further growth
+if os.path.exists(gcloud_key_path):
+    try:
+        print(f"🔍 DEBUG: File size: {os.path.getsize(gcloud_key_path)} bytes")
+        print(f"🔍 DEBUG: File permissions readable: {os.access(gcloud_key_path, os.R_OK)}")
+        
+        # Try to read and parse the JSON
+        with open(gcloud_key_path, 'r') as f:
+            import json
+            creds = json.load(f)
+            print(f"✅ DEBUG: JSON file parsed successfully")
+            print(f"🔍 DEBUG: JSON keys: {list(creds.keys())}")
+            print(f"🔍 DEBUG: Service account type: {creds.get('type', 'unknown')}")
+            print(f"🔍 DEBUG: Project ID: {creds.get('project_id', 'unknown')}")
+            print(f"🔍 DEBUG: Client email: {creds.get('client_email', 'unknown')}")
+            
+            # Check if this matches GOOGLE_APPLICATION_CREDENTIALS
+            current_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+            print(f"🔍 DEBUG: Current GOOGLE_APPLICATION_CREDENTIALS: {current_creds}")
+            print(f"🔍 DEBUG: Paths match: {os.path.abspath(gcloud_key_path) == os.path.abspath(current_creds) if current_creds else False}")
+            
+    except json.JSONDecodeError as e:
+        print(f"❌ DEBUG: JSON parsing error: {e}")
+    except Exception as e:
+        print(f"❌ DEBUG: Error reading file: {e}")
+else:
+    print("❌ DEBUG: gcloud-key.json not found in project root")
+    print("🔍 DEBUG: Contents of project root:")
+    try:
+        files = os.listdir(project_root)
+        for file in sorted(files):
+            if file.endswith('.json') or 'key' in file.lower() or 'cred' in file.lower():
+                print(f"   📄 {file}")
+    except Exception as e:
+        print(f"❌ DEBUG: Error listing directory: {e}")
 
-**NOTE:** This is a preliminary assessment. For comprehensive analysis, please ensure laboratory results are clearly visible and consult with a certified mold remediation specialist.""",
-            "extracted_text": "Laboratory results require manual review - OCR service not available",
-            "model": "mock-analysis",
-            "images_processed": 0
-        }
+print("🔍 DEBUG: Environment variables related to Google Cloud:")
+for key, value in os.environ.items():
+    if 'GOOGLE' in key or 'GCLOUD' in key:
+        print(f"   {key} = {value}")
+
+print("\n🔍 DEBUG: Now initializing OCR integration...")
 
 # Initialize OCR integration
 ocr_integration = SimpleOCRIntegration()
@@ -383,6 +482,39 @@ def health_check():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "message": "Backend is running with Supabase"})
 
+@app.route('/api/ocr-status', methods=['GET'])
+def ocr_status():
+    """OCR integration status endpoint for debugging"""
+    print("🔍 OCR STATUS: Checking OCR integration status...")
+    
+    status = {
+        "vision_client_available": bool(ocr_integration.vision_client),
+        "openai_client_available": bool(ocr_integration.openai_client), 
+        "integration_available": ocr_integration.is_available,
+        "google_credentials_env": bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS')),
+        "google_credentials_path": os.getenv('GOOGLE_APPLICATION_CREDENTIALS'),
+        "openai_api_key_configured": bool(OPENAI_API_KEY)
+    }
+    
+    # Check if credentials file exists
+    creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    if creds_path:
+        status["credentials_file_exists"] = os.path.exists(creds_path)
+        if os.path.exists(creds_path):
+            try:
+                with open(creds_path, 'r') as f:
+                    import json
+                    creds = json.load(f)
+                    status["credentials_valid_json"] = True
+                    status["service_account_type"] = creds.get('type') == 'service_account'
+                    status["project_id"] = creds.get('project_id', 'unknown')
+            except Exception as e:
+                status["credentials_valid_json"] = False
+                status["credentials_error"] = str(e)
+    
+    print(f"🔍 OCR STATUS: Returning status: {status}")
+    return jsonify(status)
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """User login endpoint"""
@@ -479,7 +611,8 @@ def get_inspections():
         
         print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
         
-        # Build the query - select ALL fields from inspection table
+        # Build the query - explicitly select ALL fields including lab_analysis_images and mold_images
+        # Using * should include all columns, but let's be explicit about the image fields we need
         query = supabase.table('inspection').select('*')
         
         # Apply sorting - handle different sort fields
@@ -503,6 +636,13 @@ def get_inspections():
         result = query.execute()
         inspections = result.data
         print(f"🔍 DEBUG: Found {len(inspections)} inspections")
+        
+        # Debug the first inspection to see what fields are available
+        if inspections and len(inspections) > 0:
+            first_inspection = inspections[0]
+            print(f"🔍 DEBUG: First inspection available fields: {list(first_inspection.keys())}")
+            print(f"🔍 DEBUG: First inspection lab_analysis_images: {first_inspection.get('lab_analysis_images')}")
+            print(f"🔍 DEBUG: First inspection mold_images: {first_inspection.get('mold_images')}")
 
         # Filter by email if provided
         if email:
@@ -511,6 +651,7 @@ def get_inspections():
         # Convert to expected format with ALL available fields
         result_list = []
         for inspection in inspections:
+            print(f"🔍 DEBUG: Processing inspection {inspection.get('id')} - lab_analysis_images: {inspection.get('lab_analysis_images')}, mold_images: {inspection.get('mold_images')}")
             result_list.append({
                 # Basic identification
                 "id": inspection['id'],
@@ -546,6 +687,9 @@ def get_inspections():
                 # Environmental data
                 "thermostat_image": inspection.get('thermostat_image'),
                 
+                # Lab analysis data (ensure both column names are handled)
+                "lab_analysis_images": inspection.get('lab_analysis_images') or inspection.get('mold_images'),
+                
                 # Status and metadata
                 "status": inspection.get('status', 'pending'),
                 "is_sample": inspection.get('is_sample'),
@@ -557,6 +701,10 @@ def get_inspections():
                 "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
                 "user_email": inspection.get('email'),
             })
+            
+            # Log what we're returning for this inspection
+            final_lab_images = result_list[-1]['lab_analysis_images']
+            print(f"🔍 DEBUG: Returning for inspection {inspection.get('id')} - final lab_analysis_images: {final_lab_images}")
         
         print(f"🔍 DEBUG: Returning {len(result_list)} inspections with complete data")
         return jsonify(result_list)
@@ -577,7 +725,10 @@ def get_inspection_by_id(inspection_id):
         
         if inspections and len(inspections) > 0:
             inspection = inspections[0]
-            print(f"🔍 DEBUG: Found inspection: {inspection}")
+            print(f"🔍 DEBUG: Found inspection - ID: {inspection.get('id')}")
+            print(f"🔍 DEBUG: lab_analysis_images field: {inspection.get('lab_analysis_images')}")
+            print(f"🔍 DEBUG: mold_images field: {inspection.get('mold_images')}")
+            print(f"🔍 DEBUG: All available fields: {list(inspection.keys())}")
             return jsonify(inspection)
         else:
             print(f"🔍 DEBUG: No inspection found with ID: {inspection_id}")
@@ -597,46 +748,41 @@ def create_inspection():
     print(f"🔍 DEBUG: Creating inspection with data:", data)
     
     try:
-        # Prepare data for insertion - handle JSON serialization for arrays
+        # Prepare data for insertion using actual database column names
         inspection_data = {
             'full_name': data.get('full_name'),
             'street_address': data.get('street_address'),
-            'unit_number': data.get('unit_number'),
             'city': data.get('city'),
             'state': data.get('state'),
             'zip_code': data.get('zip_code'),
             'property_type': data.get('property_type'),
             'client_type': data.get('client_type'),
             'square_footage': data.get('square_footage'),
-            'background_info': data.get('background_info'),
             'has_visible_mold': data.get('has_visible_mold'),
             'has_water_damage': data.get('has_water_damage'),
-            'environmental_data_method': data.get('environmental_data_method'),
-            'temperature': data.get('temperature'),
-            'humidity': data.get('humidity'),
             'status': data.get('status', 'pending'),
-            'created_by_id': data.get('user_id'),
+            'created_by_id': data.get('created_by'),
             'email': data.get('email'),
             'is_sample': data.get('is_sample', False),
-            'client_status_detail': data.get('client_status_detail'),
             'created_date': data.get('created_date')
         }
         
-        # Handle image arrays - serialize as JSON
+        # Handle image fields using correct database column names
         if 'visible_mold_details' in data and data['visible_mold_details']:
-            inspection_data['visible_mold_details'] = json.dumps(data['visible_mold_details'])
-            print(f"🔍 DEBUG: Serializing visible_mold_details: {len(data['visible_mold_details'])} entries")
+            # Map visible_mold_details to mold_locations (which stores the array with images)
+            inspection_data['mold_locations'] = json.dumps(data['visible_mold_details'])
+            print(f"🔍 DEBUG: Serializing visible_mold_details to mold_locations: {len(data['visible_mold_details'])} entries")
         
         if 'water_damage_details' in data and data['water_damage_details']:
-            inspection_data['water_damage_details'] = json.dumps(data['water_damage_details'])
-            print(f"🔍 DEBUG: Serializing water_damage_details: {len(data['water_damage_details'])} entries")
+            # Map water_damage_details to water_damage_locations
+            inspection_data['water_damage_locations'] = json.dumps(data['water_damage_details'])
+            print(f"🔍 DEBUG: Serializing water_damage_details to water_damage_locations: {len(data['water_damage_details'])} entries")
         
-        if 'lab_analysis_images' in data and data['lab_analysis_images']:
-            inspection_data['lab_analysis_images'] = json.dumps(data['lab_analysis_images'])
-            print(f"🔍 DEBUG: Serializing lab_analysis_images: {len(data['lab_analysis_images'])} images")
-        
+        # Handle individual image fields
         if 'thermostat_image' in data and data['thermostat_image']:
             inspection_data['thermostat_image'] = data['thermostat_image']
+            
+        # Note: lab_analysis_images will be handled by the separate upload endpoint
         
         print(f"🔍 DEBUG: Final inspection data for insert:", inspection_data)
         
@@ -686,39 +832,41 @@ def update_inspection(inspection_id):
         if 'is_sample' in data:
             update_data['is_sample'] = data['is_sample']
         
-        # Handle image fields - serialize arrays as JSON
+        # Handle image fields using correct database column names
         if 'lab_analysis_images' in data:
             if isinstance(data['lab_analysis_images'], list):
-                update_data['lab_analysis_images'] = json.dumps(data['lab_analysis_images'])
-                print(f"🔍 DEBUG: Serializing lab_analysis_images: {len(data['lab_analysis_images'])} images")
+                update_data['lab_analysis_images'] = data['lab_analysis_images']  # Store as PostgreSQL array
+                print(f"🔍 DEBUG: Storing lab_analysis_images as PostgreSQL array: {len(data['lab_analysis_images'])} images")
             else:
                 update_data['lab_analysis_images'] = data['lab_analysis_images']
         
         if 'visible_mold_details' in data:
+            # Map visible_mold_details to mold_locations database column
             if isinstance(data['visible_mold_details'], list):
-                update_data['visible_mold_details'] = json.dumps(data['visible_mold_details'])
-                print(f"🔍 DEBUG: Serializing visible_mold_details: {len(data['visible_mold_details'])} entries")
+                update_data['mold_locations'] = json.dumps(data['visible_mold_details'])
+                print(f"🔍 DEBUG: Serializing visible_mold_details to mold_locations: {len(data['visible_mold_details'])} entries")
             else:
-                update_data['visible_mold_details'] = data['visible_mold_details']
+                update_data['mold_locations'] = data['visible_mold_details']
         
         if 'water_damage_details' in data:
+            # Map water_damage_details to water_damage_locations database column
             if isinstance(data['water_damage_details'], list):
-                update_data['water_damage_details'] = json.dumps(data['water_damage_details'])
-                print(f"🔍 DEBUG: Serializing water_damage_details: {len(data['water_damage_details'])} entries")
+                update_data['water_damage_locations'] = json.dumps(data['water_damage_details'])
+                print(f"🔍 DEBUG: Serializing water_damage_details to water_damage_locations: {len(data['water_damage_details'])} entries")
             else:
-                update_data['water_damage_details'] = data['water_damage_details']
+                update_data['water_damage_locations'] = data['water_damage_details']
         
         if 'thermostat_image' in data:
             update_data['thermostat_image'] = data['thermostat_image']
             print(f"🔍 DEBUG: Updating thermostat_image: {data['thermostat_image']}")
         
-        # Handle text fields for conclusions and recommendations
-        if 'conclusion' in data:
-            update_data['conclusion'] = data['conclusion']
-        if 'recommendations' in data:
-            update_data['recommendations'] = data['recommendations']
-        if 'client_status_detail' in data:
-            update_data['client_status_detail'] = data['client_status_detail']
+        # Handle text fields (only if they exist in database schema)
+        # NOTE: conclusion and recommendations columns don't exist in current database schema
+        # Remove these to prevent PGRST204 "column not found" errors
+        # if 'conclusion' in data:
+        #     update_data['conclusion'] = data['conclusion']
+        # if 'recommendations' in data:
+        #     update_data['recommendations'] = data['recommendations']
         
         print(f"🔍 DEBUG: Update data to apply:", update_data)
         
@@ -824,42 +972,214 @@ def llm_summarize():
         "model": "gpt-4-mock"
     })
 
+@app.route('/api/validate-lab-image-file', methods=['POST'])
+def validate_lab_image_file():
+    """Validate a lab analysis image file using OCR before uploading to storage"""
+    print("🔍 VALIDATE FILE: Starting lab image file validation...")
+    
+    try:
+        # Check if file is present in request
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided", "valid": False}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected", "valid": False}), 400
+        
+        print(f"🔍 VALIDATE FILE: Validating file: {file.filename}")
+        
+        # Read file content
+        file_content = file.read()
+        if not file_content:
+            return jsonify({"error": "Empty file", "valid": False}), 400
+        
+        # Reset file pointer for potential reuse
+        file.seek(0)
+        
+        print(f"🔍 VALIDATE FILE: File size: {len(file_content)} bytes")
+        
+        # Always attempt Google Vision API call - no fallback logic
+        try:
+            # Ensure Vision client is available
+            if not ocr_integration.vision_client:
+                logger.error("❌ Google Vision API client is None - check credentials configuration")
+                raise Exception("Google Vision API client not initialized. Please verify GOOGLE_APPLICATION_CREDENTIALS environment variable and credentials file exist.")
+            
+            from google.cloud import vision
+            image = vision.Image(content=file_content)
+            
+            # Configure text detection with language hints
+            image_context = vision.ImageContext(language_hints=OCR_SUPPORTED_LANGUAGES)
+            
+            # Always perform real Google Vision API text detection call
+            print(f"🔍 VALIDATE FILE: Making Google Vision API text_detection call for file: {file.filename}")
+            response = ocr_integration.vision_client.text_detection(image=image, image_context=image_context)
+            texts = response.text_annotations
+            
+            if response.error.message:
+                logger.error(f"❌ Google Vision API returned error: {response.error.message}")
+                raise Exception(f"Google Vision API error: {response.error.message}")
+            
+            # Extract full text
+            extracted_text = texts[0].description if texts else ""
+            
+            print(f"✅ VALIDATE FILE: Google Vision API successfully extracted {len(extracted_text)} characters from file")
+            
+            # Consider image valid if we extracted any text
+            is_valid = len(extracted_text.strip()) > 0
+            
+            print(f"✅ VALIDATE FILE: Processing complete - Valid: {is_valid}, Text length: {len(extracted_text)}")
+            
+            return jsonify({
+                "valid": is_valid,
+                "extracted_text": extracted_text,
+                "confidence": "high" if len(extracted_text) > 50 else "medium",
+                "message": "Image processed successfully" if is_valid else "No text detected in image"
+            }), 200
+            
+        except Exception as ocr_error:
+            logger.error(f"❌ VALIDATE FILE: Google Vision API call failed: {ocr_error}")
+            print(f"❌ VALIDATE FILE: Google Vision API processing failed: {ocr_error}")
+            return jsonify({
+                "valid": False,
+                "error": f"Google Vision API call failed: {str(ocr_error)}",
+                "extracted_text": "",
+                "message": "Manual review required - Google Vision API call failed"
+            }), 200
+        
+    except Exception as e:
+        print(f"❌ VALIDATE FILE: Error: {str(e)}")
+        return jsonify({
+            "valid": False,
+            "error": str(e),
+            "extracted_text": ""
+        }), 500
+
+@app.route('/api/validate-lab-image', methods=['POST'])
+def validate_lab_image():
+    """Validate a lab analysis image using OCR before saving to database (legacy URL method)"""
+    print("🔍 VALIDATE IMAGE: Starting lab image validation...")
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided", "valid": False}), 400
+        
+        image_url = data.get('image_url')
+        if not image_url:
+            return jsonify({"error": "No image URL provided", "valid": False}), 400
+        
+        print(f"🔍 VALIDATE IMAGE: Validating image at URL: {image_url}")
+        
+        # Use OCR to validate the image can be processed
+        ocr_result = ocr_integration.extract_text_from_image_url(image_url)
+        
+        if 'error' in ocr_result:
+            print(f"❌ VALIDATE IMAGE: OCR validation failed: {ocr_result['error']}")
+            return jsonify({
+                "valid": False,
+                "error": ocr_result['error'],
+                "extracted_text": ""
+            }), 200
+        
+        extracted_text = ocr_result.get('extracted_text', '')
+        
+        # Consider image valid if we extracted any text
+        is_valid = len(extracted_text.strip()) > 0
+        
+        print(f"✅ VALIDATE IMAGE: Validation complete - Valid: {is_valid}, Text length: {len(extracted_text)}")
+        
+        return jsonify({
+            "valid": is_valid,
+            "extracted_text": extracted_text,
+            "confidence": ocr_result.get('confidence', 'unknown'),
+            "message": "Image processed successfully" if is_valid else "No text detected in image"
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ VALIDATE IMAGE: Error: {str(e)}")
+        return jsonify({
+            "valid": False,
+            "error": str(e),
+            "extracted_text": ""
+        }), 500
+
 @app.route('/api/ocr-gpt', methods=['POST'])
 def ocr_gpt():
     """OCR-GPT endpoint for lab analysis with Google Cloud Vision integration"""
+    print("🚀 BACKEND OCR: OCR-GPT endpoint called!")
+    
     try:
+        print("📦 BACKEND OCR: Getting request data...")
         data = request.get_json()
         
         if not data:
+            print("❌ BACKEND OCR: No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
         
         prompt = data.get('prompt', '')
         image_urls = data.get('image_urls', [])
         
-        print(f"🔍 OCR-GPT called with prompt: {prompt[:100]}...")
-        print(f"🔍 OCR-GPT image URLs: {len(image_urls)} images")
-        print(f"🔍 OCR service available: {ocr_integration.is_available}")
+        print("✅ BACKEND OCR: Request data parsed successfully")
+        print(f"🔍 DEBUG: Prompt length: {len(prompt)}")
+        print(f"🔍 DEBUG: Prompt preview: {prompt[:200]}...")
+        print(f"🔍 DEBUG: Image URLs count: {len(image_urls)}")
+        print(f"🔍 DEBUG: Image URLs: {image_urls}")
+        print(f"🔍 DEBUG: OCR service available: {ocr_integration.is_available}")
+        print(f"🔍 DEBUG: OCR integration type: {type(ocr_integration)}")
+        
+        if not image_urls:
+            print("⚠️ BACKEND OCR: No image URLs provided")
+        
+        if not prompt:
+            print("⚠️ BACKEND OCR: No prompt provided")
         
         # Process images for lab analysis
-        if 'lab' in prompt.lower() or 'analysis' in prompt.lower():
-            if image_urls and ocr_integration.is_available:
-                # Real OCR processing for lab analysis
-                print("🔬 Processing lab images with Google Cloud Vision OCR...")
+        print("🔍 BACKEND OCR: Checking if this is a lab analysis request...")
+        is_lab_analysis = 'lab' in prompt.lower() or 'analysis' in prompt.lower()
+        print(f"✅ BACKEND OCR: Lab analysis detected: {is_lab_analysis}")
+        
+        if is_lab_analysis:
+            print("🔬 BACKEND OCR: This is a lab analysis request")
+            print(f"🔍 DEBUG: Has image URLs: {bool(image_urls)}")
+            print(f"🔍 DEBUG: OCR integration available: {ocr_integration.is_available}")
+            
+            if image_urls:
+                # Always attempt real OCR processing for lab analysis - no fallback logic
+                print("🔬 BACKEND OCR: Starting Google Cloud Vision OCR processing...")
+                print(f"🔍 DEBUG: Will process {len(image_urls)} images")
+                
+                # Ensure Vision client is available
+                if not ocr_integration.vision_client:
+                    logger.error("❌ Google Vision API client not initialized")
+                    return jsonify({
+                        "error": "Google Vision API client not initialized. Please check your credentials and configuration.",
+                        "content": "Manual review required - Google Vision API not available",
+                        "analysis": "Manual review required - Google Vision API not available"
+                    }), 500
                 
                 all_extracted_text = []
                 ocr_results = []
                 
                 for i, image_url in enumerate(image_urls):
-                    print(f"📸 Processing image {i+1}/{len(image_urls)}: {image_url}")
+                    print(f"📸 BACKEND OCR: Processing image {i+1}/{len(image_urls)} with Google Vision API")
+                    print(f"🔍 DEBUG: Image URL: {image_url}")
                     
-                    ocr_result = ocr_integration.extract_text_from_image_url(image_url)
-                    ocr_results.append(ocr_result)
+                    try:
+                        ocr_result = ocr_integration.extract_text_from_image_url(image_url)
+                        ocr_results.append(ocr_result)
+                        print(f"✅ BACKEND OCR: Google Vision API call completed for image {i+1}")
+                        print(f"🔍 DEBUG: OCR result keys: {list(ocr_result.keys())}")
+                    except Exception as img_error:
+                        logger.error(f"❌ BACKEND OCR: Google Vision API call failed for image {i+1}: {img_error}")
+                        print(f"❌ BACKEND OCR: Google Vision API error for image {i+1}: {img_error}")
+                        ocr_results.append({"error": str(img_error), "extracted_text": ""})
                     
                     if 'extracted_text' in ocr_result and ocr_result['extracted_text']:
                         all_extracted_text.append(f"IMAGE {i+1}:\n{ocr_result['extracted_text']}")
-                        print(f"✅ Extracted {len(ocr_result['extracted_text'])} characters from image {i+1}")
+                        print(f"✅ Google Vision API extracted {len(ocr_result['extracted_text'])} characters from image {i+1}")
                     else:
-                        print(f"⚠️  No text extracted from image {i+1}")
+                        print(f"⚠️ Google Vision API returned no text for image {i+1}")
                 
                 # Combine all extracted text
                 combined_text = "\n\n".join(all_extracted_text)
@@ -867,45 +1187,64 @@ def ocr_gpt():
                 if combined_text.strip():
                     # Analyze with GPT-4
                     print("🤖 Analyzing extracted text with GPT-4...")
-                    gpt_result = ocr_integration.analyze_lab_results_with_gpt(combined_text, image_urls)
+                    print(f"📝 Extracted text preview: {combined_text[:200]}...")
                     
-                    response = {
-                        "content": gpt_result["analysis"],
-                        "analysis": gpt_result["analysis"],
-                        "extracted_text": combined_text,
-                        "ocr_results": ocr_results,
-                        "usage": {
-                            "prompt_tokens": len(combined_text.split()) + len(prompt.split()),
-                            "completion_tokens": len(gpt_result["analysis"].split()),
-                            "total_tokens": len(combined_text.split()) + len(prompt.split()) + len(gpt_result["analysis"].split())
-                        },
-                        "model": "gpt-4-vision-ocr",
-                        "images_processed": len(image_urls),
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    
-                    print("✅ Real OCR lab analysis completed successfully")
-                    return jsonify(response)
+                    try:
+                        gpt_result = ocr_integration.analyze_lab_results_with_gpt(combined_text, image_urls)
+                        
+                        print("✅ GPT-4 analysis completed")
+                        print(f"📋 Conclusion preview: {gpt_result.get('conclusion', '')[:100]}...")
+                        print(f"💡 Recommendations preview: {gpt_result.get('recommendations', '')[:100]}...")
+                        
+                        response = {
+                            "content": gpt_result["analysis"],
+                            "analysis": gpt_result["analysis"],
+                            "conclusion": gpt_result.get("conclusion", ""),
+                            "recommendations": gpt_result.get("recommendations", ""),
+                            "extracted_text": combined_text,
+                            "ocr_results": ocr_results,
+                            "usage": {
+                                "prompt_tokens": len(combined_text.split()) + len(prompt.split()),
+                                "completion_tokens": len(gpt_result["analysis"].split()),
+                                "total_tokens": len(combined_text.split()) + len(prompt.split()) + len(gpt_result["analysis"].split())
+                            },
+                            "model": "gpt-4-vision-ocr",
+                            "images_processed": len(image_urls),
+                            "timestamp": datetime.now().isoformat()
+                        }
+                        
+                        print("✅ Real OCR lab analysis completed successfully")
+                        return jsonify(response)
+                        
+                    except Exception as gpt_error:
+                        logger.error(f"❌ GPT analysis failed after successful OCR: {gpt_error}")
+                        print(f"❌ Error in GPT analysis: {gpt_error}")
+                        return jsonify({
+                            "error": f"GPT analysis failed after successful OCR: {str(gpt_error)}",
+                            "content": "Manual review required - OCR successful but analysis failed",
+                            "analysis": "Manual review required - OCR successful but analysis failed",
+                            "extracted_text": combined_text,
+                            "ocr_results": ocr_results,
+                            "images_processed": len(image_urls)
+                        }), 200
                 
                 else:
-                    print("⚠️  No text could be extracted from any images")
-            
-            # Fallback to enhanced mock for lab analysis
-            mock_result = ocr_integration.get_mock_lab_analysis()
-            response = {
-                "content": mock_result["analysis"],
-                "analysis": mock_result["analysis"],
-                "extracted_text": mock_result["extracted_text"],
-                "usage": {
-                    "prompt_tokens": len(prompt.split()),
-                    "completion_tokens": len(mock_result["analysis"].split()),
-                    "total_tokens": len(prompt.split()) + len(mock_result["analysis"].split())
-                },
-                "model": mock_result["model"],
-                "images_processed": len(image_urls),
-                "ocr_available": ocr_integration.is_available,
-                "timestamp": datetime.now().isoformat()
-            }
+                    print("⚠️ Google Vision API returned no text from any images")
+                    return jsonify({
+                        "error": "No text detected in any images by Google Vision API",
+                        "content": "Manual review required - no text detected by Google Vision API",
+                        "analysis": "Manual review required - no text detected by Google Vision API", 
+                        "extracted_text": "",
+                        "ocr_results": ocr_results,
+                        "images_processed": len(image_urls)
+                    }), 200
+            else:
+                print("⚠️ No images provided for OCR processing")
+                return jsonify({
+                    "error": "No images provided",
+                    "content": "Manual review required - no images provided",
+                    "analysis": "Manual review required - no images provided"
+                }), 400
         
         else:
             # General OCR processing
@@ -1091,22 +1430,54 @@ def upload_lab_analysis_image(inspection_id):
             public_url = f"{SUPABASE_URL}/storage/v1/object/public/lab-analysis/{file_path}"
             print(f"🔍 DEBUG: Using constructed URL: {public_url}")
         
-        # Get current lab_analysis_images array
+        # Get current lab_analysis_images array - try lab_analysis_images first, then mold_images as fallback
         current_images = []
-        if inspection.get('lab_analysis_images'):
-            try:
-                current_images = json.loads(inspection['lab_analysis_images'])
-            except json.JSONDecodeError:
-                current_images = []
+        lab_images_field = inspection.get('lab_analysis_images') or inspection.get('mold_images')
+        if lab_images_field:
+            # Handle both PostgreSQL array and JSON string formats
+            if isinstance(lab_images_field, list):
+                current_images = lab_images_field
+            elif isinstance(lab_images_field, str):
+                try:
+                    current_images = json.loads(lab_images_field)
+                except json.JSONDecodeError:
+                    current_images = []
+        
+        # Check for duplicates before adding (prevent same image upload)
+        if public_url in current_images:
+            print(f"⚠️ Image already exists in array, skipping duplicate: {public_url}")
+            return jsonify({
+                "message": "Image already exists",
+                "image_url": public_url,
+                "inspection_id": inspection_id,
+                "total_images": len(current_images),
+                "duplicate": True
+            })
         
         # Append new image URL to array
         current_images.append(public_url)
+        print(f"🔍 DEBUG: Added new image to array. Total images: {len(current_images)}")
         
-        # Update inspection record with new image array
+        # Update inspection record with PostgreSQL array format
+        # Try updating with lab_analysis_images column, if it fails try with mold_images as fallback
         try:
-            update_result = supabase.table('inspection').update({
-                'lab_analysis_images': json.dumps(current_images)
-            }).eq('id', inspection_id).execute()
+            print(f"🔍 DEBUG: Attempting to update inspection {inspection_id} with lab_analysis_images array of {len(current_images)} items")
+            
+            # First try with lab_analysis_images column
+            try:
+                update_result = supabase.table('inspection').update({
+                    'lab_analysis_images': current_images  # Store as PostgreSQL array, not JSON string
+                }).eq('id', inspection_id).execute()
+                print(f"🔍 DEBUG: Successfully updated lab_analysis_images column")
+            except Exception as lab_error:
+                print(f"⚠️ lab_analysis_images column not found, trying mold_images as fallback: {lab_error}")
+                # Fallback to mold_images column if lab_analysis_images doesn't exist
+                update_result = supabase.table('inspection').update({
+                    'mold_images': current_images  # Store as PostgreSQL array in mold_images column
+                }).eq('id', inspection_id).execute()
+                print(f"🔍 DEBUG: Successfully updated mold_images column as fallback")
+            
+            print(f"🔍 DEBUG: Update result: {update_result}")
             
             if hasattr(update_result, 'error') and update_result.error:
                 print(f"❌ Database update error: {update_result.error}")
@@ -1145,13 +1516,18 @@ def delete_lab_analysis_image(inspection_id, image_index):
         
         inspection = inspection_result.data[0]
         
-        # Get current lab_analysis_images array
+        # Get current lab_analysis_images array - try lab_analysis_images first, then mold_images as fallback
         current_images = []
-        if inspection.get('lab_analysis_images'):
-            try:
-                current_images = json.loads(inspection['lab_analysis_images'])
-            except json.JSONDecodeError:
-                current_images = []
+        lab_images_field = inspection.get('lab_analysis_images') or inspection.get('mold_images')
+        if lab_images_field:
+            # Handle both PostgreSQL array and JSON string formats
+            if isinstance(lab_images_field, list):
+                current_images = lab_images_field
+            elif isinstance(lab_images_field, str):
+                try:
+                    current_images = json.loads(lab_images_field)
+                except json.JSONDecodeError:
+                    current_images = []
         
         # Validate image index
         if image_index < 0 or image_index >= len(current_images):
@@ -1180,12 +1556,20 @@ def delete_lab_analysis_image(inspection_id, image_index):
         # Remove from array
         current_images.pop(image_index)
         
-        # Update inspection record
-        update_result = supabase.table('inspection').update({
-            'lab_analysis_images': json.dumps(current_images)
-        }).eq('id', inspection_id).execute()
+        # Update inspection record - try lab_analysis_images first, fallback to mold_images
+        try:
+            update_result = supabase.table('inspection').update({
+                'lab_analysis_images': current_images  # Store as PostgreSQL array, not JSON string
+            }).eq('id', inspection_id).execute()
+            print(f"🔍 DEBUG: Successfully updated lab_analysis_images column for deletion")
+        except Exception as lab_error:
+            print(f"⚠️ lab_analysis_images column not found for deletion, trying mold_images as fallback: {lab_error}")
+            update_result = supabase.table('inspection').update({
+                'mold_images': current_images  # Store as PostgreSQL array in mold_images column
+            }).eq('id', inspection_id).execute()
+            print(f"🔍 DEBUG: Successfully updated mold_images column as fallback for deletion")
         
-        if update_result.error:
+        if hasattr(update_result, 'error') and update_result.error:
             print(f"❌ Database update error: {update_result.error}")
             return jsonify({"error": f"Failed to update inspection: {update_result.error}"}), 500
         
@@ -1204,6 +1588,27 @@ def delete_lab_analysis_image(inspection_id, image_index):
 if __name__ == '__main__':
     print("🚀 Starting Mold Testing Houston Backend...")
     print("📊 Database initialized with Supabase")
+    
+    # Show detailed OCR status after initialization
+    print(f"\n🔬 OCR INTEGRATION FINAL STATUS:")
+    print(f"   Vision Client: {'✅ Available' if ocr_integration.vision_client else '❌ Not initialized'}")
+    print(f"   OpenAI Client: {'✅ Available' if ocr_integration.openai_client else '❌ Not initialized'}")
+    print(f"   Integration Available: {'✅ Ready' if ocr_integration.is_available else '❌ Not ready'}")
+    
+    if ocr_integration.vision_client:
+        print("   🎯 Google Vision API calls will be REAL")
+    else:
+        print("   ⚠️  Google Vision API calls will FAIL - check credentials")
+        
+    # Show current environment variable status
+    creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+    print(f"   Current GOOGLE_APPLICATION_CREDENTIALS: {creds_path}")
+    if creds_path and os.path.exists(creds_path):
+        print(f"   ✅ Credentials file exists and is accessible")
+    elif creds_path:
+        print(f"   ❌ Credentials file does not exist at specified path")
+    else:
+        print(f"   ❌ GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
     
     # Run validation checks
     validate_supabase_credentials()
@@ -1224,9 +1629,11 @@ if __name__ == '__main__':
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
     print("   - POST /api/llm/summarize")
+    print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
+    print("   - POST /api/validate-lab-image (OCR validation before database save)")
     print("   - POST /api/ocr-gpt (Google Cloud Vision integration)")
     print("   - POST /api/email/send")
     print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
-    print(f"🔬 OCR Status: {'Real Google Cloud Vision' if ocr_integration.is_available else 'Mock responses - Add .env credentials'}")
+    print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")
     
     app.run(debug=True, host='0.0.0.0', port=5000) 
