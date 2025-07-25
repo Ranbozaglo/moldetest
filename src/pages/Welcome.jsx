@@ -66,7 +66,7 @@ export default function Welcome() {
             
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-slate-900 mb-8 leading-tight">
               Start Your
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent"> NEW Mold Inspection</span>
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Mold Inspection</span>
               <br />& Testing Today
             </h1>
             
@@ -87,7 +87,7 @@ export default function Welcome() {
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
                 >
                
-                  Start NEW Mold Inspection & Testing
+                  Start your Mold Inspection & Testing
                 </Button>
             </motion.div>
             
@@ -162,7 +162,7 @@ export default function Welcome() {
                 size="lg" 
                 className="bg-white text-blue-900 hover:bg-blue-50 px-12 py-6 text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
               >
-                Begin NEW Inspection Process
+                Begin your Inspection Process
               </Button>
           </motion.div>
         </div>
