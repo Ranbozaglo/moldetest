@@ -494,6 +494,16 @@ def ocr_status():
     print(f"🔍 OCR STATUS: Returning status: {status}")
     return jsonify(status)
 
+@app.route("/")
+def home():
+    from datetime import datetime
+    return {
+        "status": "✅ OK",
+        "time": datetime.utcnow().isoformat() + "Z",
+        "version": "v1.0.0"
+    }
+
+
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     """User login endpoint"""
