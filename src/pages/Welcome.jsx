@@ -12,11 +12,7 @@ export default function Welcome() {
   const navigate = useNavigate();
   
   const handleStartInspection = () => {
-    if (user) {
-      navigate(createPageUrl("Inspection"));
-    } else {
-      navigate(createPageUrl("SignIn"));
-    }
+    navigate(createPageUrl("SignUp"));
   };
   
   const features = [
