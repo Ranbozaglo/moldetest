@@ -285,9 +285,9 @@ export default function InspectionDetails() {
         
         try {
           // Upload file to lab-analysis bucket
-          const uploadResult = await UploadLabAnalysisImage(file);
-          console.log("🔍 DEBUG: Upload result:", uploadResult);
-          
+        const uploadResult = await UploadLabAnalysisImage(file);
+        console.log("🔍 DEBUG: Upload result:", uploadResult);
+        
           if (uploadResult && uploadResult.file_url) {
             console.log(`✅ UPLOAD: Successfully uploaded ${file.name} to lab-analysis bucket`);
             uploadedFiles.push({
@@ -399,7 +399,7 @@ export default function InspectionDetails() {
               const parsedResult = JSON.parse(analysisResult.content);
               conclusion = parsedResult.conclusion || analysisResult.content;
               recommendations = parsedResult.recommendations || "";
-            } catch (parseError) {
+        } catch (parseError) {
               conclusion = analysisResult.content;
               recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
             }
@@ -429,7 +429,7 @@ export default function InspectionDetails() {
 
         // Save lab images URLs and report content to the database
         const labImageUrls = uploadedFiles.map(file => file.file_url);
-        await MoldInspection.update(inspectionId, {
+      await MoldInspection.update(inspectionId, {
           lab_analysis_images: labImageUrls,
           lab_conclusion: conclusion,
           lab_recommendations: recommendations
@@ -1287,7 +1287,7 @@ export default function InspectionDetails() {
                 </div>
               )}
 
-              
+
               {generatingAnalysis && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-center gap-3">

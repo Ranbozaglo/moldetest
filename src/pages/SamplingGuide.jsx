@@ -16,7 +16,8 @@ export default function SamplingGuide() {
     const [inspectionId, setInspectionId] = useState(null);
     const [inspectionData, setInspectionData] = useState(null);
     const [sampleImages, setSampleImages] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [inspectionLoading, setInspectionLoading] = useState(true);
+    const [imagesLoading, setImagesLoading] = useState(true);
     const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
     const [imageErrors, setImageErrors] = useState({});
     const [logoErrors, setLogoErrors] = useState({});
@@ -36,7 +37,7 @@ export default function SamplingGuide() {
             console.log("🔍 DEBUG: Available URL parameters:", new URLSearchParams(location.search).toString());
             // Instead of showing an alert, show a user-friendly error page
             loadSampleImages(); // Still load sample images for guide
-            setLoading(false);
+            setInspectionLoading(false);
         }
         
         // Cleanup function to reset image errors if component unmounts
@@ -49,6 +50,7 @@ export default function SamplingGuide() {
 
     const loadInspectionData = async (id) => {
         try {
+            setInspectionLoading(true);
             console.log("🔍 DEBUG: Loading inspection data for ID:", id);
             const data = await MoldInspection.findUnique({ id });
             console.log("🔍 DEBUG: Loaded inspection data:", data);
@@ -72,7 +74,7 @@ export default function SamplingGuide() {
             console.error("Failed to load inspection data for guide:", error);
             setInspectionData(null);
         } finally {
-            setLoading(false);
+            setInspectionLoading(false);
         }
     };
 
@@ -80,36 +82,46 @@ export default function SamplingGuide() {
 
     const loadSampleImages = async () => {
         console.log("[SamplingGuide] loadSampleImages called");
-        setLoading(true);
+        setImagesLoading(true);
         try {
-            // Use the provided static sample image URLs
-            const staticSampleImages = [
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples9.jpeg",
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples8.jpeg",
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples7.jpeg",
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples6.jpeg",
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples4.jpeg",
-                "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Sample1.jpeg"
+            // Replace staticSampleImages with an array of objects containing sample_image, name, and description
+            const sampleImagesWithInfo = [
+              {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples9.jpeg",
+                name: "Ceiling Sampling",
+                description: "Demonstrates sampling technique on ceiling mold growth."
+              },
+              {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples7.jpeg",
+                name: "Wall Surface Sampling",
+                description: "Shows proper Q-tip angle and glove use on wall mold growth."
+              },
+              {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples4.jpeg",
+                name: "Air Vent Sampling",
+                description: "Shows how to sample from air vents and HVAC components."
+              },
+              {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples8.jpeg",
+                name: "Labeling and Bagging",
+                description: "Ensure each bag is clearly labeled with the location before sealing."
+              },
+              {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples6.jpeg",
+                name: "Shipping Label Example",
+                description: "Example of properly addressed shipping label for Mold Testing Houston."
+              }
+              // Add more samples as needed
             ];
 
-            console.log(`[SamplingGuide] Static sample image URLs:`, staticSampleImages);
+            console.log(`[SamplingGuide] Static sample image URLs:`, sampleImagesWithInfo);
 
-            const sampleImagesWithUrls = staticSampleImages.map((url, index) => ({
-                id: `static_sample_${index}`,
-                sample_image: url,
-                location: `Sample Location ${index + 1}`,
-                description: `Sample collection example (Sample ${index + 1})`,
-                name: url.split('/').pop()
-            }));
-
-            console.log(`[SamplingGuide] sampleImagesWithUrls:`, sampleImagesWithUrls);
-
-            setSampleImages(sampleImagesWithUrls);
+            setSampleImages(sampleImagesWithInfo);
         } catch (error) {
             console.error("[SamplingGuide] Fatal error in loadSampleImages:", error);
             setSampleImages([]);
         } finally {
-            setLoading(false);
+            setImagesLoading(false);
             console.log("[SamplingGuide] loadSampleImages finished");
         }
     };
@@ -148,11 +160,11 @@ export default function SamplingGuide() {
         );
     };
     
-    if (loading) {
+    if (inspectionLoading || imagesLoading) {
         return <div className="text-center p-12">Loading Collection Guide...</div>
     }
 
-    if (!inspectionData) {
+    if (!inspectionData && !inspectionLoading) {
         return (
           <div className="max-w-2xl mx-auto text-center py-20 px-6">
             <h2 className="text-xl text-red-600 mb-4">
@@ -165,7 +177,7 @@ export default function SamplingGuide() {
               }
             </p>
             <div className="flex gap-4 justify-center">
-              <Link to={createPageUrl("Welcome")}>
+              <Link to={createPageUrl("Welcome")}> 
                   <Button variant="outline">Back to Home</Button>
               </Link>
               {!inspectionId && (
@@ -282,43 +294,47 @@ export default function SamplingGuide() {
                     </p>
                     
                     {sampleImages.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {sampleImages.map((sample, index) => (
-                                <div key={sample.id || index} className="space-y-3">
-                                    {!imageErrors[sample.id || index] ? (
-                                        <img 
-                                            src={sample.sample_image}
-                                            alt={`Sample collection at ${sample.location}`}
-                                            className="w-full h-48 object-cover rounded-xl border border-slate-200"
-                                            onError={(e) => {
-                                                console.log(`🔍 DEBUG: Image load error for sample ${index}:`, sample.sample_image);
-                                                // Prevent further error propagation
-                                                e.preventDefault();
-                                                
-                                                // Use functional update to avoid race conditions
-                                                setImageErrors(prev => {
-                                                    const newErrors = { ...prev };
-                                                    newErrors[sample.id || index] = true;
-                                                    return newErrors;
-                                                });
-                                            }}
-                                            onLoad={() => {
-                                                console.log(`🔍 DEBUG: Image loaded successfully for sample ${index}:`, sample.sample_image);
-                                            }}
-                                        />
-                                    ) : (
-                                        <div className="w-full h-48 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 text-sm">
-                                            <div className="text-center">
-                                                <FlaskConical className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-                                                <p>Image temporarily unavailable</p>
-                                                <p className="text-xs mt-1">Sample: {sample.name}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <p className="text-sm text-slate-600 font-medium">{sample.location}</p>
-                                    <p className="text-xs text-slate-500">{sample.description}</p>
-                                </div>
-                            ))}
+                        <div className="sample-images-grid" style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(2, 1fr)',
+                          gap: '3rem',
+                          marginTop: 24
+                        }}>
+                          {sampleImages.map((sample, idx) => (
+                            <div key={sample.sample_image} style={{
+                              background: '#f9fafb',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: 12,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'stretch',
+                              justifyContent: 'stretch',
+                              overflow: 'hidden',
+                              minWidth: 0
+                            }}>
+                              <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                <img
+                                  src={sample.sample_image}
+                                  alt={sample.name}
+                                  style={{
+                                    width: '100%',
+                                    height: 300,
+                                    objectFit: 'cover',
+                                    borderTopLeftRadius: 12,
+                                    borderTopRightRadius: 12,
+                                    marginBottom: 0,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.10)'
+                                  }}
+                                />
+                              </div>
+                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 16, width: '100%', textAlign: 'left' }}>
+                               <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 18 }}>{sample.name}</div>
+                               <div style={{ color: '#6b7280', fontSize: 16 }}>{sample.description}</div>
+                             </div>
+                            </div>
+                          ))}
                         </div>
                     ) : (
                         <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
@@ -331,6 +347,38 @@ export default function SamplingGuide() {
                         </div>
                     )}
                 </div>
+
+                <h2 style={{ fontSize: 24, fontWeight: 700, marginTop: 40, marginBottom: 16 }}>Sample Delivery :</h2>
+<div style={{
+  background: '#f9fafb',
+  border: '1px solid #e5e7eb',
+  borderRadius: 12,
+  padding: 16,
+  textAlign: 'center',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  minWidth: 0,
+  width: '100%',
+  margin: '0 auto 2rem auto',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'hidden'
+}}>
+  <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <img
+      src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Sample1.jpeg"
+      alt="Sample Delivery Example"
+      style={{
+        width: '80%',
+        height: 260,
+        objectFit: 'cover',
+        marginBottom: 16,
+      }}
+    />
+  </div>
+  <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 18 }}>Drop it in any Fedex mailbox</div>
+</div>
 
                 {hasVisibleMold && (
                     <div className="glass-effect p-8 rounded-2xl mb-8">
