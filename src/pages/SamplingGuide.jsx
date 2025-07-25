@@ -120,7 +120,7 @@ export default function SamplingGuide() {
             <>
                 {!logoErrors[logoId] ? (
                     <img 
-                        src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logo.jpeg" 
+                        src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
                         alt="Mold Testing Houston Logo" 
                         className={`${size} object-contain`}
                         onError={(e) => {
@@ -204,7 +204,7 @@ export default function SamplingGuide() {
                         
                         <div className="space-y-4 text-slate-700 leading-relaxed">
                             <p>
-                                The Mold Testing Houston DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations.
+                                Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations.
                             </p>
                             
                             <p>
