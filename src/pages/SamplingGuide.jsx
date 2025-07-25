@@ -88,13 +88,13 @@ export default function SamplingGuide() {
             const sampleImagesWithInfo = [
               {
                 sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples9.jpeg",
-                name: "Ceiling Sampling",
-                description: "Demonstrates sampling technique on ceiling mold growth."
+                name: "Wall Surface Sampling",
+                description: "Shows proper Q-tip angle and glove use on wall mold growth."
               },
               {
                 sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples7.jpeg",
-                name: "Wall Surface Sampling",
-                description: "Shows proper Q-tip angle and glove use on wall mold growth."
+                name: "Ceiling Sampling",
+                description: "Demonstrates sampling technique on ceiling mold growth."
               },
               {
                 sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples4.jpeg",
@@ -107,10 +107,16 @@ export default function SamplingGuide() {
                 description: "Ensure each bag is clearly labeled with the location before sealing."
               },
               {
+                sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//totaltestsample.jpeg",
+                name: "Fill out COC",
+                description: "Fill out the Chain Of Custody form with your samples location and info"
+              },
+              {
                 sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples6.jpeg",
-                name: "Shipping Label Example",
-                description: "Example of properly addressed shipping label for Mold Testing Houston."
-              }
+                name: "Shipping Label",
+                description: "Properly stick the shipping label on the envelope and drop it off in any FedEx locations."
+              },
+            
               // Add more samples as needed
             ];
 
@@ -228,7 +234,7 @@ export default function SamplingGuide() {
                             </p>
                             
                             <p className="font-medium">
-                                By purchasing and using this kit, the user acknowledges and agrees that Mold Testing Houston, LLC is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial "first-aid" tool to gain awareness and guide next steps.
+                                By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial "first-aid" tool to gain awareness and guide next steps.
                             </p>
                         </div>
                     </div>
@@ -347,54 +353,7 @@ export default function SamplingGuide() {
                         </div>
                     )}
                 </div>
-
-                <h2 style={{ fontSize: 24, fontWeight: 700, marginTop: 40, marginBottom: 16 }}>Sample Delivery :</h2>
-<div style={{
-  background: '#f9fafb',
-  border: '1px solid #e5e7eb',
-  borderRadius: 12,
-  padding: 16,
-  textAlign: 'center',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-  minWidth: 0,
-  width: '100%',
-  margin: '0 auto 2rem auto',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'center',
-  overflow: 'hidden'
-}}>
-  <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-    <img
-      src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Sample1.jpeg"
-      alt="Sample Delivery Example"
-      style={{
-        width: '80%',
-        height: 260,
-        objectFit: 'cover',
-        marginBottom: 16,
-      }}
-    />
-  </div>
-  <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 18 }}>Drop it in any Fedex mailbox</div>
-</div>
-
-                {hasVisibleMold && (
-                    <div className="glass-effect p-8 rounded-2xl mb-8">
-                        <h2 className="text-2xl font-bold text-slate-900 mb-6">Your Identified Mold Locations to Sample</h2>
-                        <p className="text-slate-600 mb-4">You will need to collect one sample from each of the following locations you identified earlier:</p>
-                        <ul className="space-y-3">
-                            {inspectionData && inspectionData.visible_mold_details && inspectionData.visible_mold_details.map((detail, index) => (
-                                <li key={index} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
-                                    <MapPin className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                    <span className="font-medium text-slate-700">{detail.location}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-                
+         
                 <div className="bg-amber-50 rounded-xl p-6 border border-amber-100 mb-8">
                     <h3 className="font-semibold text-amber-900 mb-2">Important Reminders</h3>
                     <ul className="text-amber-800 text-sm list-disc list-inside space-y-1">
