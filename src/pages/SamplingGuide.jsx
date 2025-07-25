@@ -205,7 +205,7 @@ export default function SamplingGuide() {
             <div className="max-w-4xl mx-auto py-12 px-6">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                             <LogoImage size="w-8 h-8" logoId="disclaimer-main" fallbackText="MTH" />
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">Important Disclaimer</h1>
