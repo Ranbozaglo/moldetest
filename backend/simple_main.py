@@ -1797,4 +1797,5 @@ if __name__ == '__main__':
     print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
     print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision & OpenAI READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")
     
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+port = int(os.environ.get("PORT", 5000))  # לוקח את הפורט של Render אם קיים
+app.run(debug=True, host='0.0.0.0', port=port)
