@@ -791,7 +791,7 @@ def create_inspection():
                     mold_images.extend(entry['images'])
                 if 'location' in entry:
                     mold_locations.append(entry['location'])
-            inspection_data['mold_images'] = json.dumps(mold_images)
+            inspection_data['mold_images'] = mold_images
             inspection_data['mold_locations'] = json.dumps(mold_locations)
             print(f"🔍 DEBUG: Serializing mold_images: {len(mold_images)} images, mold_locations: {len(mold_locations)} locations")
         
@@ -805,7 +805,7 @@ def create_inspection():
                     water_damage_images.extend(entry['images'])
                 if 'location' in entry:
                     water_damage_locations.append(entry['location'])
-            inspection_data['water_damage_images'] = json.dumps(water_damage_images)
+            inspection_data['water_damage_images'] = water_damage_images
             inspection_data['water_damage_locations'] = json.dumps(water_damage_locations)
             print(f"🔍 DEBUG: Serializing water_damage_images: {len(water_damage_images)} images, water_damage_locations: {len(water_damage_locations)} locations")
         
