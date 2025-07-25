@@ -34,7 +34,11 @@ except ImportError as e:
     print("   Install with: pip install google-cloud-vision openai pillow")
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://mold-testing.netlify.app",
+    "http://localhost:5173",
+    "http://localhost:3000"
+], supports_credentials=True)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
