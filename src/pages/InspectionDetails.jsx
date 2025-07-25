@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { ProcessLabImageWithOCR, InvokeLLM } from "@/api/integrations";
+import { ProcessLabImageWithOCR, InvokeLLM, UploadLabAnalysisImage } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,10 +104,10 @@ export default function InspectionDetails() {
   useEffect(() => {
     if (inspection) {
       console.log("🔍 INSPECTION STATE CHANGE:");
-      console.log("  - Conclusion:", inspection.conclusion || "EMPTY");
-      console.log("  - Recommendations:", inspection.recommendations || "EMPTY");
+      console.log("  - Lab Conclusion:", inspection.lab_conclusion || "EMPTY");
+      console.log("  - Lab Recommendations:", inspection.lab_recommendations || "EMPTY");
     }
-  }, [inspection?.conclusion, inspection?.recommendations]);
+  }, [inspection?.lab_conclusion, inspection?.lab_recommendations]);
 
   useEffect(() => {
     (async () => {
@@ -162,11 +162,16 @@ export default function InspectionDetails() {
 
   const loadInspectionData = async () => {
     try {
-      const inspectionData = await MoldInspection.filter({ id: inspectionId });
-      if (inspectionData && inspectionData.length > 0) {
-        const inspection = inspectionData[0];
+      const inspectionData = await MoldInspection.findUnique({ id: inspectionId });
+      if (inspectionData) {
+        const inspection = inspectionData;
 
-  
+        // Debug: Log the lab analysis fields from database
+        console.log("🔍 DEBUG: Loading inspection data from database:");
+        console.log("  - lab_conclusion:", inspection.lab_conclusion || "EMPTY");
+        console.log("  - lab_recommendations:", inspection.lab_recommendations || "EMPTY");
+        console.log("  - lab_analysis_images:", inspection.lab_analysis_images || "EMPTY");
+
         let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
         
         if (labImagesField && typeof labImagesField === 'string') {
@@ -180,6 +185,24 @@ export default function InspectionDetails() {
         } else {
           // Only default to empty array if truly no data exists
           inspection.lab_analysis_images = [];
+        }
+        
+        // Check if there are no lab analysis images and clear conclusion/recommendations if needed
+        if (!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) {
+          console.log("🔍 DEBUG: No lab analysis images found, clearing conclusion and recommendations");
+          
+          // Only update database if there are conclusion/recommendations to clear
+          if (inspection.lab_conclusion || inspection.lab_recommendations) {
+            console.log("🔍 DEBUG: Clearing lab_conclusion and lab_recommendations from database");
+            await MoldInspection.update(inspectionId, {
+              lab_conclusion: "",
+              lab_recommendations: ""
+            });
+            
+            // Update local state to reflect the cleared fields
+            inspection.lab_conclusion = "";
+            inspection.lab_recommendations = "";
+          }
         }
         
         setInspection(inspection);
@@ -224,16 +247,17 @@ export default function InspectionDetails() {
     setUploadProgress(0);
     
     try {
-      console.log("🔍 DEBUG: Starting lab image OCR analysis process (no database storage)");
+      console.log("🔍 DEBUG: Starting lab image upload and OCR analysis process");
       console.log("🔍 DEBUG: Inspection ID:", inspectionId);
-      console.log("🔍 DEBUG: Files to process with OCR:", files.length);
+      console.log("🔍 DEBUG: Files to process:", files.length);
       
-      // Step 1: Process ALL files with OCR directly (no upload to storage or database)
+      // Step 1: Upload ALL files to lab-analysis bucket first
+      const uploadedFiles = [];
       const processedFiles = [];
       const skippedFiles = [];
       let allExtractedText = "";
       
-      console.log("🔍 STEP 1: Processing all files with OCR (no storage upload)...");
+      console.log("🔍 STEP 1: Uploading all files to lab-analysis bucket...");
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -257,46 +281,61 @@ export default function InspectionDetails() {
           continue;
         }
 
-        console.log(`🔍 DEBUG: Processing file ${i + 1}/${files.length} with OCR (bytes only): ${file.name}`);
+        console.log(`🔍 DEBUG: Uploading file ${i + 1}/${files.length} to lab-analysis bucket: ${file.name}`);
         
         try {
-          console.log(`📡 OCR: Making Google Vision API call for file: ${file.name}`);
-        
-          // Process file directly with OCR (bytes only, no upload)
-          const ocrResult = await ProcessLabImageWithOCR(file);
-          console.log("🔍 DEBUG: OCR processing result:", ocrResult);
-          console.log("🔍 DEBUG: OCR result keys:", Object.keys(ocrResult || {}));
-          console.log("🔍 DEBUG: OCR valid:", ocrResult?.valid);
-          console.log("🔍 DEBUG: OCR extracted text length:", ocrResult?.extracted_text?.length || 0);
-        
-          if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
-            console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
-            // Apply auto-filters to remove noisy lines
-            const filteredText = applyAutoFilters(ocrResult.extracted_text);
-            processedFiles.push({
+          // Upload file to lab-analysis bucket
+          const uploadResult = await UploadLabAnalysisImage(file);
+          console.log("🔍 DEBUG: Upload result:", uploadResult);
+          
+          if (uploadResult && uploadResult.file_url) {
+            console.log(`✅ UPLOAD: Successfully uploaded ${file.name} to lab-analysis bucket`);
+            uploadedFiles.push({
               filename: file.name,
-              extracted_text: filteredText,
-              confidence: ocrResult.confidence
+              file_url: uploadResult.file_url,
+              file_path: uploadResult.file_path,
+              bucket: uploadResult.bucket
             });
             
-            // Combine all extracted text for analysis
-            allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
+            // Step 2: Process uploaded file with OCR
+            console.log(`📡 OCR: Making Google Vision API call for uploaded file: ${file.name}`);
+            const ocrResult = await ProcessLabImageWithOCR(file);
+            console.log("🔍 DEBUG: OCR processing result:", ocrResult);
             
+            if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
+              console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
+              // Apply auto-filters to remove noisy lines
+              const filteredText = applyAutoFilters(ocrResult.extracted_text);
+              processedFiles.push({
+                filename: file.name,
+                file_url: uploadResult.file_url,
+                extracted_text: filteredText,
+                confidence: ocrResult.confidence
+              });
+              
+              // Combine all extracted text for analysis
+              allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
+              
+            } else {
+              const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
+              console.warn(`❌ OCR: Google Vision API failed for ${file.name}:`, errorMessage);
+              skippedFiles.push({ 
+                file: file.name, 
+                reason: `Google Vision API failed: ${errorMessage}` 
+              });
+            }
           } else {
-            const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
-            console.warn(`❌ OCR: Google Vision API failed for ${file.name}:`, errorMessage);
-            console.warn("🔍 DEBUG: Full OCR result:", ocrResult);
+            console.error(`❌ UPLOAD: Failed to upload ${file.name} to lab-analysis bucket`);
             skippedFiles.push({ 
               file: file.name, 
-              reason: `Google Vision API failed: ${errorMessage}` 
+              reason: 'Upload to lab-analysis bucket failed' 
             });
-        }
-        } catch (ocrError) {
-          console.error(`❌ OCR: Unexpected error processing ${file.name}:`, ocrError);
-          console.error("🔍 DEBUG: Error stack:", ocrError.stack);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing ${file.name}:`, error);
           skippedFiles.push({ 
             file: file.name, 
-            reason: `Unexpected OCR error: ${ocrError.message}` 
+            reason: `Processing error: ${error.message}` 
           });
         }
       }
@@ -312,7 +351,8 @@ export default function InspectionDetails() {
         throw new Error('No files could be processed with OCR. No analysis will be generated.');
       }
       
-      console.log(`✅ OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
+      console.log(`✅ UPLOAD & OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
+      
       // Clean the extracted text to filter only mold-related content
       let cleanedExtractedText = cleanExtractedText(allExtractedText);
       console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
@@ -330,12 +370,11 @@ export default function InspectionDetails() {
         })
         .join('\n');
       
-      // Step 2: Generate analysis from cleaned extracted text (no image URLs needed)
-      console.log("🔍 STEP 2: Generating analysis from cleaned extracted text...");
+      // Step 3: Generate analysis from cleaned extracted text
+      console.log("🔍 STEP 3: Generating analysis from cleaned extracted text...");
       
       try {
         // Construct the full prompt to send to the backend
-        // const contextLines = `Analyze this laboratory mold analysis report text and provide professional conclusions and recommendations.\n\nContext:\n- This is a mold inspection and testing report from ${inspection.street_address}, ${inspection.city}, ${inspection.state}\n- Property type: ${inspection.property_type} (${inspection.square_footage} sq ft)\n- Client type: ${inspection.client_type}\n- Text extracted from ${processedFiles.length} lab report image(s)\n`;
         const extractedTextSection = `\nEXTRACTED TEXT FROM LAB REPORTS:\n${cleanedExtractedText}\n`;
         const instructions = `\nPlease analyze the lab results and provide:\n\n1. **CONCLUSION** (2-3 paragraphs):\n   - Summarize the lab findings and extracted text\n   - Assess the mold levels and types found\n   - Evaluate health and safety implications\n   - Compare to normal/acceptable levels\n   - Consider the property context and client type\n\n2. **RECOMMENDATIONS** (detailed list):\n   - Immediate actions needed (if any)\n   - Preventive measures\n   - Professional services recommended\n   - Timeline for any required actions\n   - Environmental controls to implement\n   - Follow-up testing recommendations\n\nMake the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.\n\nReturn your response in this exact JSON format:\n{\n  \"conclusion\": \"Your detailed conclusion here...\",\n  \"recommendations\": \"Your detailed recommendations here...\"\n}\n`;
         const analysisPrompt =  extractedTextSection + instructions;
@@ -384,24 +423,19 @@ export default function InspectionDetails() {
         // Update local state immediately so the textareas show the response
         setInspection(prev => ({
           ...prev,
-          conclusion: conclusion,
-          recommendations: recommendations
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
         }));
 
-        // Save lab images and report content to the database
-        let labImagesToSave = inspection.lab_analysis_images || [];
-        // If new images were just uploaded, update the array
-        if (selectedLabImages && selectedLabImages.length > 0) {
-          // Only save the file names for now, or you can adjust to save URLs if available
-          labImagesToSave = selectedLabImages.map(file => file.name);
-        }
+        // Save lab images URLs and report content to the database
+        const labImageUrls = uploadedFiles.map(file => file.file_url);
         await MoldInspection.update(inspectionId, {
-          lab_analysis_images: labImagesToSave,
-          conclusion: conclusion,
-          recommendations: recommendations
+          lab_analysis_images: labImageUrls,
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
         });
         
-        console.log("✅ Analysis complete! OCR processed files and generated analysis without storing image URLs.");
+        console.log("✅ Analysis complete! Lab images uploaded to bucket and analysis saved to database.");
         
       } catch (analysisError) {
         console.error("❌ OCR ANALYSIS: Error during analysis generation:", analysisError);
@@ -505,8 +539,8 @@ export default function InspectionDetails() {
       console.log("🔍 DEBUG: Update payload:", { conclusion, recommendations });
       
       const updateResult = await MoldInspection.update(inspectionId, {
-        conclusion: conclusion,
-        recommendations: recommendations
+        lab_conclusion: conclusion,
+        lab_recommendations: recommendations
       });
 
       console.log("✅ ANALYZE AI: Analysis saved successfully!");
@@ -534,8 +568,8 @@ export default function InspectionDetails() {
 
         console.log("💾 ANALYZE AI: Saving mock analysis to database...");
       await MoldInspection.update(inspectionId, {
-        conclusion: mockAnalysis.conclusion,
-        recommendations: mockAnalysis.recommendations
+        lab_conclusion: mockAnalysis.conclusion,
+        lab_recommendations: mockAnalysis.recommendations
       });
 
         console.log("✅ ANALYZE AI: Mock analysis saved successfully");
@@ -566,12 +600,12 @@ export default function InspectionDetails() {
       }
 
       console.log("🔍 DEBUG: Saving changes for inspection ID:", inspectionId);
-      console.log("🔍 DEBUG: Conclusion:", inspection.conclusion);
-      console.log("🔍 DEBUG: Recommendations:", inspection.recommendations);
+      console.log("🔍 DEBUG: Lab Conclusion:", inspection.lab_conclusion);
+      console.log("🔍 DEBUG: Lab Recommendations:", inspection.lab_recommendations);
 
       await MoldInspection.update(inspectionId, {
-        conclusion: inspection.conclusion,
-        recommendations: inspection.recommendations
+        lab_conclusion: inspection.lab_conclusion,
+        lab_recommendations: inspection.lab_recommendations
       });
 
       console.log("🔍 DEBUG: Changes saved successfully");
@@ -1113,9 +1147,21 @@ export default function InspectionDetails() {
                                 const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
                                 console.log("🔍 DEBUG: Removing image at index:", index);
                                 console.log("🔍 DEBUG: Updated images:", updatedImages);
-                                MoldInspection.update(inspectionId, {
+                                
+                                // If this was the last image, also clear the conclusion and recommendations
+                                const shouldClearAnalysis = updatedImages.length === 0;
+                                
+                                const updateData = {
                                   lab_analysis_images: updatedImages
-                                }).then(() => {
+                                };
+                                
+                                if (shouldClearAnalysis) {
+                                  updateData.lab_conclusion = "";
+                                  updateData.lab_recommendations = "";
+                                  console.log("🔍 DEBUG: Clearing analysis fields since no images remain");
+                                }
+                                
+                                MoldInspection.update(inspectionId, updateData).then(() => {
                                   loadInspectionData();
                                 }).catch((error) => {
                                   console.error("❌ Error removing image:", error);
@@ -1165,8 +1211,8 @@ export default function InspectionDetails() {
                                  console.log("🔍 DEBUG: About to save:", { newConclusion, newRecommendations });
                                  
                                  await MoldInspection.update(inspectionId, {
-                                   conclusion: newConclusion,
-                                   recommendations: newRecommendations
+                                   lab_conclusion: newConclusion,
+                                   lab_recommendations: newRecommendations
                                  });
                                  
                                  console.log("✅ Mock analysis saved to database!");
@@ -1175,8 +1221,8 @@ export default function InspectionDetails() {
                                  console.log("🔄 Updating local inspection state...");
                                  setInspection(prev => ({
                                    ...prev,
-                                   conclusion: newConclusion,
-                                   recommendations: newRecommendations
+                                   lab_conclusion: newConclusion,
+                                   lab_recommendations: newRecommendations
                                  }));
                                  
                                  console.log("✅ Analysis complete! Fields should now show the content and stay visible.");
@@ -1210,7 +1256,9 @@ export default function InspectionDetails() {
                           if (confirm('Are you sure you want to remove all lab analysis images?')) {
                             console.log("🔍 DEBUG: Removing all lab analysis images for inspection ID:", inspectionId);
                             MoldInspection.update(inspectionId, {
-                              lab_analysis_images: []
+                              lab_analysis_images: [],
+                              lab_conclusion: "",
+                              lab_recommendations: ""
                             }).then(() => {
                               loadInspectionData();
                             }).catch((error) => {
@@ -1284,9 +1332,9 @@ export default function InspectionDetails() {
                 <Textarea
                   id="conclusion"
                   value={
-                    (inspection.conclusion || "") 
+                    (inspection.lab_conclusion || "") 
                   }
-                  onChange={e => setInspection({ ...inspection, conclusion: e.target.value })}
+                  onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
                   placeholder="Professional conclusion and recommendations based on lab analysis..."
                   className="min-h-32 mt-2"
                 />
@@ -1296,8 +1344,8 @@ export default function InspectionDetails() {
                 <Label htmlFor="recommendations">Recommendations</Label>
                 <Textarea
                   id="recommendations"
-                  value={inspection.recommendations || ""}
-                  onChange={e => setInspection({ ...inspection, recommendations: e.target.value })}
+                  value={inspection.lab_recommendations || ""}
+                  onChange={e => setInspection({ ...inspection, lab_recommendations: e.target.value })}
                   placeholder="Detailed recommendations for the client..."
                   className="min-h-32 mt-2"
                 />

@@ -707,6 +707,9 @@ def get_inspections():
                 "inspection_date": inspection.get('created_date'),
                 "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
                 "user_email": inspection.get('email'),
+                # Lab analysis fields
+                "lab_conclusion": inspection.get('lab_conclusion'),
+                "lab_recommendations": inspection.get('lab_recommendations'),
             })
             
             # Log what we're returning for this inspection
@@ -715,6 +718,7 @@ def get_inspections():
         
         print(f"🔍 DEBUG: Returning {len(result_list)} inspections with complete data")
         return jsonify(result_list)
+            
     except Exception as e:
         print(f"🔍 DEBUG: Get inspections error: {e}")
         import traceback
@@ -735,6 +739,8 @@ def get_inspection_by_id(inspection_id):
             print(f"🔍 DEBUG: Found inspection - ID: {inspection.get('id')}")
             print(f"🔍 DEBUG: lab_analysis_images field: {inspection.get('lab_analysis_images')}")
             print(f"🔍 DEBUG: mold_images field: {inspection.get('mold_images')}")
+            print(f"🔍 DEBUG: lab_conclusion field: {inspection.get('lab_conclusion')}")
+            print(f"🔍 DEBUG: lab_recommendations field: {inspection.get('lab_recommendations')}")
             print(f"🔍 DEBUG: All available fields: {list(inspection.keys())}")
             return jsonify(inspection)
         else:
@@ -903,6 +909,15 @@ def update_inspection(inspection_id):
         #     update_data['conclusion'] = data['conclusion']
         # if 'recommendations' in data:
         #     update_data['recommendations'] = data['recommendations']
+        
+        # Handle lab analysis fields
+        if 'lab_conclusion' in data:
+            update_data['lab_conclusion'] = data['lab_conclusion']
+            print(f"🔍 DEBUG: Updating lab_conclusion: {data['lab_conclusion'][:100]}...")
+        
+        if 'lab_recommendations' in data:
+            update_data['lab_recommendations'] = data['lab_recommendations']
+            print(f"🔍 DEBUG: Updating lab_recommendations: {data['lab_recommendations'][:100]}...")
         
         print(f"🔍 DEBUG: Update data to apply:", update_data)
         

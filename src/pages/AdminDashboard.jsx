@@ -43,8 +43,6 @@ export default function AdminDashboard() {
 
   // Optimize auth checking - only run when authUser ID changes, not on every property change
   useEffect(() => {
-    console.log('🔍 AUTH DEBUG: AdminDashboard useEffect triggered, authUser ID:', authUser?.id);
-    
     // Debounce auth checks to prevent excessive calls
     const timeoutId = setTimeout(() => {
       checkUser();
@@ -54,65 +52,54 @@ export default function AdminDashboard() {
   }, [authUser?.id]); // Only depend on user ID, not full user object
 
   const checkUser = useCallback(async () => {
-    console.log('🔍 AUTH DEBUG: AdminDashboard checkUser called, authUser ID:', authUser?.id);
-    
     try {
       // Use the authenticated user from AuthContext instead of calling User.me()
       if (!authUser) {
-        console.log('🔍 AUTH DEBUG: AdminDashboard - No authUser found, redirecting to Welcome');
         navigate(createPageUrl("Welcome"));
         return;
       }
-      
-      console.log('🔍 AUTH DEBUG: AdminDashboard - authUser found, role:', authUser.role);
       
       // Check if user is admin
       if (authUser.role !== 'admin' && !authUser.is_admin) {
-        console.log('🔍 AUTH DEBUG: AdminDashboard - User is not admin, redirecting to Welcome');
         navigate(createPageUrl("Welcome"));
         return;
       }
       
-      console.log('🔍 AUTH DEBUG: AdminDashboard - User is admin, loading data');
       setUser(authUser);
       loadInspections();
     } catch (error) {
-      console.error('🔍 AUTH DEBUG: AdminDashboard - Error checking user:', error);
       navigate(createPageUrl("Welcome"));
     } finally {
-      console.log('🔍 AUTH DEBUG: AdminDashboard - Setting loading to false');
       setLoading(false);
     }
   }, [authUser, navigate]);
 
   const loadInspections = async () => {
     try {
-      console.log("🔍 Loading all inspections...");
       const allInspections = await MoldInspection.list('-created_at', 1000); // Load more inspections
-      console.log("🔍 Loaded inspections:", allInspections);
+      
+      // Check if allInspections is an array
+      if (!Array.isArray(allInspections)) {
+        setInspections([]);
+        return;
+      }
       
       // Parse JSON fields for each inspection (same logic as InspectionDetails)
       const parsedInspections = allInspections.map(inspection => {
         // Ensure lab_analysis_images is always an array (handle both lab_analysis_images and mold_images columns)
-        console.log("🔍 DEBUG: Raw data for inspection", inspection.id, "- lab_analysis_images:", inspection.lab_analysis_images, "- mold_images:", inspection.mold_images);
-        
         let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
         
         if (labImagesField && typeof labImagesField === 'string') {
           try {
             inspection.lab_analysis_images = JSON.parse(labImagesField);
-            console.log("🔍 DEBUG: Parsed legacy JSON lab images for inspection", inspection.id, ":", inspection.lab_analysis_images);
           } catch (parseError) {
-            console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
             inspection.lab_analysis_images = [];
           }
         } else if (Array.isArray(labImagesField)) {
-          console.log("🔍 DEBUG: Using PostgreSQL array lab images for inspection", inspection.id, ":", labImagesField);
           inspection.lab_analysis_images = labImagesField;
         } else {
           // Only default to empty array if truly no data exists
           inspection.lab_analysis_images = [];
-          console.log("🔍 DEBUG: No lab images found for inspection", inspection.id, ", defaulting to empty array");
         }
         
         // Parse visible_mold_details if it's a string
@@ -120,7 +107,6 @@ export default function AdminDashboard() {
           try {
             inspection.visible_mold_details = JSON.parse(inspection.visible_mold_details);
           } catch (parseError) {
-            console.error("❌ Error parsing visible_mold_details JSON for inspection", inspection.id, ":", parseError);
             inspection.visible_mold_details = [];
           }
         }
@@ -130,7 +116,6 @@ export default function AdminDashboard() {
           try {
             inspection.water_damage_details = JSON.parse(inspection.water_damage_details);
           } catch (parseError) {
-            console.error("❌ Error parsing water_damage_details JSON for inspection", inspection.id, ":", parseError);
             inspection.water_damage_details = [];
           }
         }
@@ -142,6 +127,9 @@ export default function AdminDashboard() {
       setSelectedInspections(new Set());
     } catch (error) {
       console.error("Error loading inspections:", error);
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+      setInspections([]);
       alert("Failed to load inspections. Please refresh the page.");
     }
   };
@@ -287,7 +275,6 @@ export default function AdminDashboard() {
       
       alert(`Successfully deleted ${ids.length} inspection(s).`);
     } catch (error) {
-      console.error("Error deleting inspections:", error);
       alert("Failed to delete some inspections. Please try again.");
     } finally {
       setIsDeleting(false);
@@ -622,10 +609,6 @@ export default function AdminDashboard() {
                 </div>
               `).join('')}
             </div>
-            ${inspection.conclusion ? `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #004aac;">
-              <h4 style="color: #004aac; margin-bottom: 10px;">Analysis Summary</h4>
-              <p style="line-height: 1.6;">${inspection.conclusion}</p>
-            </div>` : ''}
           </div>`
         : `<div class="lab-analysis-section">
             <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
@@ -689,12 +672,22 @@ export default function AdminDashboard() {
 
             <div class="section">
                 <h2>Conclusion</h2>
-                <p>${inspection.conclusion || 'Pending conclusion.'}</p>
+                <p>${inspection.lab_conclusion || inspection.conclusion || 'Pending conclusion.'}</p>
             </div>
 
             <div class="section">
                 <h2>Recommendations</h2>
-                ${recommendationsSection}
+                <div>
+                  ${
+                    (inspection.lab_recommendations || inspection.recommendations)
+                      ? (inspection.lab_recommendations || inspection.recommendations)
+                          .split('\n')
+                          .filter(line => line.trim().length > 0)
+                          .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
+                          .join('')
+                      : '<p>Pending recommendations.</p>'
+                  }
+                </div>
             </div>
             
             <div class="limitations-section">
@@ -713,8 +706,6 @@ export default function AdminDashboard() {
   };
 
   const downloadPDF = async (inspection) => {
-    console.log("🔍 DEBUG: downloadPDF called with inspection:", inspection);
-    
     // This is now the "Download Report" button logic
     if (inspection.report_html_url) {
       setDownloadStatus({ type: 'info', message: `Preparing download...` });
@@ -722,7 +713,6 @@ export default function AdminDashboard() {
         const displayNum = getDisplayNumber(inspection);
         const fileName = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
 
-        console.log("🔍 DEBUG: Fetching pre-generated report from:", inspection.report_html_url);
         const response = await fetch(inspection.report_html_url);
         if (!response.ok) throw new Error('Failed to fetch report file.');
 
@@ -739,7 +729,6 @@ export default function AdminDashboard() {
         setTimeout(() => setDownloadStatus(null), 3000);
         return; // Important to stop execution here
       } catch (error) {
-        console.error("Error downloading pre-generated report:", error);
         setDownloadStatus({ type: 'error', message: 'Download failed. Trying to generate a new report...' });
         // Fall through to generate a new one if download fails
       }
@@ -752,15 +741,11 @@ export default function AdminDashboard() {
         throw new Error("Could not find inspection details.");
       }
       
-      console.log("🔍 DEBUG: Fetching samples for inspection ID:", inspection.id);
       const samples = await Sample.findMany({ inspection_id: inspection.id });
-      console.log("🔍 DEBUG: Samples fetched:", samples);
       
       const displayNum = getDisplayNumber(inspection);
-      console.log("🔍 DEBUG: Generating report HTML for:", displayNum);
       
       const reportHtml = await generateReportHtmlContent(inspection, samples);
-      console.log("🔍 DEBUG: Report HTML generated successfully");
       
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
@@ -777,12 +762,6 @@ export default function AdminDashboard() {
       
     } catch (error) {
       console.error("❌ Error generating report:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        stack: error.stack,
-        inspection: inspection,
-        inspectionId: inspection?.id
-      });
       setDownloadStatus({ type: 'error', message: `Failed to generate report: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
@@ -817,7 +796,6 @@ export default function AdminDashboard() {
       }, 3000);
       
     } catch (error) {
-      console.error("Error sending lab received email:", error);
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
       setTimeout(() => {
         setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
@@ -868,7 +846,6 @@ export default function AdminDashboard() {
       }, 3000);
       
     } catch (error) {
-      console.error("Error sending report ready email:", error);
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
       setDownloadStatus({ type: 'error', message: `Failed to prepare report: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
@@ -884,17 +861,12 @@ export default function AdminDashboard() {
       const template = await EmailTemplate.getByType('review_request');
       const processedEmail = processEmailTemplate(template, inspection);
       
-      console.log(`Sending review request email for inspection ${inspection.id}`);
-      console.log(`Subject: ${processedEmail.subject}`);
-      console.log(`Body: ${processedEmail.body}`);
-      
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
       setTimeout(() => {
         setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
       }, 3000);
       
     } catch (error) {
-      console.error("Error sending review request email:", error);
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
       setTimeout(() => {
         setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
@@ -909,10 +881,6 @@ export default function AdminDashboard() {
   // Status switching functionality
   const updateInspectionStatus = async (inspectionId, newStatus) => {
     try {
-      console.log(`🔍 DEBUG: Updating inspection ${inspectionId} status to ${newStatus}`);
-      console.log(`🔍 DEBUG: Inspection ID type:`, typeof inspectionId);
-      console.log(`🔍 DEBUG: New status type:`, typeof newStatus);
-      
       // Validate inputs
       if (!inspectionId) {
         throw new Error("Inspection ID is required");
@@ -926,15 +894,10 @@ export default function AdminDashboard() {
       const inspectionIdStr = String(inspectionId);
       const statusStr = String(newStatus);
       
-      console.log(`🔍 DEBUG: Using inspection ID:`, inspectionIdStr);
-      console.log(`🔍 DEBUG: Using status:`, statusStr);
-      
       const updatedInspection = await MoldInspection.update(inspectionIdStr, { 
         status: statusStr,
         updated_date: new Date().toISOString() // Add update timestamp
       });
-      
-      console.log("🔍 DEBUG: Status updated successfully:", updatedInspection);
       
       // Update the local state
       setInspections(prevInspections => 
@@ -948,12 +911,6 @@ export default function AdminDashboard() {
       alert(`Status updated to ${statusStr}`);
     } catch (error) {
       console.error("❌ Error updating inspection status:", error);
-      console.error("❌ Error details:", {
-        message: error.message,
-        stack: error.stack,
-        inspectionId,
-        newStatus
-      });
       alert(`Failed to update status: ${error.message}`);
     }
   };
@@ -1418,13 +1375,6 @@ export default function AdminDashboard() {
                                     <DropdownMenuItem 
                                       key={status}
                                       onClick={() => {
-                                        console.log("🔍 DEBUG: Status update clicked:", {
-                                          inspectionId: inspection.id,
-                                          inspectionIdType: typeof inspection.id,
-                                          currentStatus: inspection.status,
-                                          newStatus: status,
-                                          inspection: inspection
-                                        });
                                         updateInspectionStatus(inspection.id, status);
                                       }}
                                       className="flex items-center gap-2"
@@ -1495,7 +1445,6 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem 
                                   onClick={() => {
                                     const url = createPageUrl('InspectionDetails', { id: inspection.id });
-                                    console.log("🔍 DEBUG: Opening InspectionDetails URL:", url);
                                     window.open(url, '_blank');
                                   }}
                                   className="flex items-center gap-2"
@@ -1521,7 +1470,6 @@ export default function AdminDashboard() {
                                       newWindow.document.write(reportHtml);
                                       newWindow.document.close();
                                     } catch (error) {
-                                      console.error("Error generating report:", error);
                                       alert("Failed to generate report. Please try again.");
                                     }
                                   }}
@@ -1567,7 +1515,6 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem 
                                   onClick={() => {
                                     const url = createPageUrl('InspectionDetails', { id: inspection.id, edit: true });
-                                    console.log("🔍 DEBUG: Opening InspectionDetails Edit URL:", url);
                                     window.open(url, '_blank');
                                   }}
                                   className="flex items-center gap-2"
