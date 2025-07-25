@@ -181,10 +181,9 @@ export const AuthProvider = ({ children }) => {
   }, [user?.id, validateTokenWithServer]); // Only depend on user ID, not full user object
 
   const signIn = useCallback(async (email, password) => {
+    const isProduction = window.location.hostname !== 'localhost';
+    const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
     try {
-      const isProduction = window.location.hostname !== 'localhost';
-      const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
-      
       console.log(`${logPrefix} AuthContext signIn called with:`, { 
         email, 
         environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT',
