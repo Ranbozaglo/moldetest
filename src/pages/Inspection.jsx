@@ -193,6 +193,38 @@ export default function Inspection() {
         created_date: new Date().toISOString() // Add the current date
       };
 
+      // Extract mold_images and mold_locations from visible_mold_details
+      if (formData.visible_mold_details && Array.isArray(formData.visible_mold_details)) {
+        const mold_images = [];
+        const mold_locations = [];
+        formData.visible_mold_details.forEach(entry => {
+          if (entry.images && Array.isArray(entry.images)) {
+            mold_images.push(...entry.images);
+          }
+          if (entry.location) {
+            mold_locations.push(entry.location);
+          }
+        });
+        submissionData.mold_images = mold_images;
+        submissionData.mold_locations = mold_locations;
+      }
+
+      // Extract water_damage_images and water_damage_locations from water_damage_details
+      if (formData.water_damage_details && Array.isArray(formData.water_damage_details)) {
+        const water_damage_images = [];
+        const water_damage_locations = [];
+        formData.water_damage_details.forEach(entry => {
+          if (entry.images && Array.isArray(entry.images)) {
+            water_damage_images.push(...entry.images);
+          }
+          if (entry.location) {
+            water_damage_locations.push(entry.location);
+          }
+        });
+        submissionData.water_damage_images = water_damage_images;
+        submissionData.water_damage_locations = water_damage_locations;
+      }
+
       // Convert temperature and humidity to numbers if they exist
       if (formData.temperature !== "") {
         submissionData.temperature = parseFloat(formData.temperature);

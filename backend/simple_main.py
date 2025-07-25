@@ -782,14 +782,32 @@ def create_inspection():
         
         # Handle image fields using correct database column names
         if 'visible_mold_details' in data and data['visible_mold_details']:
-            # Map visible_mold_details to mold_locations (which stores the array with images)
-            inspection_data['mold_locations'] = json.dumps(data['visible_mold_details'])
-            print(f"🔍 DEBUG: Serializing visible_mold_details to mold_locations: {len(data['visible_mold_details'])} entries")
+            # Extract only images and locations from visible_mold_details
+            mold_images = []
+            mold_locations = []
+            for entry in data['visible_mold_details']:
+                # Each entry is expected to be a dict with 'images' and 'location'
+                if 'images' in entry and isinstance(entry['images'], list):
+                    mold_images.extend(entry['images'])
+                if 'location' in entry:
+                    mold_locations.append(entry['location'])
+            inspection_data['mold_images'] = json.dumps(mold_images)
+            inspection_data['mold_locations'] = json.dumps(mold_locations)
+            print(f"🔍 DEBUG: Serializing mold_images: {len(mold_images)} images, mold_locations: {len(mold_locations)} locations")
         
         if 'water_damage_details' in data and data['water_damage_details']:
-            # Map water_damage_details to water_damage_locations
-            inspection_data['water_damage_locations'] = json.dumps(data['water_damage_details'])
-            print(f"🔍 DEBUG: Serializing water_damage_details to water_damage_locations: {len(data['water_damage_details'])} entries")
+            # Extract only images and locations from water_damage_details
+            water_damage_images = []
+            water_damage_locations = []
+            for entry in data['water_damage_details']:
+                # Each entry is expected to be a dict with 'images' and 'location'
+                if 'images' in entry and isinstance(entry['images'], list):
+                    water_damage_images.extend(entry['images'])
+                if 'location' in entry:
+                    water_damage_locations.append(entry['location'])
+            inspection_data['water_damage_images'] = json.dumps(water_damage_images)
+            inspection_data['water_damage_locations'] = json.dumps(water_damage_locations)
+            print(f"🔍 DEBUG: Serializing water_damage_images: {len(water_damage_images)} images, water_damage_locations: {len(water_damage_locations)} locations")
         
         # Handle individual image fields
         if 'thermostat_image' in data and data['thermostat_image']:
