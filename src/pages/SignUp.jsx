@@ -63,7 +63,7 @@ export default function SignUp() {
             <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center mb-4">
               <img 
                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                alt="Mold Testing Houston Logo" 
+                alt="Total Testing Logo" 
                 className="w-8 h-8 object-contain"
               />
             </div>
@@ -71,7 +71,7 @@ export default function SignUp() {
               Create Account
             </CardTitle>
             <CardDescription className="text-slate-600">
-              Join Mold Testing Houston to start your mold inspection journey
+              Join Total Testing to start your mold inspection journey
             </CardDescription>
           </CardHeader>
           

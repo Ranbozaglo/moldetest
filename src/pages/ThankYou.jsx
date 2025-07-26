@@ -34,7 +34,7 @@ export default function ThankYou() {
   }, [currentUser]);
 
   const getDisplayNumber = (inspection) => {
-    return inspection?.inspection_number ? `MTH #${inspection.inspection_number}` : `MTH #${inspection?.id}`;
+    return inspection?.inspection_number ? `TT #${inspection.inspection_number}` : `TT #${inspection?.id}`;
   };
 
   if (loading) {
@@ -146,7 +146,7 @@ export default function ThankYou() {
 
         <div className="text-center mt-8">
           <p className="text-slate-500 text-sm">
-            Need help? Contact Mold Testing Houston support for assistance.
+            Need help? Contact Total Testing support for assistance.
           </p>
         </div>
       </motion.div>

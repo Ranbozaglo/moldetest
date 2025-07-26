@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { MoldInspection } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,16 +53,47 @@ export default function SignIn() {
             window.location.href = '/AdminDashboard';
           }
         } else {
-          console.log('🔍 PROD DEBUG: SignIn - Redirecting regular user to Inspection');
-          console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
+          // Check if user has existing inspections
           try {
-            navigate('/Inspection', { replace: true });
-            console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
-          } catch (navError) {
-            console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
-            // Fallback navigation
-            console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
-            window.location.href = '/Inspection';
+            console.log('🔍 DEBUG: Checking for existing inspections for user:', result.user.email);
+            const existingInspections = await MoldInspection.list("-created_at", 10, false);
+            
+            if (existingInspections && existingInspections.length > 0) {
+              console.log('🔍 DEBUG: User has existing inspections, redirecting to MyInspections');
+              console.log('🔍 PROD DEBUG: SignIn - Redirecting user with existing inspections to MyInspections');
+              console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
+              try {
+                navigate('/MyInspections', { replace: true });
+                console.log('🔍 PROD DEBUG: SignIn - Navigate to MyInspections called successfully');
+              } catch (navError) {
+                console.error('🔍 PROD DEBUG: SignIn - Navigation error to MyInspections:', navError);
+                // Fallback navigation
+                console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
+                window.location.href = '/MyInspections';
+              }
+            } else {
+              console.log('🔍 DEBUG: User has no existing inspections, redirecting to Inspection');
+              console.log('🔍 PROD DEBUG: SignIn - Redirecting new user to Inspection');
+              console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
+              try {
+                navigate('/Inspection', { replace: true });
+                console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
+              } catch (navError) {
+                console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
+                // Fallback navigation
+                console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
+                window.location.href = '/Inspection';
+              }
+            }
+          } catch (inspectionError) {
+            console.error('🔍 DEBUG: Error checking existing inspections:', inspectionError);
+            // If we can't check inspections, default to Inspection page
+            console.log('🔍 PROD DEBUG: SignIn - Error checking inspections, defaulting to Inspection');
+            try {
+              navigate('/Inspection', { replace: true });
+            } catch (navError) {
+              window.location.href = '/Inspection';
+            }
           }
         }
       } else {
@@ -89,15 +121,15 @@ export default function SignIn() {
             <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-900 rounded-full flex items-center justify-center mb-4">
               <img 
                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                alt="Mold Testing Houston Logo" 
+                alt="Total Testing Logo" 
                 className="w-8 h-8 object-contain"
               />
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900">
-              Welcome Back
+              Welcome
             </CardTitle>
             <CardDescription className="text-slate-600">
-              Sign in to your Mold Testing Houston account
+              Sign in to your Total Testing account
             </CardDescription>
           </CardHeader>
           

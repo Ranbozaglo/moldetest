@@ -76,7 +76,7 @@ export default function AdminDashboard() {
 
   const loadInspections = async () => {
     try {
-      const allInspections = await MoldInspection.list('-created_at', 1000); // Load more inspections
+      const allInspections = await MoldInspection.list('-created_at', 50, false); // Use lightweight endpoint for better performance
       
       // Check if allInspections is an array
       if (!Array.isArray(allInspections)) {
@@ -84,46 +84,8 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Parse JSON fields for each inspection (same logic as InspectionDetails)
-      const parsedInspections = allInspections.map(inspection => {
-        // Ensure lab_analysis_images is always an array (handle both lab_analysis_images and mold_images columns)
-        let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
-        
-        if (labImagesField && typeof labImagesField === 'string') {
-          try {
-            inspection.lab_analysis_images = JSON.parse(labImagesField);
-          } catch (parseError) {
-            inspection.lab_analysis_images = [];
-          }
-        } else if (Array.isArray(labImagesField)) {
-          inspection.lab_analysis_images = labImagesField;
-        } else {
-          // Only default to empty array if truly no data exists
-          inspection.lab_analysis_images = [];
-        }
-        
-        // Parse visible_mold_details if it's a string
-        if (inspection.visible_mold_details && typeof inspection.visible_mold_details === 'string') {
-          try {
-            inspection.visible_mold_details = JSON.parse(inspection.visible_mold_details);
-          } catch (parseError) {
-            inspection.visible_mold_details = [];
-          }
-        }
-        
-        // Parse water_damage_details if it's a string
-        if (inspection.water_damage_details && typeof inspection.water_damage_details === 'string') {
-          try {
-            inspection.water_damage_details = JSON.parse(inspection.water_damage_details);
-          } catch (parseError) {
-            inspection.water_damage_details = [];
-          }
-        }
-        
-        return inspection;
-      });
-      
-      setInspections(parsedInspections);
+      // For lightweight data, we don't need to parse heavy fields
+      setInspections(allInspections);
       setSelectedInspections(new Set());
     } catch (error) {
       console.error("Error loading inspections:", error);
@@ -165,7 +127,7 @@ export default function AdminDashboard() {
   
   const getDisplayNumber = (inspection) => {
     const number = inspection.inspection_number || inspection.id;
-    return `MTH #${number}`;
+    return `TT #${number}`;
   };
 
   // Calculate dashboard statistics
@@ -318,7 +280,7 @@ export default function AdminDashboard() {
   const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
-    const disclaimerText = "The Mold Testing Houston DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Mold Testing Houston, LLC is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
+    const disclaimerText = "The Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
     const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
 
     const css = `
@@ -397,6 +359,9 @@ export default function AdminDashboard() {
     console.log("🔍 DEBUG: Admin report generation - inspection.visible_mold_details:", inspection.visible_mold_details);
     console.log("🔍 DEBUG: Admin report generation - inspection.water_damage_details:", inspection.water_damage_details);
     console.log("🔍 DEBUG: Admin report generation - inspection.thermostat_image:", inspection.thermostat_image);
+    console.log("🔍 DEBUG: Admin report generation - inspection.lab_conclusion:", inspection.lab_conclusion);
+    console.log("🔍 DEBUG: Admin report generation - inspection.lab_recommendations:", inspection.lab_recommendations);
+    console.log("🔍 DEBUG: Admin report generation - inspection.lab_analysis_images:", inspection.lab_analysis_images);
     
     const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
       ? `<div style="margin-bottom: 20px;">
@@ -626,12 +591,11 @@ export default function AdminDashboard() {
     <body>
         <div class="cover-page">
             <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="MTH Logo" class="cover-image" />            <div class="cover-details">
+<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="TT Logo" class="cover-image" />            <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
             </div>
-            <p style="margin-top: 50px; font-size: 16px; color: #555;">Mold Testing Houston, LLC</p>
         </div>
         <div class="page-break"></div>
 
@@ -696,8 +660,7 @@ export default function AdminDashboard() {
             </div>
 
             <div class="footer">
-                <p>Mold Testing Houston, LLC</p>
-                <p>Report generated on ${format(new Date(), "MMMM d, yyyy")}</p>
+                <p>Powered by Total Testing</p>
             </div>
         </div>
     </body>
@@ -706,46 +669,32 @@ export default function AdminDashboard() {
   };
 
   const downloadPDF = async (inspection) => {
-    // This is now the "Download Report" button logic
-    if (inspection.report_html_url) {
-      setDownloadStatus({ type: 'info', message: `Preparing download...` });
-      try {
-        const displayNum = getDisplayNumber(inspection);
-        const fileName = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
-
-        const response = await fetch(inspection.report_html_url);
-        if (!response.ok) throw new Error('Failed to fetch report file.');
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        setDownloadStatus({ type: 'success', message: 'Report downloaded.' });
-        setTimeout(() => setDownloadStatus(null), 3000);
-        return; // Important to stop execution here
-      } catch (error) {
-        setDownloadStatus({ type: 'error', message: 'Download failed. Trying to generate a new report...' });
-        // Fall through to generate a new one if download fails
-      }
-    }
-
-    // Fallback for older reports without a pre-generated URL or if download failed
+    // Always generate a fresh report to ensure latest lab analysis is included
     setDownloadStatus({ type: 'info', message: `Generating report for ${getDisplayNumber(inspection)}...` });
     try {
       if (!inspection) {
         throw new Error("Could not find inspection details.");
       }
       
+      // Fetch detailed inspection data to ensure we have the latest lab analysis
+      let detailedInspection = inspection;
+      console.log("🔍 DEBUG: Fetching detailed inspection data for report generation");
+      try {
+        detailedInspection = await MoldInspection.getDetailed(inspection.id);
+        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+        console.log("🔍 DEBUG: Lab conclusion:", detailedInspection.lab_conclusion);
+        console.log("🔍 DEBUG: Lab recommendations:", detailedInspection.lab_recommendations);
+        console.log("🔍 DEBUG: Lab analysis images:", detailedInspection.lab_analysis_images);
+      } catch (detailError) {
+        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+        // Continue with current data if detailed fetch fails
+      }
+      
       const samples = await Sample.findMany({ inspection_id: inspection.id });
       
       const displayNum = getDisplayNumber(inspection);
       
-      const reportHtml = await generateReportHtmlContent(inspection, samples);
+      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
       
       const blob = new Blob([reportHtml], { type: 'text/html' });
       const url = window.URL.createObjectURL(blob);
@@ -983,7 +932,7 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
               <img 
                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                alt="Mold Testing Houston Logo" 
+                  alt="Total Testing Logo" 
                 className="w-8 h-8 object-contain"
               />
               Admin Dashboard
@@ -1044,31 +993,7 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">With Visible Mold</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.withMold}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {stats.total > 0 ? `${((stats.withMold / stats.total) * 100).toFixed(1)}%` : '0%'} of total
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">With Water Damage</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.withWaterDamage}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {stats.total > 0 ? `${((stats.withWaterDamage / stats.total) * 100).toFixed(1)}%` : '0%'} of total
-                  </p>
-                </CardContent>
-              </Card>
+        
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1205,68 +1130,8 @@ export default function AdminDashboard() {
                     </Select>
                   </div>
                   
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Property Type</label>
-                    <Select value={propertyTypeFilter} onValueChange={setPropertyTypeFilter}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Property type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="house">House</SelectItem>
-                        <SelectItem value="apartment">Apartment</SelectItem>
-                        <SelectItem value="condo">Condo</SelectItem>
-                        <SelectItem value="office">Office</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Client Type</label>
-                    <Select value={clientTypeFilter} onValueChange={setClientTypeFilter}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Client type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="individual">Individual</SelectItem>
-                        <SelectItem value="real_estate">Real Estate</SelectItem>
-                        <SelectItem value="property_management">Property Management</SelectItem>
-                        <SelectItem value="home_inspector">Home Inspector</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Visible Mold</label>
-                    <Select value={moldFilter} onValueChange={setMoldFilter}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Mold status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="yes">Yes</SelectItem>
-                        <SelectItem value="no">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Water Damage</label>
-                    <Select value={waterDamageFilter} onValueChange={setWaterDamageFilter}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Water damage" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        <SelectItem value="yes">Yes</SelectItem>
-                        <SelectItem value="no">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
+
               </CardContent>
             </Card>
 
@@ -1318,10 +1183,6 @@ export default function AdminDashboard() {
                         <TableHead>Client</TableHead>
                         <TableHead>Property</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Mold</TableHead>
-                        <TableHead>Water Damage</TableHead>
-                        <TableHead>Lab Analysis</TableHead>
-                        <TableHead>Sample</TableHead>
                         <TableHead>Created</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -1386,45 +1247,9 @@ export default function AdminDashboard() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            {inspection.has_visible_mold ? (
-                              <Badge variant="destructive">Yes</Badge>
-                            ) : (
-                              <Badge variant="outline">No</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {inspection.has_water_damage ? (
-                              <Badge variant="destructive">Yes</Badge>
-                            ) : (
-                              <Badge variant="outline">No</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? (
-                                <div className="flex items-center gap-1">
-                                  <FlaskConical className="w-4 h-4 text-blue-500" />
-                                  <Badge variant="default" className="text-xs">
-                                    {inspection.lab_analysis_images.length} image{inspection.lab_analysis_images.length > 1 ? 's' : ''}
-                                  </Badge>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1">
-                                  <FlaskConical className="w-4 h-4 text-gray-300" />
-                                  <Badge variant="outline" className="text-xs">None</Badge>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {inspection.is_sample ? (
-                              <Badge variant="default">Yes</Badge>
-                            ) : (
-                              <Badge variant="outline">No</Badge>
-                            )}
-                          </TableCell>
+                          </TableCell>                       
+             
+                    
                           <TableCell>
                             <div className="text-sm">
                               {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
@@ -1464,12 +1289,19 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem 
                                   onClick={async () => {
                                     try {
+                                      // Fetch the latest detailed inspection data
+                                      const detailedInspection = await MoldInspection.getDetailed(inspection.id);
+                                      console.log("🔍 DEBUG: View Report - Fetched detailed inspection:", detailedInspection);
+                                      console.log("🔍 DEBUG: View Report - Lab conclusion:", detailedInspection.lab_conclusion);
+                                      console.log("🔍 DEBUG: View Report - Lab recommendations:", detailedInspection.lab_recommendations);
+                                      
                                       const samples = await Sample.findMany({ inspection_id: inspection.id });
-                                      const reportHtml = await generateReportHtmlContent(inspection, samples);
+                                      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
                                       const newWindow = window.open('', '_blank');
                                       newWindow.document.write(reportHtml);
                                       newWindow.document.close();
                                     } catch (error) {
+                                      console.error("❌ Error viewing report:", error);
                                       alert("Failed to generate report. Please try again.");
                                     }
                                   }}

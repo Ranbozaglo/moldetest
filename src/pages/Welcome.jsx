@@ -54,7 +54,7 @@ export default function Welcome() {
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-medium mb-8">
               <img 
                 src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                alt="Mold Testing Houston Logo" 
+                alt="Total Testing Logo" 
                 className="w-4 h-4 object-contain"
               />
               Total Testing - Your Mold Experts!

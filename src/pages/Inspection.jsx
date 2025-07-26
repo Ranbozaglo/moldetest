@@ -25,6 +25,7 @@ import MoldDetectionStep from "../components/inspection/MoldDetectionStep";
 import WaterDamageStep from "../components/inspection/WaterDamageStep";
 import ThermostatStep from "../components/inspection/ThermostatStep";
 import ReviewStep from "../components/inspection/ReviewStep";
+import SamplingGuide from "./SamplingGuide";
 
 const steps = [
   { id: 1, title: "Personal Information", component: PersonalInfoStep },
@@ -32,8 +33,7 @@ const steps = [
   { id: 3, title: "Mold Detection", component: MoldDetectionStep },
   { id: 4, title: "Water Damage Assessment", component: WaterDamageStep },
   { id: 5, title: "Environmental Conditions", component: ThermostatStep },
-  { id: 6, title: "Review & Submit", component: ReviewStep },
-  { id: 7, title: "Sample Collection", component: null }
+  { id: 6, title: "Review & Submit", component: ReviewStep }
 ];
 
 export default function Inspection() {
@@ -72,6 +72,7 @@ export default function Inspection() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [newInspection, setNewInspection] = useState(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   useEffect(() => {
     const checkUserAndPreloadData = async () => {
@@ -281,8 +282,8 @@ export default function Inspection() {
           }
           
           console.log("🔍 DEBUG: Set newInspection state to:", newInspection);
-          // Move to the next step (step 7) instead of navigating directly
-          setCurrentStep(7);
+          // Set isSubmitted to true on successful submission
+          setIsSubmitted(true);
       } else {
           // This case handles if creation fails to return a valid object with an ID
           console.error("🔍 DEBUG: Invalid inspection response:", newInspection);
@@ -373,7 +374,7 @@ export default function Inspection() {
             {steps[currentStep - 1].title}
           </h2>
           
-          {CurrentStepComponent ? (
+          {!isSubmitted && CurrentStepComponent ? (
             <CurrentStepComponent
               formData={formData}
               updateFormData={updateFormData}

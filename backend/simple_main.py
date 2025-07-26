@@ -20,6 +20,7 @@ import tempfile
 import requests
 from urllib.parse import urlparse
 import pathlib
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # OCR and AI imports
 try:
@@ -510,7 +511,7 @@ def home():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login endpoint"""
+    """User login endpoint - now checks password securely"""
     print(f"🔍 DEBUG: Login request received")
     data = request.get_json()
     print(f"🔍 DEBUG: Request data: {data}")
@@ -532,9 +533,11 @@ def login():
         print(f"🔍 DEBUG: User found: {user}")
         
         if user:
-            # For demo purposes, accept any password
-            # In production, you would verify the password against auth.users table
-            
+            # Check password hash
+            password_hash = user.get('password_hash')
+            if not password_hash or not check_password_hash(password_hash, password):
+                print(f"🔍 DEBUG: Invalid password for user {email}")
+                return jsonify({"error": "Invalid credentials"}), 401
             # Generate simple token (in production, use JWT)
             token = secrets.token_urlsafe(32)
             response_data = {
@@ -544,7 +547,8 @@ def login():
                     "id": user['id'],
                     "email": user['email'],
                     "full_name": user.get('full_name', ''),
-                    "is_admin": user.get('role') == 'admin'
+                    "is_admin": user.get('role') == 'admin',
+                    "role": user.get('role', 'user')
                 }
             }
             print(f"🔍 DEBUG: Returning success response: {response_data}")
@@ -586,7 +590,7 @@ def validate_token():
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """User registration endpoint"""
+    """User registration endpoint - now stores password hash"""
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -600,12 +604,15 @@ def register():
         if existing_user.data:
             return jsonify({"error": "Email already exists"}), 400
         
+        # Hash the password
+        password_hash = generate_password_hash(password)
         # Insert new user in user_profiles table
         result = supabase.table('user_profiles').insert({
             'id': str(uuid.uuid4()),
             'email': email,
             'full_name': email.split('@')[0],  # Use email prefix as name
-            'role': 'user'
+            'role': 'user',
+            'password_hash': password_hash
         }).execute()
         
         user_id = result.data[0]['id'] if result.data else None
@@ -620,21 +627,35 @@ def register():
 
 @app.route('/api/inspection', methods=['GET'])
 def get_inspections():
-    """Get all inspections with complete data"""
+    """Get lightweight inspection list - optimized for performance"""
     try:
         # Get query parameters
         sort_by = request.args.get('sort', '-created_at')
-        limit = request.args.get('limit', 10)
+        limit = int(request.args.get('limit', 10))  # Default to 10, max 50
         email = request.args.get('email')
+        detailed = request.args.get('detailed', 'false').lower() == 'true'
+        
+        # Limit the maximum number of inspections to prevent performance issues
+        if limit > 50:
+            limit = 50
         
         # Check if user is admin
         is_admin = email == 'rotemiluz53@gmail.com'
         
-        print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
+        print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}, detailed={detailed}")
         
-        # Build the query - explicitly select ALL fields including lab_analysis_images and mold_images
-        # Using * should include all columns, but let's be explicit about the image fields we need
-        query = supabase.table('inspection').select('*')
+        # Build the query - select only lightweight fields by default
+        if detailed:
+            # For detailed view, include all fields (used for individual inspection views)
+            query = supabase.table('inspection').select('*')
+        else:
+            # For list view, select only essential lightweight fields
+            query = supabase.table('inspection').select(
+                'id,created_at,created_date,updated_date,created_by_id,'
+                'full_name,email,client_type,street_address,city,state,zip_code,'
+                'property_type,square_footage,has_visible_mold,has_water_damage,'
+                'status,is_sample,inspection_number'
+            )
         
         # Apply sorting - handle different sort fields
         if sort_by:
@@ -649,34 +670,25 @@ def get_inspections():
             else:
                 query = query.order(sort_by)
         
-        # Apply limit only for non-admin users
-        if limit and not is_admin:
-            query = query.limit(int(limit))
+        # Apply limit
+        query = query.limit(limit)
 
         print(f"🔍 DEBUG: Executing query...")
         result = query.execute()
         inspections = result.data
         print(f"🔍 DEBUG: Found {len(inspections)} inspections")
         
-        # Debug the first inspection to see what fields are available
-        if inspections and len(inspections) > 0:
-            first_inspection = inspections[0]
-            print(f"🔍 DEBUG: First inspection available fields: {list(first_inspection.keys())}")
-            print(f"🔍 DEBUG: First inspection lab_analysis_images: {first_inspection.get('lab_analysis_images')}")
-            print(f"🔍 DEBUG: First inspection mold_images: {first_inspection.get('mold_images')}")
-
-        # Filter by email if provided
-        if email:
+        # Filter by email if provided (for non-admin users)
+        if email and not is_admin:
             inspections = [i for i in inspections if i.get('email') == email]
 
-        # Convert to expected format with ALL available fields
+        # Convert to expected format
         result_list = []
         for inspection in inspections:
-            print(f"🔍 DEBUG: Processing inspection {inspection.get('id')} - lab_analysis_images: {inspection.get('lab_analysis_images')}, mold_images: {inspection.get('mold_images')}")
-            result_list.append({
+            inspection_data = {
                 # Basic identification
                 "id": inspection['id'],
-                "inspection_number": inspection.get('id'),
+                "inspection_number": inspection.get('inspection_number') or inspection.get('id'),
                 "created_at": inspection['created_at'],
                 "created_date": inspection.get('created_date'),
                 "updated_date": inspection.get('updated_date'),
@@ -695,22 +707,6 @@ def get_inspections():
                 "property_type": inspection.get('property_type'),
                 "square_footage": inspection.get('square_footage'),
                 
-                # Mold assessment
-                "has_visible_mold": inspection.get('has_visible_mold'),
-                "mold_locations": inspection.get('mold_locations'),
-                "mold_images": inspection.get('mold_images'),
-                
-                # Water damage assessment
-                "has_water_damage": inspection.get('has_water_damage'),
-                "water_damage_locations": inspection.get('water_damage_locations'),
-                "water_damage_images": inspection.get('water_damage_images'),
-                
-                # Environmental data
-                "thermostat_image": inspection.get('thermostat_image'),
-                
-                # Lab analysis data (ensure both column names are handled)
-                "lab_analysis_images": inspection.get('lab_analysis_images') or inspection.get('mold_images'),
-                
                 # Status and metadata
                 "status": inspection.get('status', 'pending'),
                 "is_sample": inspection.get('is_sample'),
@@ -721,16 +717,31 @@ def get_inspections():
                 "inspection_date": inspection.get('created_date'),
                 "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
                 "user_email": inspection.get('email'),
-                # Lab analysis fields
-                "lab_conclusion": inspection.get('lab_conclusion'),
-                "lab_recommendations": inspection.get('lab_recommendations'),
-            })
+            }
             
-            # Log what we're returning for this inspection
-            final_lab_images = result_list[-1]['lab_analysis_images']
-            print(f"🔍 DEBUG: Returning for inspection {inspection.get('id')} - final lab_analysis_images: {final_lab_images}")
+            # Only include heavy fields if detailed view is requested
+            if detailed:
+                inspection_data.update({
+                    # Mold assessment
+                    "mold_locations": inspection.get('mold_locations'),
+                    "mold_images": inspection.get('mold_images'),
+                    
+                    # Water damage assessment
+                    "water_damage_locations": inspection.get('water_damage_locations'),
+                    "water_damage_images": inspection.get('water_damage_images'),
+                    
+                    # Environmental data
+                    "thermostat_image": inspection.get('thermostat_image'),
+                    
+                    # Lab analysis data
+                    "lab_analysis_images": inspection.get('lab_analysis_images') or inspection.get('mold_images'),
+                    "lab_conclusion": inspection.get('lab_conclusion'),
+                    "lab_recommendations": inspection.get('lab_recommendations'),
+                })
+            
+            result_list.append(inspection_data)
         
-        print(f"🔍 DEBUG: Returning {len(result_list)} inspections with complete data")
+        print(f"🔍 DEBUG: Returning {len(result_list)} inspections (detailed={detailed})")
         return jsonify(result_list)
             
     except Exception as e:
@@ -1730,6 +1741,74 @@ def reset_email_template(template_type):
         print(f"❌ Error resetting email template: {e}")
         return jsonify({"error": "Failed to reset email template", "details": str(e)}), 500
 
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    """General file upload endpoint for report files and other documents."""
+    try:
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({"error": "No file uploaded"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        
+        # Generate unique filename to prevent conflicts
+        unique_filename = f"{uuid.uuid4()}_{filename}"
+        
+        # Create uploads directory if it doesn't exist
+        upload_dir = 'uploads'
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Save uploaded file
+        filepath = os.path.join(upload_dir, unique_filename)
+        file.save(filepath)
+        
+        print(f"🔍 DEBUG: File uploaded: {filepath}")
+        
+        # Upload to Supabase storage for public access
+        try:
+            # Determine bucket based on file type
+            bucket_name = "mold-images"  # Default bucket
+            
+            # Upload to Supabase
+            upload_result = supabase.storage.from_(bucket_name).upload(
+                f"reports/{unique_filename}",
+                open(filepath, 'rb').read(),
+                {"content-type": file.content_type}
+            )
+            
+            if hasattr(upload_result, 'error') and upload_result.error:
+                raise Exception(f"Supabase upload error: {upload_result.error}")
+            
+            # Get public URL
+            public_url = supabase.storage.from_(bucket_name).get_public_url(f"reports/{unique_filename}")
+            
+            # Clean up local file
+            os.remove(filepath)
+            
+            print(f"✅ File uploaded successfully to Supabase: {public_url}")
+            
+            return jsonify({
+                "message": "File uploaded successfully",
+                "url": public_url,
+                "filename": unique_filename
+            })
+            
+        except Exception as upload_error:
+            print(f"❌ Error uploading to Supabase: {upload_error}")
+            # Clean up local file if it exists
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            raise upload_error
+            
+    except Exception as e:
+        print(f"❌ Error in file upload: {e}")
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
 # --- PATCH: Dynamic Google Vision credentials from env ---
 CRED_FILENAME = 'gcloud-key.json'
 cred_path = os.path.join(os.path.dirname(__file__), CRED_FILENAME)
@@ -1808,6 +1887,7 @@ if __name__ == '__main__':
     print("   - GET  /api/email-templates/<template_type>")
     print("   - PUT  /api/email-templates/<template_type>")
     print("   - POST /api/email-templates/<template_type>/reset")
+    print("   - POST /api/upload")
     print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
     print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision & OpenAI READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")
     
