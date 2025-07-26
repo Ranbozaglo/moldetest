@@ -49,11 +49,12 @@ const convertToWebP = async (file) => {
 };
 
 export const Core = {
-  InvokeLLM: async (prompt) => {
+  InvokeLLM: async (prompt, imageUrls = [], inspectionId = null) => {
     console.log('🚀 CORE API: InvokeLLM called!');
     console.log('🔍 DEBUG: Prompt length:', prompt?.length || 0);
     console.log('🔍 DEBUG: Prompt start:', prompt?.substring(0, 200));
     console.log('🔍 DEBUG: Prompt end:', prompt?.substring(prompt.length - 200));
+    console.log('🔍 DEBUG: Inspection ID:', inspectionId);
   
     
     try {
@@ -79,8 +80,11 @@ export const Core = {
       console.log('🔍 DEBUG: Base API URL:', baseApiUrl);
       
       // Send the extracted text under the correct field
-      const requestData = { extracted_text: prompt };
-      console.log('📦 CORE API: Preparing JSON extracted_text payload...');
+      const requestData = { 
+        extracted_text: prompt,
+        inspection_id: inspectionId
+      };
+      console.log('📦 CORE API: Preparing JSON payload with inspection_id:', inspectionId);
       console.log('🔍 DEBUG: extracted_text payload length:', prompt.length);
       console.log('🔍 DEBUG: extracted_text payload end:', prompt.substring(prompt.length - 200));
        

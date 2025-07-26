@@ -392,7 +392,7 @@ export default function MyInspections() {
               });
           }
           
-          if (inspection.humidity && parseFloat(inspection.humidity) > 60) {
+          if (detailedInspection.humidity && parseFloat(detailedInspection.humidity) > 60) {
               recommendations.push({
                   priority: 'medium',
                   icon: '🟡',

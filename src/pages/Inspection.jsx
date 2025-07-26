@@ -24,6 +24,7 @@ import PropertyInfoStep from "../components/inspection/PropertyInfoStep";
 import MoldDetectionStep from "../components/inspection/MoldDetectionStep";
 import WaterDamageStep from "../components/inspection/WaterDamageStep";
 import ThermostatStep from "../components/inspection/ThermostatStep";
+import SamplingGuideStep from "../components/inspection/SamplingGuideStep";
 import ReviewStep from "../components/inspection/ReviewStep";
 import SamplingGuide from "./SamplingGuide";
 
@@ -33,7 +34,8 @@ const steps = [
   { id: 3, title: "Mold Detection", component: MoldDetectionStep },
   { id: 4, title: "Water Damage Assessment", component: WaterDamageStep },
   { id: 5, title: "Environmental Conditions", component: ThermostatStep },
-  { id: 6, title: "Review & Submit", component: ReviewStep }
+  { id: 6, title: "Sampling Guide", component: SamplingGuideStep },
+  { id: 7, title: "Review & Submit", component: ReviewStep }
 ];
 
 export default function Inspection() {
@@ -389,30 +391,19 @@ export default function Inspection() {
           ) : (
             <div className="text-center py-10">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">Report Created!</h3>
-              <p className="text-slate-600 text-lg">
+              <h3 className="text-2xl font-bold text-slate-800 mb-2">Inspection Complete!</h3>
+              <p className="text-slate-600 text-lg">  
                 Your inspection details have been submitted successfully.
               </p>
-              <p className="text-slate-600 text-lg mt-1">
-                Please proceed to the Sample Collection guide.
-              </p>
+             
               <Button 
                 onClick={() => {
-                  console.log("🔍 DEBUG: Button clicked, newInspection state:", newInspection);
-                  console.log("🔍 DEBUG: newInspection?.id:", newInspection?.id);
-                  if (newInspection?.id) {
-                    console.log("🔍 DEBUG: Navigating to SamplingGuide with ID:", newInspection.id);
-                    // Use consistent parameter name (lowercase for better compatibility)
-                    navigate(createPageUrl(`SamplingGuide?inspectionid=${newInspection.id}`));
-                  } else {
-                    console.error("🔍 DEBUG: No inspection ID available for navigation");
-                    alert("Error: Inspection ID not found. Please try submitting the inspection again.");
-                  }
+                  console.log("🔍 DEBUG: Navigating to MyInspections page");
+                  navigate(createPageUrl("MyInspections"));
                 }} 
-                disabled={!newInspection?.id} 
                 className="mt-6 px-8 py-3 text-lg"
               >
-                Go to Sampling Guide
+                View My Inspections
               </Button>
             </div>
           )}

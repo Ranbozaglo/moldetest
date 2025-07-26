@@ -161,23 +161,71 @@ class SimpleOCRIntegration:
             logger.error(f"❌ Google Vision API call failed: {e}")
             return {"error": str(e), "extracted_text": ""}
     
-    def analyze_lab_results_with_gpt(self, extracted_text: str, image_urls: list):
-        """Analyze extracted lab text using GPT-4"""
+    def analyze_lab_results_with_gpt(self, extracted_text: str, image_urls: list, inspection_findings: dict = None):
+        """Analyze extracted lab text using GPT-4 with inspection findings context"""
         if not extracted_text.strip():
             raise Exception("No extracted text provided for analysis. Manual review required.")
+        
         try:
-            # Pass extracted_text directly as the prompt
+            # Build comprehensive prompt with inspection findings
+            prompt_parts = []
+            
+            # Add inspection findings if available
+            if inspection_findings:
+                findings_text = "INSPECTION FINDINGS:\n"
+                if inspection_findings.get('has_visible_mold'):
+                    findings_text += "- Visible mold detected during inspection\n"
+                if inspection_findings.get('has_water_damage'):
+                    findings_text += "- Water damage detected during inspection\n"
+                if inspection_findings.get('temperature'):
+                    findings_text += f"- Temperature: {inspection_findings['temperature']}°F\n"
+                if inspection_findings.get('humidity'):
+                    findings_text += f"- Humidity: {inspection_findings['humidity']}%\n"
+                if inspection_findings.get('mold_locations'):
+                    findings_text += f"- Mold locations: {inspection_findings['mold_locations']}\n"
+                if inspection_findings.get('water_damage_locations'):
+                    findings_text += f"- Water damage locations: {inspection_findings['water_damage_locations']}\n"
+                
+                prompt_parts.append(findings_text)
+            
+            # Add lab analysis text
+            prompt_parts.append(f"LAB ANALYSIS RESULTS:\n{extracted_text}")
+            
+            # Add instructions for GPT
+            prompt_parts.append("""
+TASK: Based on the inspection findings and lab analysis results above, provide a professional conclusion and recommendations.
+
+Please provide your response in the following JSON format:
+{
+  "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
+  "recommendations": "Detailed recommendations for the client based on all available information"
+}
+
+Focus on:
+1. Correlating lab results with inspection findings
+2. Specifically mentioning mold_locations and water_damage_locations in the conclusion
+3. Providing actionable recommendations
+4. Addressing any health or safety concerns
+5. Suggesting next steps for the client
+6. Always start the conclusion with "According to the lab report and the details provided,"
+7. When mold_locations or water_damage_locations are present, explicitly state them in the conclusion like: "The laboratory analysis report indicates the presence of mold on the wall swab taken from [mold_location] at the property."
+8. Use the exact location names from mold_locations and water_damage_locations arrays in your conclusion
+""")
+            
+            full_prompt = "\n\n".join(prompt_parts)
+            
+            # Pass the comprehensive prompt to GPT
             response = self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "user", "content": extracted_text}
+                    {"role": "user", "content": full_prompt}
                 ],
                 max_tokens=1500,
                 temperature=0.3
             )
             print(f"🔍 DEBUG: GPT-4 response: {response}")
             analysis_content = response.choices[0].message.content
-            logger.info("✅ GPT-4 lab analysis completed")
+            logger.info("✅ GPT-4 lab analysis completed with inspection findings")
             try:
                 import json
                 analysis_json = json.loads(analysis_content)
@@ -838,6 +886,20 @@ def create_inspection():
         if 'thermostat_image' in data and data['thermostat_image']:
             inspection_data['thermostat_image'] = data['thermostat_image']
             
+        # Handle environmental data fields
+        if 'temperature' in data and data['temperature'] is not None and data['temperature'] != '':
+            try:
+                inspection_data['temperature'] = float(data['temperature'])
+            except (ValueError, TypeError):
+                print(f"⚠️ WARNING: Invalid temperature value: {data['temperature']}, skipping")
+        if 'humidity' in data and data['humidity'] is not None and data['humidity'] != '':
+            try:
+                inspection_data['humidity'] = float(data['humidity'])
+            except (ValueError, TypeError):
+                print(f"⚠️ WARNING: Invalid humidity value: {data['humidity']}, skipping")
+        if 'environmental_data_method' in data:
+            inspection_data['environmental_data_method'] = data['environmental_data_method']
+            
         # Note: lab_analysis_images will be handled by the separate upload endpoint
         
         print(f"🔍 DEBUG: Final inspection data for insert:", inspection_data)
@@ -944,6 +1006,23 @@ def update_inspection(inspection_id):
         if 'thermostat_image' in data:
             update_data['thermostat_image'] = data['thermostat_image']
             print(f"🔍 DEBUG: Updating thermostat_image: {data['thermostat_image']}")
+        
+        # Handle environmental data fields
+        if 'temperature' in data and data['temperature'] is not None and data['temperature'] != '':
+            try:
+                update_data['temperature'] = float(data['temperature'])
+                print(f"🔍 DEBUG: Updating temperature: {data['temperature']}")
+            except (ValueError, TypeError):
+                print(f"⚠️ WARNING: Invalid temperature value: {data['temperature']}, skipping")
+        if 'humidity' in data and data['humidity'] is not None and data['humidity'] != '':
+            try:
+                update_data['humidity'] = float(data['humidity'])
+                print(f"🔍 DEBUG: Updating humidity: {data['humidity']}")
+            except (ValueError, TypeError):
+                print(f"⚠️ WARNING: Invalid humidity value: {data['humidity']}, skipping")
+        if 'environmental_data_method' in data:
+            update_data['environmental_data_method'] = data['environmental_data_method']
+            print(f"🔍 DEBUG: Updating environmental_data_method: {data['environmental_data_method']}")
         
         # Handle text fields (only if they exist in database schema)
         # NOTE: conclusion and recommendations columns don't exist in current database schema
@@ -1243,7 +1322,27 @@ def ocr_gpt():
         # Only use extracted_text for the GPT call. Ignore prompt and image_urls.
         if extracted_text and extracted_text.strip():
             try:
-                gpt_result = ocr_integration.analyze_lab_results_with_gpt(extracted_text, image_urls=None)
+                # Get inspection findings if inspection_id is provided
+                inspection_findings = None
+                if 'inspection_id' in request.get_json():
+                    inspection_id = request.get_json()['inspection_id']
+                    try:
+                        inspection_result = supabase.table('inspection').select('*').eq('id', inspection_id).execute()
+                        if inspection_result.data:
+                            inspection = inspection_result.data[0]
+                            inspection_findings = {
+                                'has_visible_mold': inspection.get('has_visible_mold'),
+                                'has_water_damage': inspection.get('has_water_damage'),
+                                'temperature': inspection.get('temperature'),
+                                'humidity': inspection.get('humidity'),
+                                'mold_locations': inspection.get('mold_locations'),
+                                'water_damage_locations': inspection.get('water_damage_locations')
+                            }
+                            print(f"🔍 DEBUG: Found inspection findings for GPT: {inspection_findings}")
+                    except Exception as e:
+                        print(f"⚠️ Could not fetch inspection findings: {e}")
+                
+                gpt_result = ocr_integration.analyze_lab_results_with_gpt(extracted_text, image_urls=None, inspection_findings=inspection_findings)
             except Exception as e:
                 print(f"❌ Error in analyze_lab_results_with_gpt: {str(e)}")
                 return jsonify({

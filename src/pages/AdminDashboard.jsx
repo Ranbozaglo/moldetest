@@ -356,27 +356,56 @@ export default function AdminDashboard() {
     };
 
     // Debug: Log inspection image data for report generation  
-    console.log("🔍 DEBUG: Admin report generation - inspection.visible_mold_details:", inspection.visible_mold_details);
-    console.log("🔍 DEBUG: Admin report generation - inspection.water_damage_details:", inspection.water_damage_details);
+    console.log("🔍 DEBUG: Admin report generation - inspection.mold_images:", inspection.mold_images);
+    console.log("🔍 DEBUG: Admin report generation - inspection.mold_locations:", inspection.mold_locations);
+    console.log("🔍 DEBUG: Admin report generation - inspection.water_damage_images:", inspection.water_damage_images);
+    console.log("🔍 DEBUG: Admin report generation - inspection.water_damage_locations:", inspection.water_damage_locations);
     console.log("🔍 DEBUG: Admin report generation - inspection.thermostat_image:", inspection.thermostat_image);
     console.log("🔍 DEBUG: Admin report generation - inspection.lab_conclusion:", inspection.lab_conclusion);
     console.log("🔍 DEBUG: Admin report generation - inspection.lab_recommendations:", inspection.lab_recommendations);
     console.log("🔍 DEBUG: Admin report generation - inspection.lab_analysis_images:", inspection.lab_analysis_images);
     
-    const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
+    // Parse JSON strings to arrays
+    let moldLocations = [];
+    let waterDamageLocations = [];
+    
+    try {
+      if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+        moldLocations = JSON.parse(inspection.mold_locations);
+      } else if (Array.isArray(inspection.mold_locations)) {
+        moldLocations = inspection.mold_locations;
+      }
+    } catch (e) {
+      console.error("❌ Error parsing mold_locations:", e);
+    }
+    
+    try {
+      if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
+        waterDamageLocations = JSON.parse(inspection.water_damage_locations);
+      } else if (Array.isArray(inspection.water_damage_locations)) {
+        waterDamageLocations = inspection.water_damage_locations;
+      }
+    } catch (e) {
+      console.error("❌ Error parsing water_damage_locations:", e);
+    }
+    
+    console.log("🔍 DEBUG: Parsed moldLocations:", moldLocations);
+    console.log("🔍 DEBUG: Parsed waterDamageLocations:", waterDamageLocations);
+    
+    const visibleMoldHtml = inspection.mold_images && inspection.mold_images.length > 0 && moldLocations.length > 0
       ? `<div style="margin-bottom: 20px;">
           <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
             ⚠️ Visible Mold Detected
           </h3>
-          ${inspection.visible_mold_details.map((d, i) => `
+          ${moldLocations.map((location, i) => `
             <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location || 'N/A'}</h4>
+                <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
                 ${createPriorityBadge('high', 'High Priority')}
               </div>
               <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
               <div style="text-align: center; margin: 15px 0;">
-                ${createImageList(d.images)}
+                ${createImageList(inspection.mold_images)}
               </div>
             </div>
           `).join('')}
@@ -388,20 +417,20 @@ export default function AdminDashboard() {
           <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
         </div>`;
 
-    const waterDamageHtml = inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0
+    const waterDamageHtml = inspection.water_damage_images && inspection.water_damage_images.length > 0 && waterDamageLocations.length > 0
       ? `<div style="margin-bottom: 20px;">
           <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
             💧 Water Damage Detected
           </h3>
-          ${inspection.water_damage_details.map((d, i) => `
+          ${waterDamageLocations.map((location, i) => `
             <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location || 'N/A'}</h4>
+                <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
                 ${createPriorityBadge('medium', 'Medium Priority')}
               </div>
               <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">💧 Water damage detected - may contribute to mold growth</p>
               <div style="text-align: center; margin: 15px 0;">
-                ${createImageList(d.images)}
+                ${createImageList(inspection.water_damage_images)}
               </div>
             </div>
           `).join('')}

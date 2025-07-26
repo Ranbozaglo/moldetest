@@ -172,18 +172,18 @@ export default function InspectionDetails() {
         console.log("  - lab_recommendations:", inspection.lab_recommendations || "EMPTY");
         console.log("  - lab_analysis_images:", inspection.lab_analysis_images || "EMPTY");
 
-        let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
-        
-        if (labImagesField && typeof labImagesField === 'string') {
+        // Parse lab_analysis_images if it's a string
+        if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
           try {
-            inspection.lab_analysis_images = JSON.parse(labImagesField);
+            inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
           } catch (parseError) {
+            console.error("❌ Error parsing lab_analysis_images JSON:", parseError);
             inspection.lab_analysis_images = [];
           }
-        } else if (Array.isArray(labImagesField)) {
-          inspection.lab_analysis_images = labImagesField;
+        } else if (Array.isArray(inspection.lab_analysis_images)) {
+          // Already an array, keep as is
         } else {
-          // Only default to empty array if truly no data exists
+          // No lab analysis images, set to empty array
           inspection.lab_analysis_images = [];
         }
         
@@ -465,6 +465,7 @@ export default function InspectionDetails() {
     setGeneratingAnalysis(true);
     try {
       console.log("🔍 DEBUG: Generating analysis for image:", imageUrl);
+    console.log("🔍 DEBUG: Inspection ID:", inspectionId);
       
       // Use the InvokeLLM function to analyze the image
       const analysisResult = await InvokeLLM({
@@ -476,7 +477,7 @@ export default function InspectionDetails() {
         
         Please provide a clear, professional analysis suitable for a mold inspection report.`,
         image_url: imageUrl
-      });
+      }, [], inspectionId); // Pass inspectionId as the third parameter
       
       console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
@@ -601,6 +602,7 @@ export default function InspectionDetails() {
           </h3>
           <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
         </div>`;
+        
 
     const waterDamageHtml = inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0
       ? `<div style="margin-bottom: 20px;">
@@ -802,7 +804,14 @@ export default function InspectionDetails() {
                       ? (inspection.lab_recommendations || inspection.recommendations)
                           .split('\n')
                           .filter(line => line.trim().length > 0)
-                          .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
+                          .map(line => {
+                            // Check if line is a section header (starts with * and ends with :)
+                            if (line.trim().startsWith('*') && line.trim().endsWith(':*')) {
+                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                            }
+                            // Regular line
+                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                          })
                           .join('')
                       : '<p>Pending recommendations.</p>'
                   }
@@ -990,29 +999,29 @@ export default function InspectionDetails() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              
               {/* Summary Overview */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
                 <div className="text-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                    inspection.has_visible_mold ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+                    inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
                   }`}>
                     <AlertTriangle className="w-6 h-6" />
                   </div>
                   <p className="text-sm font-medium text-slate-700">Visible Mold</p>
-                  <Badge variant={inspection.has_visible_mold ? "destructive" : "secondary"} className="mt-1">
-                    {inspection.has_visible_mold ? "Present" : "Not Detected"}
+                                    <Badge variant={inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0 ? "destructive" : "secondary"} className="mt-1">
+                    {inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0 ? "Present" : "Not Detected"}
                   </Badge>
                 </div>
-                
                 <div className="text-center">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                    inspection.has_water_damage ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+                    inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0 ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
                   }`}>
                     <Droplets className="w-6 h-6" />
                   </div>
                   <p className="text-sm font-medium text-slate-700">Water Damage</p>
-                  <Badge variant={inspection.has_water_damage ? "default" : "secondary"} className="mt-1">
-                    {inspection.has_water_damage ? "Present" : "Not Detected"}
+                  <Badge variant={inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0 ? "default" : "secondary"} className="mt-1">
+                    {inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0 ? "Present" : "Not Detected"}
                   </Badge>
                 </div>
                 
@@ -1028,6 +1037,69 @@ export default function InspectionDetails() {
                   </Badge>
                 </div>
               </div>
+
+              {/* Mold Images with Locations */}
+              {inspection.mold_images && inspection.mold_images.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Mold Images with Locations</Label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(() => {
+                      // Parse mold_locations similar to AdminDashboard
+                      let moldLocations = [];
+                      try {
+                        if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+                          moldLocations = JSON.parse(inspection.mold_locations);
+                        } else if (Array.isArray(inspection.mold_locations)) {
+                          moldLocations = inspection.mold_locations;
+                        }
+                      } catch (e) {
+                        console.error("❌ Error parsing mold_locations:", e);
+                      }
+                      
+                      return inspection.mold_images.map((image, index) => (
+                      <div key={index} className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                          <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                              <p className="font-semibold text-red-800">
+                                Location: {(() => {
+                                  try {
+                                    if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+                                      const parsed = JSON.parse(inspection.mold_locations);
+                                      return Array.isArray(parsed) ? parsed.join(', ') : parsed;
+                                    } else if (Array.isArray(inspection.mold_locations)) {
+                                      return inspection.mold_locations.join(', ');
+                                    } else {
+                                      return inspection.mold_locations || 'Unknown Location';
+                                    }
+                                  } catch (e) {
+                                    return inspection.mold_locations || 'Unknown Location';
+                                  }
+                                })()}
+                            </p>
+                          </div>
+                          <Badge variant="destructive" className="ml-2">High Priority</Badge>
+                        </div>
+                          <div className="relative group">
+                                <img
+                                  src={image}
+                              alt={`Mold image ${index + 1}`}
+                              className="w-full h-32 object-cover rounded border-2 border-red-300"
+                                />
+                                <div className="absolute inset-0 bg-red-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                                    Mold Evidence
+                                  </span>
+                                </div>
+                              </div>
+                          </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Environmental Conditions */}
               <div className="space-y-4">
@@ -1078,6 +1150,51 @@ export default function InspectionDetails() {
                   )}
                 </div>
               </div>
+
+
+
+              {/* Water Damage Images */}
+              {inspection.has_water_damage && inspection.water_damage_details && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="w-5 h-5 text-orange-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Water Damage Images</Label>
+                  </div>
+                  <div className="space-y-3">
+                    {inspection.water_damage_details.map((detail, index) => (
+                      <div key={index} className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="font-semibold text-orange-800">Location {index + 1}: {detail.location}</p>
+                            <p className="text-sm text-orange-600 mt-1">
+                              💧 Water damage detected - may contribute to mold growth
+                            </p>
+                          </div>
+                          <Badge variant="default" className="ml-2">Medium Priority</Badge>
+                        </div>
+                        {detail.images && detail.images.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                            {detail.images.map((image, imgIndex) => (
+                              <div key={imgIndex} className="relative group">
+                                <img
+                                  src={image}
+                                  alt={`Water damage evidence ${index + 1}-${imgIndex + 1}`}
+                                  className="w-full h-20 object-cover rounded border-2 border-orange-300"
+                                />
+                                <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                                    Water Damage
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Recommendations */}
               <div className="space-y-3">
@@ -1161,23 +1278,6 @@ export default function InspectionDetails() {
 
         {/* Right Column - Lab Analysis & Report */}
         <div className="space-y-6">
-          {/* Lab Image Preview Section */}
-          {selectedLabImages.length > 0 && (
-            <div className="mb-4">
-              <Label>Selected Lab Images (Preview):</Label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: 8 }}>
-                {selectedLabImages.map((file, idx) => {
-                  const url = URL.createObjectURL(file);
-                  return (
-                    <div key={idx} style={{ border: '1px solid #ccc', borderRadius: 8, padding: 4, background: '#fafafa' }}>
-                      <img src={url} alt={file.name} style={{ maxWidth: 120, maxHeight: 120, objectFit: 'contain', display: 'block' }} />
-                      <div style={{ fontSize: 12, marginTop: 4, wordBreak: 'break-all' }}>{file.name}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
           {/* Lab Analysis Upload */}
           <Card>
             <CardHeader>
@@ -1191,94 +1291,9 @@ export default function InspectionDetails() {
             </CardHeader>
             <CardContent className="space-y-4">
               
-              {/* Mold Images */}
-              {inspection.has_visible_mold && inspection.visible_mold_details && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                    <Label className="text-slate-700 font-semibold text-lg">Mold Detection Images</Label>
-                  </div>
-                  <div className="space-y-3">
-                    {inspection.visible_mold_details.map((detail, index) => (
-                      <div key={index} className="bg-red-50 border border-red-200 p-4 rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold text-red-800">Location {index + 1}: {detail.location}</p>
-                            <p className="text-sm text-red-600 mt-1">
-                              ⚠️ Visible mold detected - requires immediate attention
-                            </p>
-                          </div>
-                          <Badge variant="destructive" className="ml-2">High Priority</Badge>
-                        </div>
-                        {detail.images && detail.images.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                            {detail.images.map((image, imgIndex) => (
-                              <div key={imgIndex} className="relative group">
-                                <img
-                                  src={image}
-                                  alt={`Mold evidence ${index + 1}-${imgIndex + 1}`}
-                                  className="w-full h-20 object-cover rounded border-2 border-red-300"
-                                />
-                                <div className="absolute inset-0 bg-red-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
-                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
-                                    Mold Evidence
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Water Damage Images */}
-              {inspection.has_water_damage && inspection.water_damage_details && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-5 h-5 text-orange-600" />
-                    <Label className="text-slate-700 font-semibold text-lg">Water Damage Images</Label>
-                  </div>
-                  <div className="space-y-3">
-                    {inspection.water_damage_details.map((detail, index) => (
-                      <div key={index} className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold text-orange-800">Location {index + 1}: {detail.location}</p>
-                            <p className="text-sm text-orange-600 mt-1">
-                              💧 Water damage detected - may contribute to mold growth
-                            </p>
-                          </div>
-                          <Badge variant="default" className="ml-2">Medium Priority</Badge>
-                        </div>
-                        {detail.images && detail.images.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                            {detail.images.map((image, imgIndex) => (
-                              <div key={imgIndex} className="relative group">
-                                <img
-                                  src={image}
-                                  alt={`Water damage evidence ${index + 1}-${imgIndex + 1}`}
-                                  className="w-full h-20 object-cover rounded border-2 border-orange-300"
-                                />
-                                <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
-                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
-                                    Water Damage
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                  {console.log("🔍 DEBUG: No lab analysis images found, showing upload section")}
                   <input
                     type="file"
                     accept="image/*"
@@ -1321,6 +1336,7 @@ export default function InspectionDetails() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {console.log("🔍 DEBUG: Lab analysis images found:", inspection.lab_analysis_images)}
                   <div className="bg-slate-50 rounded-lg p-4">
                     <Label className="text-slate-600 font-medium">
                       Lab Analysis Images ({inspection.lab_analysis_images.length})
@@ -1623,6 +1639,35 @@ export default function InspectionDetails() {
               </Button>
             </CardContent>
           </Card>
+
+
+          {/* Water Damage Images from Database */}
+          {inspection.water_damage_images && inspection.water_damage_images.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Droplets className="w-5 h-5 text-orange-600" />
+                <Label className="text-slate-700 font-semibold text-lg">Water Damage Images</Label>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {inspection.water_damage_images.map((image, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={image}
+                      alt={`Water damage image ${index + 1}`}
+                      className="w-full h-24 object-cover rounded border-2 border-orange-300"
+                    />
+                    <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                        Water Damage
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
         </div>
       </div>
     </div>

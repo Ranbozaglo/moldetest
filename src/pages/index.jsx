@@ -2,7 +2,7 @@ import Layout from "./Layout.jsx";
 
 import Welcome from "./Welcome";
 import Inspection from "./Inspection";
-import Sampling from "./Sampling";
+// import Sampling from "./Sampling";
 import AdminDashboard from "./AdminDashboard";
 import EmailSettings from "./EmailSettings";
 import InspectionDetails from "./InspectionDetails";
@@ -85,7 +85,6 @@ function PublicRoute({ children }) {
 const PAGES = {
     Welcome: Welcome,
     Inspection: Inspection,
-    Sampling: Sampling,
     AdminDashboard: AdminDashboard,
     EmailSettings: EmailSettings,
     InspectionDetails: InspectionDetails,
@@ -164,11 +163,7 @@ function PagesContent() {
                     </ProtectedRoute>
                 } />
                 
-                <Route path="/Sampling" element={
-                    <ProtectedRoute allowAdmin={false}>
-                        <Sampling />
-                    </ProtectedRoute>
-                } />
+             
                 
                 <Route path="/SamplingGuide" element={
                     <ProtectedRoute allowAdmin={false}>
