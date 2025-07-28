@@ -222,19 +222,23 @@ class SimpleOCRIntegration:
             prompt_parts.append("""
 TASK: Based on the inspection findings and lab analysis results above, provide a professional conclusion and recommendations.
 
-Please provide your response in the following JSON format:
+IMPORTANT: You MUST respond with ONLY valid JSON. Do not include any text before or after the JSON object. Do not use markdown code blocks.
+
+Your response must be exactly in this JSON format:
 {
   "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
   "recommendations": "**Immediate Actions Needed**\n• [Your bullet points here]\n\n**Preventive Measures**\n• [Your bullet points here]\n\n**Professional Services Recommended**\n• [Your bullet points here]\n\n**Timeline for Required Actions**\n• [Your bullet points here]\n\n**Environmental Controls to Implement**\n• [Your bullet points here]"
 }
 
-Important formatting requirements for recommendations:
-1. Use **bold** for section headers
-2. Include a blank line before each new section header
-3. Use bullet points (•) for each recommendation
-4. Ensure each section has at least 1-2 relevant bullet points
-5. Do not add extra sections beyond the 5 specified
-6. Do not summarize or repeat the original text — only extract and organize actionable insights
+CRITICAL REQUIREMENTS:
+1. Return ONLY the JSON object - no additional text, no markdown formatting
+2. Ensure the JSON is properly formatted with double quotes
+3. Use **bold** for section headers in recommendations
+4. Include a blank line before each new section header
+5. Use bullet points (•) for each recommendation
+6. Ensure each section has at least 1-2 relevant bullet points
+7. Do not add extra sections beyond the 5 specified
+8. Do not summarize or repeat the original text — only extract and organize actionable insights
 
 Focus on:
 1. Correlating lab results with inspection findings
@@ -245,6 +249,8 @@ Focus on:
 6. Always start the conclusion with "According to the lab report and the details provided,"
 7. When mold_locations or water_damage_locations are present, explicitly state them in the conclusion like: "The laboratory analysis report indicates the presence of mold on the wall swab taken from [mold_location] at the property."
 8. Use the exact location names from mold_locations and water_damage_locations arrays in your conclusion
+
+Remember: Your entire response must be valid JSON that can be parsed by json.loads()
 """)
             
             full_prompt = "\n\n".join(prompt_parts)
@@ -260,18 +266,71 @@ Focus on:
             )
             print(f"🔍 DEBUG: GPT-4 response: {response}")
             analysis_content = response.choices[0].message.content
+            print(f"🔍 DEBUG: Raw analysis content: {analysis_content}")
             logger.info("✅ GPT-4 lab analysis completed with inspection findings")
             try:
                 import json
-                analysis_json = json.loads(analysis_content)
+                # Try to clean the response if it has markdown code blocks
+                cleaned_content = analysis_content.strip()
+                if cleaned_content.startswith("```json"):
+                    cleaned_content = cleaned_content[7:]
+                if cleaned_content.endswith("```"):
+                    cleaned_content = cleaned_content[:-3]
+                cleaned_content = cleaned_content.strip()
+                
+                print(f"🔍 DEBUG: Cleaned content for JSON parsing: {cleaned_content}")
+                analysis_json = json.loads(cleaned_content)
+                print(f"🔍 DEBUG: Parsed JSON keys: {list(analysis_json.keys())}")
+                
                 conclusion = analysis_json.get("conclusion", "")
                 recommendations = analysis_json.get("recommendations", "")
+                
+                print(f"🔍 DEBUG: Extracted conclusion length: {len(conclusion)}")
+                print(f"🔍 DEBUG: Extracted recommendations length: {len(recommendations)}")
+                
                 formatted_analysis = f"""**CONCLUSION**\n\n{conclusion}\n\n**RECOMMENDATIONS**\n\n{recommendations}"""
-            except json.JSONDecodeError:
-                logger.warning("⚠️ GPT response was not valid JSON, using raw content")
-                formatted_analysis = analysis_content
-                conclusion = analysis_content
-                recommendations = "Please review the analysis above and consult with a professional for specific recommendations."
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ GPT response was not valid JSON: {e}")
+                print(f"🔍 DEBUG: JSON decode error: {e}")
+                print(f"🔍 DEBUG: Attempting to extract conclusion and recommendations manually...")
+                
+                # Try to manually extract conclusion and recommendations from the text
+                conclusion = ""
+                recommendations = ""
+                
+                # Look for conclusion section
+                if "**CONCLUSION**" in analysis_content:
+                    parts = analysis_content.split("**CONCLUSION**")
+                    if len(parts) > 1:
+                        remaining = parts[1]
+                        if "**RECOMMENDATIONS**" in remaining:
+                            conclusion_part = remaining.split("**RECOMMENDATIONS**")[0]
+                            conclusion = conclusion_part.strip()
+                            recommendations_part = remaining.split("**RECOMMENDATIONS**")[1]
+                            recommendations = recommendations_part.strip()
+                        else:
+                            conclusion = remaining.strip()
+                elif "conclusion" in analysis_content.lower():
+                    # Try to find conclusion in the text
+                    lines = analysis_content.split('\n')
+                    in_conclusion = False
+                    conclusion_lines = []
+                    for line in lines:
+                        if "conclusion" in line.lower() and ":" in line:
+                            in_conclusion = True
+                            conclusion_lines.append(line.split(":", 1)[1].strip())
+                        elif in_conclusion and line.strip() and not line.startswith("recommendations"):
+                            conclusion_lines.append(line.strip())
+                        elif "recommendations" in line.lower():
+                            break
+                    conclusion = "\n".join(conclusion_lines)
+                
+                # If we still don't have a conclusion, use the whole content
+                if not conclusion:
+                    conclusion = analysis_content
+                    recommendations = "Please review the analysis above and consult with a professional for specific recommendations."
+                
+                formatted_analysis = f"""**CONCLUSION**\n\n{conclusion}\n\n**RECOMMENDATIONS**\n\n{recommendations}"""
             return {
                 "conclusion": conclusion,
                 "recommendations": recommendations,
