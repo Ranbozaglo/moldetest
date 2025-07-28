@@ -225,7 +225,12 @@ TASK: Based on the inspection findings and lab analysis results above, provide a
 Please provide your response in the following JSON format:
 {
   "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
-  "recommendations": "Detailed recommendations for the client based on all available information"
+  "recommendations": 
+*Immediate Actions Needed:*
+*Preventive Measures:*
+*Professional Services Recommended:* 
+*Timeline for Required Actions:*
+*Environmental Controls to Implement:*
 }
 
 Focus on:
