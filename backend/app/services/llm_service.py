@@ -90,7 +90,7 @@ class LLMService:
         Generate recommendations based on inspection findings using structured format
         """
         prompt = f"""
-        Based on this mold inspection, generate professional recommendations in clear, professional English using Markdown formatting. Use **bolded section headers** followed by bullet points under each.
+        Based on this mold inspection, generate professional recommendations in clear, professional English using Markdown formatting. 
 
         Inspection Findings:
         - Visible Mold: {'Yes' if inspection_data.get('has_visible_mold') else 'No'}
@@ -99,14 +99,30 @@ class LLMService:
         - Water Damage Locations: {inspection_data.get('water_damage_details', [])}
         - Lab Analysis: {inspection_data.get('lab_conclusion', 'Not available')}
         
-        Structure your response with these 5 sections:
-        1. **Immediate Actions Needed**
-        2. **Preventive Measures**
-        3. **Professional Services Recommended**
-        4. **Timeline for Required Actions**
-        5. **Environmental Controls to Implement**
-        
-        Ensure each section includes at least 1–2 relevant bullet points. Do not add extra sections. Do not summarize or repeat the original text — only extract and organize actionable insights.
+        Structure your response with these 5 sections, ensuring each section is separated by a blank line:
+
+        **Immediate Actions Needed**
+        • [Your bullet points here]
+
+        **Preventive Measures**
+        • [Your bullet points here]
+
+        **Professional Services Recommended**
+        • [Your bullet points here]
+
+        **Timeline for Required Actions**
+        • [Your bullet points here]
+
+        **Environmental Controls to Implement**
+        • [Your bullet points here]
+
+        Important formatting requirements:
+        1. Use **bold** for section headers
+        2. Include a blank line before each new section header
+        3. Use bullet points (•) for each recommendation
+        4. Ensure each section has at least 1-2 relevant bullet points
+        5. Do not add extra sections beyond the 5 specified
+        6. Do not summarize or repeat the original text — only extract and organize actionable insights
         """
         
         request = LLMRequest(prompt=prompt, context=inspection_data)

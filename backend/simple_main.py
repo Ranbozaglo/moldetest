@@ -225,33 +225,16 @@ TASK: Based on the inspection findings and lab analysis results above, provide a
 Please provide your response in the following JSON format:
 {
   "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
-recommendations": [
-**Immediate Actions Needed:**
-- Step 1
-- Step 2
-
-**Preventive Measures:**
-- Step 1
-- Step 2
-
-**Professional Services Recommended:**
-- Step 1
-- Step 2
-
-**Timeline for Required Actions:**
-- Step 1
-- Step 2
-
-**Environmental Controls to Implement:**
-- Step 1
-- Step 2
-  ]
+  "recommendations": "**Immediate Actions Needed**\n• [Your bullet points here]\n\n**Preventive Measures**\n• [Your bullet points here]\n\n**Professional Services Recommended**\n• [Your bullet points here]\n\n**Timeline for Required Actions**\n• [Your bullet points here]\n\n**Environmental Controls to Implement**\n• [Your bullet points here]"
 }
 
-
-
-Each recommendation section should begin with a bolded title using Markdown syntax (i.e. **Title:**), and each subpoint should start with a dash (-) and be listed on a new line. Use clear, actionable language for each item. Do not return any extra explanation—just return the JSON object as described.
-
+Important formatting requirements for recommendations:
+1. Use **bold** for section headers
+2. Include a blank line before each new section header
+3. Use bullet points (•) for each recommendation
+4. Ensure each section has at least 1-2 relevant bullet points
+5. Do not add extra sections beyond the 5 specified
+6. Do not summarize or repeat the original text — only extract and organize actionable insights
 
 Focus on:
 1. Correlating lab results with inspection findings
