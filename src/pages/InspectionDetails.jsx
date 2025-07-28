@@ -1009,8 +1009,8 @@ export default function InspectionDetails() {
                     <AlertTriangle className="w-6 h-6" />
                   </div>
                   <p className="text-sm font-medium text-slate-700">Visible Mold</p>
-                                    <Badge variant={inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0 ? "destructive" : "secondary"} className="mt-1">
-                    {inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0 ? "Present" : "Not Detected"}
+                                    <Badge variant={inspection.mold_images && inspection.mold_images.length > 0 ? "destructive" : "secondary"} className="mt-1">
+                    {inspection.mold_images && inspection.mold_images.length > 0 ? "Present" : "Not Detected"}
                   </Badge>
                 </div>
                 <div className="text-center">
@@ -1020,8 +1020,8 @@ export default function InspectionDetails() {
                     <Droplets className="w-6 h-6" />
                   </div>
                   <p className="text-sm font-medium text-slate-700">Water Damage</p>
-                  <Badge variant={inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0 ? "default" : "secondary"} className="mt-1">
-                    {inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0 ? "Present" : "Not Detected"}
+                  <Badge variant={inspection.water_damage_images && inspection.water_damage_images.length > 0 ? "default" : "secondary"} className="mt-1">
+                    {inspection.water_damage_images && inspection.water_damage_images.length > 0 ? "Present" : "Not Detected"}
                   </Badge>
                 </div>
                 
@@ -1103,7 +1103,7 @@ export default function InspectionDetails() {
               )}
 
                             {/* Water Damage Images with Locations */}
-                            {inspection.water_damage_images && inspection.water_damage_images.length > 0 && (
+              {inspection.water_damage_images && inspection.water_damage_images.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5 text-red-600" />

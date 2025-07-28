@@ -148,7 +148,6 @@ export default function ReviewStep({
           </CardContent>
         </Card>
 
-        {/* Environmental Conditions */}
         <Card className="border border-slate-200 rounded-xl">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -192,6 +191,43 @@ export default function ReviewStep({
           </CardContent>
         </Card>
       </div>
+
+
+      <Card className="border border-slate-200 rounded-xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CheckCircle className="w-5 h-5 text-green-500" />
+              Samples Collected
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Total Samples:</span>
+              <span className="font-medium capitalize">
+                {formData.samples.length} samples
+              </span>
+            </div>
+            {formData.samples.map((sample, index) => (
+              <div key={index} className="flex justify-between">
+                <div>
+                <p className="font-medium text-slate-700">Sample #{index + 1}</p>
+                <p className="text-sm text-slate-600 mt-1 mb-2">{sample.location}</p>
+                </div>
+                <div>
+              <img
+                src={sample.sample_image}
+                alt={`Sample ${index + 1}`} 
+                className="w-32 h-24 object-cover rounded border"
+              />  
+              </div>
+              </div>
+            ))}
+          </CardContent>
+
+        </Card>
+      
+
+      
 
       <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
         <h3 className="font-semibold text-blue-900 mb-2">What Happens Next?</h3>

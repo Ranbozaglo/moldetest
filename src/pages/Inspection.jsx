@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
+import { Sample } from "@/api/entities";
 import { User } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from '@/lib/supabase';
@@ -281,6 +282,34 @@ export default function Inspection() {
           } else {
               // Store the new inspection result
               setNewInspection(newInspection);
+          }
+          
+          // Save samples to database if they exist
+          if (formData.samples && Array.isArray(formData.samples) && formData.samples.length > 0) {
+            console.log("🔍 DEBUG: Saving samples to database:", formData.samples);
+            try {
+              const sampleData = formData.samples
+                .filter(sample => sample.location && sample.location.trim() !== '') // Only save samples with location
+                .map(sample => ({
+                  inspection_id: newInspection.id,
+                  location: sample.location,
+                  description: sample.description || sample.sample_type || '',
+                  sample_image: sample.sample_image || ''
+                }));
+              
+              if (sampleData.length > 0) {
+                console.log("🔍 DEBUG: Sample data to save:", sampleData);
+                const savedSamples = await Sample.bulkCreate(sampleData);
+                console.log("🔍 DEBUG: Successfully saved samples:", savedSamples);
+              } else {
+                console.log("🔍 DEBUG: No valid samples to save");
+              }
+            } catch (sampleError) {
+              console.error("🔍 DEBUG: Error saving samples:", sampleError);
+              // Don't throw error here - inspection was successful, just log the sample error
+            }
+          } else {
+            console.log("🔍 DEBUG: No samples to save");
           }
           
           console.log("🔍 DEBUG: Set newInspection state to:", newInspection);

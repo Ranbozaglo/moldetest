@@ -220,15 +220,23 @@ export default function ThermostatStep({ formData, updateFormData, onNext, onPre
       )}
 
       {(currentMethod === "photo" || currentMethod === "manual") && (
-        <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-          <h3 className="font-semibold text-blue-900 mb-2">Why We Need This</h3>
-          <p className="text-blue-700 text-sm">
+        <div className="bg-amber-50 rounded-xl p-6 border border-amber-100">
+          <h3 className="font-semibold text-amber-900 mb-2">Why We Need This</h3>
+          <p className="text-amber-700 text-sm">
             Temperature and humidity levels are critical factors in mold growth. 
             High humidity (above 60%) combined with warm temperatures creates ideal 
             conditions for mold development, even without visible moisture.
           </p>
         </div>
       )}
+
+      <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+        <h3 className="font-semibold text-blue-900 mb-2">What Happens Next?</h3>
+        <p className="text-blue-700 text-sm">
+          After continuing, you'll be shown a guide on how to properly collect samples.
+          You will then document the collected samples and ship it to our lab.
+        </p>
+      </div>
 
       <div className="flex justify-between pt-4">
         <Button

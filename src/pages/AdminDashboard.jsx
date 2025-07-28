@@ -138,11 +138,12 @@ export default function AdminDashboard() {
     const samples = inspections.filter(i => i.is_sample).length;
     const pending = inspections.filter(i => i.status === 'pending').length;
     const completed = inspections.filter(i => i.status === 'completed').length;
+
     
     const propertyTypes = {};
     const clientTypes = {};
     const cities = {};
-    
+        
     inspections.forEach(inspection => {
       if (inspection.property_type) {
         propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
@@ -154,6 +155,7 @@ export default function AdminDashboard() {
         cities[inspection.city] = (cities[inspection.city] || 0) + 1;
       }
     });
+
 
     return {
       total,
@@ -168,6 +170,9 @@ export default function AdminDashboard() {
     };
   };
 
+
+
+  
   // Filter inspections based on all filters
   const filteredInspections = inspections.filter(inspection => {
     const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
@@ -276,6 +281,7 @@ export default function AdminDashboard() {
     link.click();
     document.body.removeChild(link);
   };
+  
 
   const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
@@ -1059,12 +1065,12 @@ export default function AdminDashboard() {
               
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Sample Requests</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Samples</CardTitle>
                   <FlaskConical className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{stats.samples}</div>
-                  <p className="text-xs text-muted-foreground">Lab analysis requested</p>
+                  <p className="text-xs text-muted-foreground">All time samples</p>
                 </CardContent>
               </Card>
             </div>
@@ -1404,19 +1410,7 @@ export default function AdminDashboard() {
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuSeparator />
-                                
-                                {/* Edit Action */}
-                                <DropdownMenuItem 
-                                  onClick={() => {
-                                    const url = createPageUrl('InspectionDetails', { id: inspection.id, edit: true });
-                                    window.open(url, '_blank');
-                                  }}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                  Edit Inspection
-                                </DropdownMenuItem>
-                                
+                                                                
                                 {/* Delete Action */}
                                 <DropdownMenuItem 
                                   onClick={() => {
