@@ -78,7 +78,7 @@ export const validateTokenWithServer = async (userData = null) => {
   }
   
   try {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://moldetest.onrender.com/api';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api';
     const response = await fetch(`${apiBaseUrl}/auth/validate`, {
       method: 'GET',
       headers: {

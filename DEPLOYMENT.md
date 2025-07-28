@@ -2,7 +2,7 @@
 
 ## Production URL
 **Frontend**: https://mold-testing.netlify.app
-**Backend**: https://moldetest.onrender.com
+**Backend**: https://moldetest-ftxv.onrender.com
 
 ## 📋 Prerequisites
 
@@ -107,16 +107,16 @@ Once your backend is deployed, update the production backend URL:
 
 ### 1. Health Check
 ```bash
-curl https://moldetest.onrender.com/health
+curl https://moldetest-ftxv.onrender.com/health
 ```
 
 ### 2. API Endpoints
 ```bash
 # Test inspection endpoints
-curl https://moldetest.onrender.com/api/inspection
+curl https://moldetest-ftxv.onrender.com/api/inspection
 
 # Test authentication
-curl -X POST https://moldetest.onrender.com/api/auth/login \
+curl -X POST https://moldetest-ftxv.onrender.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"rotemiluz53@gmail.com","password":"admin123"}'
 ```

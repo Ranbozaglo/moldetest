@@ -134,7 +134,7 @@ Look for these messages:
 
 ### 4.3 Test API Endpoint
 ```bash
-curl -X POST https://moldetest.onrender.com/api/ocr-gpt \
+curl -X POST https://moldetest-ftxv.onrender.com/api/ocr-gpt \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Analyze these lab results",

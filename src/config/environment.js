@@ -18,8 +18,8 @@ const getApiUrls = () => {
   
   if (isProduction) {
     return {
-      BASE_API_URL: 'https://moldetest.onrender.com',
-      BACKEND_URL: 'https://moldetest.onrender.com/api'
+      BASE_API_URL: 'https://moldetest-ftxv.onrender.com',
+      BACKEND_URL: 'https://moldetest-ftxv.onrender.com/api'
     };
   } else {
     return {

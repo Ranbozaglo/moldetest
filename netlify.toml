@@ -24,7 +24,7 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://opjgytjlebfnhjzarvyy.supabase.co https://moldetest.onrender.com;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://opjgytjlebfnhjzarvyy.supabase.co https://moldetest-ftxv.onrender.com;"
 
 # Cache static assets
 [[headers]]
@@ -41,7 +41,7 @@
 # Environment variables for production
 [context.production.environment]
   VITE_APP_ENV = "production"
-  VITE_API_BASE_URL = "https://moldetest.onrender.com/api"
+  VITE_API_BASE_URL = "https://moldetest-ftxv.onrender.com/api"
   VITE_SUPABASE_URL = "https://opjgytjlebfnhjzarvyy.supabase.co"
   VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wamd5dGpsZWJmbmhqemFydnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1ODMzMzYsImV4cCI6MjA2ODE1OTMzNn0.SN7VpDUtsInqW_AUmP7fNaVKTgRkIZAJcyyVXlT8gJc"
 
