@@ -686,26 +686,27 @@ export default function AdminDashboard() {
     ${
       (inspection.lab_recommendations || inspection.recommendations)
         ? (inspection.lab_recommendations || inspection.recommendations)
-            .split(/(?:\n|\r|\*\*|\*)/)  // פיצול לפי שורות או תחילת סעיף ב־* או **Markdown
-            .map(line => line.trim())
-            .filter(line => line.length > 0)
-            .map(line => {
-              // כותרות מודגשות
-              if (line.startsWith('**') && line.endsWith('**')) {
-                return `<p style="font-weight: bold; margin: 12px 0 4px;">${line.replace(/\*\*/g, '')}</p>`;
+            .replace(/\\n/g, '\n') // הסרת תווי \n כתובים
+            .split(/\n{2,}/) // פיצול לפי רווחים בין פסקאות
+            .map(section => {
+              const match = section.match(/^([\w\s]+):\s*(.+)$/s); // תבנית: "כותרת: תוכן"
+              if (match) {
+                const title = match[1].trim();
+                const content = match[2].trim();
+                return `
+                  <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
+                  <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
+                `;
+              } else {
+                return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section.trim()}</p>`;
               }
-              // תתי סעיפים עם תבליט
-              if (line.startsWith('-')) {
-                return `<p style="margin: 4px 0 4px 16px; line-height: 1.5;">${line}</p>`;
-              }
-              // טקסט רגיל fallback
-              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line}</p>`;
             })
             .join('')
         : '<p>Pending recommendations.</p>'
     }
   </div>
 </div>
+
 
             
             <div class="limitations-section">

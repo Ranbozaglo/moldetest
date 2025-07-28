@@ -116,15 +116,13 @@ class LLMService:
         **Environmental Controls to Implement**
         • [Your bullet points here]
 
-  CRITICAL REQUIREMENTS:
-1. Return ONLY the JSON object - no additional text, no markdown formatting
-2. Ensure the JSON is properly formatted with double quotes
-3. Use **bold** for section headers in recommendations
-4. Include a blank line before each new section header
-5. Use bullet points (•) for each recommendation
-6. Ensure each section has at least 1-2 relevant bullet points
-7. Do not add extra sections beyond the 5 specified
-8. Do not summarize or repeat the original text — only extract and organize actionable insights
+        Important formatting requirements:
+        1. Use **bold** for section headers
+        2. Include a blank line before each new section header
+        3. Use bullet points (•) for each recommendation
+        4. Ensure each section has at least 1-2 relevant bullet points
+        5. Do not add extra sections beyond the 5 specified
+        6. Do not summarize or repeat the original text — only extract and organize actionable insights
         """
         
         request = LLMRequest(prompt=prompt, context=inspection_data)
