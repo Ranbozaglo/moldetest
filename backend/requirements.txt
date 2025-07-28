@@ -16,7 +16,7 @@ supabase==2.0.2
 websockets==12.0
 
 # JWT
-PyJWT==2.10.1
+PyJWT>=2.8.0,<2.11.0
 
 # Flask (optional if still used)
 flask==3.0.0
