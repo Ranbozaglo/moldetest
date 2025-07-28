@@ -21,6 +21,8 @@ import requests
 from urllib.parse import urlparse
 import pathlib
 from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+from datetime import datetime, timedelta
 
 # OCR and AI imports
 try:
@@ -41,9 +43,34 @@ CORS(app, origins=[
     "http://localhost:3000"
 ], supports_credentials=True)
 
+# JWT Configuration
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def create_jwt_token(user_id: int, email: str) -> str:
+    """Create a JWT token for the user"""
+    payload = {
+        'user_id': user_id,
+        'email': email,
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': datetime.utcnow()
+    }
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+
+def verify_jwt_token(token: str) -> dict:
+    """Verify and decode a JWT token"""
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise ValueError("Token has expired")
+    except jwt.InvalidTokenError:
+        raise ValueError("Invalid token")
 
 class SimpleOCRIntegration:
     """Simplified OCR integration for lab analysis"""
@@ -559,7 +586,7 @@ def home():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """User login endpoint - now checks password securely"""
+    """User login endpoint with secure password authentication"""
     print(f"🔍 DEBUG: Login request received")
     data = request.get_json()
     print(f"🔍 DEBUG: Request data: {data}")
@@ -574,43 +601,54 @@ def login():
         return jsonify({"error": "Email and password required"}), 400
     
     try:
-        # Check if user exists in user_profiles table
+        # Query user_profiles table for the given email using .single() to ensure only one result
         result = supabase.table('user_profiles').select('*').eq('email', email).execute()
-        user = result.data[0] if result.data else None
         
-        print(f"🔍 DEBUG: User found: {user}")
-        
-        if user:
-            # Check password hash
-            password_hash = user.get('password_hash')
-            if not password_hash or not check_password_hash(password_hash, password):
-                print(f"🔍 DEBUG: Invalid password for user {email}")
-                return jsonify({"error": "Invalid credentials"}), 401
-            # Generate simple token (in production, use JWT)
-            token = secrets.token_urlsafe(32)
-            response_data = {
-                "access_token": token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user['id'],
-                    "email": user['email'],
-                    "full_name": user.get('full_name', ''),
-                    "is_admin": user.get('role') == 'admin',
-                    "role": user.get('role', 'user')
-                }
-            }
-            print(f"🔍 DEBUG: Returning success response: {response_data}")
-            return jsonify(response_data)
-        else:
-            print(f"🔍 DEBUG: User not found")
+        # Check if user exists - use consistent error message for security
+        if not result.data:
+            print(f"🔍 DEBUG: User not found for email: {email}")
             return jsonify({"error": "Invalid credentials"}), 401
+        
+        user_data = result.data[0]
+        print(f"🔍 DEBUG: User found: {user_data.get('email')}")
+        
+        # Check if password_hash exists
+        password_hash = user_data.get('password_hash')
+        if not password_hash:
+            print(f"🔍 DEBUG: No password hash found for user: {email}")
+            return jsonify({"error": "Invalid credentials"}), 401
+        
+        # Verify password using bcrypt
+        if not check_password_hash(password_hash, password):
+            print(f"🔍 DEBUG: Invalid password for user: {email}")
+            return jsonify({"error": "Invalid credentials"}), 401
+        
+        # Create JWT token
+        access_token = create_jwt_token(user_data['id'], user_data['email'])
+        
+        # Return success response
+        response_data = {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user_data['id'],
+                "email": user_data['email'],
+                "full_name": user_data.get('full_name', ''),
+                "is_admin": user_data.get('role') == 'admin',
+                "role": user_data.get('role', 'user')
+            }
+        }
+        
+        print(f"🔍 DEBUG: Login successful for user: {email}")
+        return jsonify(response_data)
+        
     except Exception as e:
-        print(f"🔍 DEBUG: Database error: {e}")
-        return jsonify({"error": "Database error"}), 500
+        print(f"🔍 DEBUG: Login error: {e}")
+        return jsonify({"error": "Invalid credentials"}), 401
 
 @app.route('/api/auth/validate', methods=['GET'])
 def validate_token():
-    """Token validation endpoint"""
+    """Token validation endpoint with proper JWT validation"""
     print(f"🔍 DEBUG: Token validation request received")
     
     # Get Authorization header
@@ -624,16 +662,23 @@ def validate_token():
     token = auth_header.split(' ')[1]
     print(f"🔍 DEBUG: Extracted token: {token[:10]}...")
     
-    # For this simple implementation, we'll consider any non-empty token as valid
-    # In a production system, you would validate the JWT token properly
-    if len(token) > 10:  # Basic validation - token should be reasonably long
-        print(f"🔍 DEBUG: Token validation successful")
+    try:
+        # Verify and decode the JWT token
+        payload = verify_jwt_token(token)
+        print(f"🔍 DEBUG: Token validation successful for user: {payload.get('email')}")
+        
         return jsonify({
             "valid": True,
-            "message": "Token is valid"
+            "message": "Token is valid",
+            "user_id": payload.get('user_id'),
+            "email": payload.get('email')
         }), 200
-    else:
-        print(f"🔍 DEBUG: Token validation failed - token too short")
+        
+    except ValueError as e:
+        print(f"🔍 DEBUG: Token validation failed: {e}")
+        return jsonify({"error": "Invalid token"}), 401
+    except Exception as e:
+        print(f"🔍 DEBUG: Token validation error: {e}")
         return jsonify({"error": "Invalid token"}), 401
 
 @app.route('/api/auth/register', methods=['POST'])
