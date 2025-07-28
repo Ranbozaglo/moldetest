@@ -226,20 +226,25 @@ Please provide your response in the following JSON format:
 {
   "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
 recommendations": [
-    "**Immediate Actions Needed:**",
-    "- [List immediate actions here]",
-    "",
-    "**Preventive Measures:**",
-    "- [List preventive steps here]",
-    "",
-    "**Professional Services Recommended:**",
-    "- [List recommended services here]",
-    "",
-    "**Timeline for Required Actions:**",
-    "- [Specify the timeline here]",
-    "",
-    "**Environmental Controls to Implement:**",
-    "- [List environmental control steps here]"
+**Immediate Actions Needed:**
+- Step 1
+- Step 2
+
+**Preventive Measures:**
+- Step 1
+- Step 2
+
+**Professional Services Recommended:**
+- Step 1
+- Step 2
+
+**Timeline for Required Actions:**
+- Step 1
+- Step 2
+
+**Environmental Controls to Implement:**
+- Step 1
+- Step 2
   ]
 }
 
