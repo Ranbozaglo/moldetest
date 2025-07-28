@@ -680,20 +680,33 @@ export default function AdminDashboard() {
                 <p>${inspection.lab_conclusion || inspection.conclusion || 'Pending conclusion.'}</p>
             </div>
 
-            <div class="section">
-                <h2>Recommendations</h2>
-                <div>
-                  ${
-                    (inspection.lab_recommendations || inspection.recommendations)
-                      ? (inspection.lab_recommendations || inspection.recommendations)
-                          .split('\n')
-                          .filter(line => line.trim().length > 0)
-                          .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
-                          .join('')
-                      : '<p>Pending recommendations.</p>'
-                  }
-                </div>
-            </div>
+<div class="section">
+  <h2>Recommendations</h2>
+  <div>
+    ${
+      (inspection.lab_recommendations || inspection.recommendations)
+        ? (inspection.lab_recommendations || inspection.recommendations)
+            .split(/(?:\n|\r|\*\*|\*)/)  // פיצול לפי שורות או תחילת סעיף ב־* או **Markdown
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+              // כותרות מודגשות
+              if (line.startsWith('**') && line.endsWith('**')) {
+                return `<p style="font-weight: bold; margin: 12px 0 4px;">${line.replace(/\*\*/g, '')}</p>`;
+              }
+              // תתי סעיפים עם תבליט
+              if (line.startsWith('-')) {
+                return `<p style="margin: 4px 0 4px 16px; line-height: 1.5;">${line}</p>`;
+              }
+              // טקסט רגיל fallback
+              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line}</p>`;
+            })
+            .join('')
+        : '<p>Pending recommendations.</p>'
+    }
+  </div>
+</div>
+
             
             <div class="limitations-section">
                 <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
