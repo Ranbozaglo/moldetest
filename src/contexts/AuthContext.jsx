@@ -30,18 +30,10 @@ export const AuthProvider = ({ children }) => {
     return false; // Tokens never expire
   };
 
-  // Helper function to validate token with server (with throttling)
+  // Helper function to validate token with server
   const validateTokenWithServer = useCallback(async (userData) => {
-    // Throttle validation calls - don't validate more than once every 10 minutes
-    const now = Date.now();
-    if (lastValidationRef.current && (now - lastValidationRef.current) < 10 * 60 * 1000) {
-      console.log('🔍 AUTH DEBUG: Skipping token validation - too recent');
-      return true;
-    }
-
     try {
       console.log('🔍 AUTH DEBUG: Validating token with server...');
-      lastValidationRef.current = now;
       
       // Make a simple API call to validate the token
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api'}/auth/validate`, {
@@ -82,6 +74,14 @@ export const AuthProvider = ({ children }) => {
           const userData = JSON.parse(savedUser);
           console.log('🔍 AUTH DEBUG: Parsed user data:', userData);
           
+          // Check if we have a valid access_token
+          if (!userData.access_token) {
+            console.log('🔍 AUTH DEBUG: No access_token found, clearing session');
+            localStorage.removeItem('mth_user');
+            setLoading(false);
+            return;
+          }
+          
           // Check if token is expired based on timestamp
           if (isTokenExpired(userData)) {
             console.log('🔍 AUTH DEBUG: Token expired based on timestamp, clearing session');
@@ -90,24 +90,20 @@ export const AuthProvider = ({ children }) => {
             return;
           }
           
-          // Only validate token if it hasn't been validated recently (reduce API calls)
-          const shouldValidateToken = !userData.lastValidated || 
-                                     (Date.now() - new Date(userData.lastValidated).getTime()) > (2 * 60 * 60 * 1000); // 2 hours
+          // Validate token with server
+          console.log('🔍 AUTH DEBUG: Validating token with server...');
+          const isValid = await validateTokenWithServer(userData);
           
-          // Disable server token validation - tokens never expire
-          // if (shouldValidateToken) {
-          //   const isValid = await validateTokenWithServer(userData);
-          //   if (!isValid) {
-          //     console.log('🔍 AUTH DEBUG: Server token validation failed, clearing session');
-          //     localStorage.removeItem('mth_user');
-          //     setLoading(false);
-          //     return;
-          //   }
-          //   
-          //   // Update last validation timestamp
-          //   userData.lastValidated = new Date().toISOString();
-          //   localStorage.setItem('mth_user', JSON.stringify(userData));
-          // }
+          if (!isValid) {
+            console.log('🔍 AUTH DEBUG: Server token validation failed, clearing session');
+            localStorage.removeItem('mth_user');
+            setLoading(false);
+            return;
+          }
+          
+          // Update last validation timestamp
+          userData.lastValidated = new Date().toISOString();
+          localStorage.setItem('mth_user', JSON.stringify(userData));
           
           // Update admin role for specific emails if needed
           const adminEmails = ['rotemiluz53@gmail.com'];
@@ -131,7 +127,7 @@ export const AuthProvider = ({ children }) => {
     };
     
     initializeAuth();
-  }, []); // Empty dependency array - run only once
+  }, [validateTokenWithServer]); // Add validateTokenWithServer to dependencies
 
   // Set up periodic token validation separately
   useEffect(() => {
@@ -145,35 +141,31 @@ export const AuthProvider = ({ children }) => {
 
     console.log('🔍 AUTH DEBUG: Setting up periodic token validation for user:', user.email);
     
-    // Disable periodic token validation - tokens never expire
-    // Set up periodic token validation (every 2 hours - reduced frequency)
-    // intervalRef.current = setInterval(async () => {
-    //   const savedUser = localStorage.getItem('mth_user');
-    //   if (savedUser) {
-    //     try {
-    //       const userData = JSON.parse(savedUser);
-    //       
-    //       // Check if token is getting close to expiration (within 2 hours)
-    //       const tokenAge = Date.now() - new Date(userData.createdAt).getTime();
-    //       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-    //       const warningAge = 22 * 60 * 60 * 1000; // 22 hours (2 hours before expiration)
-    //       
-    //       if (tokenAge > maxAge) {
-    //         console.log('🔍 AUTH DEBUG: Token expired during periodic check, logging out');
-    //         signOut();
-    //       } else if (tokenAge > warningAge) {
-    //         console.log('🔍 AUTH DEBUG: Token approaching expiration, validating with server');
-    //         const isValid = await validateTokenWithServer(userData);
-    //         if (!isValid) {
-    //           console.log('🔍 AUTH DEBUG: Token validation failed during periodic check, logging out');
-    //           signOut();
-    //         }
-    //       }
-    //     } catch (error) {
-    //       console.error('🔍 AUTH DEBUG: Error during periodic token check:', error);
-    //     }
-    //   }
-    // }, 2 * 60 * 60 * 1000); // 2 hours (reduced from 30 minutes)
+    // Set up periodic token validation (every 2 hours)
+    intervalRef.current = setInterval(async () => {
+      const savedUser = localStorage.getItem('mth_user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          
+          // Validate token with server
+          console.log('🔍 AUTH DEBUG: Periodic token validation...');
+          const isValid = await validateTokenWithServer(userData);
+          if (!isValid) {
+            console.log('🔍 AUTH DEBUG: Token validation failed during periodic check, logging out');
+            signOut();
+          } else {
+            // Update last validation timestamp
+            userData.lastValidated = new Date().toISOString();
+            localStorage.setItem('mth_user', JSON.stringify(userData));
+            console.log('🔍 AUTH DEBUG: Periodic token validation successful');
+          }
+        } catch (error) {
+          console.error('🔍 AUTH DEBUG: Error during periodic token check:', error);
+          signOut();
+        }
+      }
+    }, 2 * 60 * 60 * 1000); // 2 hours
     
     // Cleanup interval on user change or unmount
     return () => {
@@ -182,7 +174,7 @@ export const AuthProvider = ({ children }) => {
         intervalRef.current = null;
       }
     };
-  }, [user?.id, validateTokenWithServer]); // Only depend on user ID, not full user object
+  }, [user?.id, validateTokenWithServer, signOut]); // Add signOut to dependencies
 
   const signIn = useCallback(async (email, password) => {
     const isProduction = window.location.hostname !== 'localhost';
@@ -239,11 +231,12 @@ export const AuthProvider = ({ children }) => {
         environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
       });
       
-      // Special handling for admin user login issue
-      if (email === 'rotemiluz53@gmail.com' && error.message.includes('Invalid credentials')) {
-        console.log(`${logPrefix} Admin user login issue detected, creating fallback session`);
+      // Special handling for admin user login issue (development only)
+      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (isDevelopment && email === 'rotemiluz53@gmail.com' && error.message.includes('Invalid credentials')) {
+        console.log(`${logPrefix} Admin user login issue detected in development, creating fallback session`);
         
-        // Create a fallback admin user session
+        // Create a fallback admin user session (development only)
         const fallbackUser = {
           id: 'admin-fallback',
           email: 'rotemiluz53@gmail.com',
@@ -258,7 +251,7 @@ export const AuthProvider = ({ children }) => {
         setUser(fallbackUser);
         localStorage.setItem('mth_user', JSON.stringify(fallbackUser));
         
-        console.log(`${logPrefix} Fallback admin session created`);
+        console.log(`${logPrefix} Fallback admin session created (development only)`);
         return { success: true, user: fallbackUser };
       }
       
