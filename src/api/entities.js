@@ -246,7 +246,7 @@ export const MoldInspection = {
     return response;
   },
   
-  list: async (sortBy = '-created_at', limit = 10) => {
+  list: async (sortBy = '-created_at', limit = 10, detailed = false) => {
     const token = getAuthToken();
     const user = localStorage.getItem('mth_user');
     let email = '';
@@ -261,7 +261,7 @@ export const MoldInspection = {
     // Use higher limit and ensure proper sort for admin users
     if (isAdmin) {
       sortBy = sortBy || '-created_at';
-      limit = limit === 10 ? 1000 : limit; // Use 1000 if default limit
+      limit = limit === 10 ? 50 : limit; // Limit to 50 for performance
     }
     
     const queryParams = new URLSearchParams();
@@ -272,14 +272,29 @@ export const MoldInspection = {
       queryParams.append('limit', limit.toString());
     }
     
+    // Add detailed parameter for heavy data
+    if (detailed) {
+      queryParams.append('detailed', 'true');
+    }
+    
     // Only send email filter for non-admin users
     // Admin users get ALL inspections without email filtering
     if (email && !isAdmin) {
       queryParams.append('email', email);
     }
-    // Note: Admin users don't send email parameter to get ALL data
     
     const response = await apiCall(`/inspection?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
+  },
+  
+  // New method for getting detailed inspection data
+  getDetailed: async (id) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/inspection/${id}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
       }

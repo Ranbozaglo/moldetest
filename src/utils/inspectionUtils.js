@@ -3,23 +3,23 @@
 /**
  * Get the display number for an inspection
  * @param {Object} inspection - The inspection object
- * @returns {string} The display number (MTH #XXX)
+ * @returns {string} The display number (TT #XXX)
  */
-export const getDisplayNumber = (inspection) => {
-  if (!inspection) return 'MTH #N/A';
+export function getDisplayNumber(inspection) {
+  if (!inspection) return 'TT #N/A';
   
   // First try inspection_number
   if (inspection.inspection_number) {
-    return `MTH #${inspection.inspection_number}`;
+    return `TT #${inspection.inspection_number}`;
   }
   
   // Fallback to ID
   if (inspection.id) {
-    return `MTH #${inspection.id.substring(0, 8)}`;
+    return `TT #${inspection.id.substring(0, 8)}`;
   }
   
-  return 'MTH #N/A';
-};
+  return 'TT #N/A';
+}
 
 /**
  * Validate inspection data

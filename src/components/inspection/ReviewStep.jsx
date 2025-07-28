@@ -214,13 +214,13 @@ export default function ReviewStep({
         <Button
           onClick={onSubmit}
           disabled={isSubmitting}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
+          className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-medium"
         >
           {isSubmitting ? (
             "Processing..."
           ) : (
             <>
-              Continue to Collection Guide
+              complete inspection
               <ArrowRight className="w-4 h-4 ml-2" />
             </>
           )}

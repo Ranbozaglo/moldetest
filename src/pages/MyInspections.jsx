@@ -52,70 +52,16 @@ export default function MyInspections() {
             if (currentUser && currentUser.email) {
               console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
               
-              // Try multiple approaches to find inspections
+              // Use the new lightweight endpoint for better performance
               try {
-                // First, try the filter method
-                const userInspections = await MoldInspection.filter({ email: currentUser.email }, "-created_date");
-                console.log("🔍 DEBUG: Found inspections with filter:", userInspections);
+                const userInspections = await MoldInspection.list("-created_at", 10, false); // Lightweight by default
+                console.log("🔍 DEBUG: Found inspections with lightweight endpoint:", userInspections);
                 
                 if (userInspections && userInspections.length > 0) {
-                  // Parse lab_analysis_images field to handle both column names
-                  const parsedInspections = userInspections.map(inspection => {
-                    let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
-                    
-                    if (labImagesField && typeof labImagesField === 'string') {
-                      try {
-                        inspection.lab_analysis_images = JSON.parse(labImagesField);
-                      } catch (parseError) {
-                        console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
-                        inspection.lab_analysis_images = [];
-                      }
-                    } else if (!labImagesField) {
-                      inspection.lab_analysis_images = [];
-                    } else if (Array.isArray(labImagesField)) {
-                      inspection.lab_analysis_images = labImagesField;
-                    } else {
-                      inspection.lab_analysis_images = [];
-                    }
-                    
-                    return inspection;
-                  });
-                  
-                  setInspections(parsedInspections);
+                  setInspections(userInspections);
                 } else {
-                  // Fallback: Get all inspections and filter manually
-                  console.log("🔍 DEBUG: No inspections found with filter, trying manual search...");
-                  const allInspections = await MoldInspection.list("-created_date", 100);
-                  console.log("🔍 DEBUG: All inspections:", allInspections);
-                  
-                  const matchingInspections = allInspections.filter(inspection => 
-                    inspection.email && inspection.email.toLowerCase() === currentUser.email.toLowerCase()
-                  );
-                  console.log("🔍 DEBUG: Matching inspections after manual filter:", matchingInspections);
-                  
-                  // Parse lab_analysis_images field to handle both column names
-                  const parsedInspections = matchingInspections.map(inspection => {
-                    let labImagesField = inspection.lab_analysis_images || inspection.mold_images;
-                    
-                    if (labImagesField && typeof labImagesField === 'string') {
-                      try {
-                        inspection.lab_analysis_images = JSON.parse(labImagesField);
-                      } catch (parseError) {
-                        console.error("❌ Error parsing lab images JSON for inspection", inspection.id, ":", parseError);
-                        inspection.lab_analysis_images = [];
-                      }
-                    } else if (!labImagesField) {
-                      inspection.lab_analysis_images = [];
-                    } else if (Array.isArray(labImagesField)) {
-                      inspection.lab_analysis_images = labImagesField;
-                    } else {
-                      inspection.lab_analysis_images = [];
-                    }
-                    
-                    return inspection;
-                  });
-                  
-                  setInspections(parsedInspections);
+                  console.log("🔍 DEBUG: No inspections found for user");
+                  setInspections([]);
                 }
               } catch (inspectionError) {
                 console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
@@ -144,7 +90,7 @@ export default function MyInspections() {
   }, [navigate, currentUser]);
 
   const getDisplayNumber = (inspection) => {
-    return inspection?.inspection_number ? `MTH #${inspection.inspection_number}` : `MTH #${inspection?.id.substring(0, 8)}`;
+    return inspection?.inspection_number ? `TT #${inspection.inspection_number}` : `TT #${inspection?.id.substring(0, 8)}`;
   };
 
   const getStatusInfo = (status) => {
@@ -164,8 +110,60 @@ export default function MyInspections() {
   
   const generateAndDownloadReport = async (inspection) => {
     try {
+      console.log("🔍 DEBUG: Generating report for inspection:", inspection.id);
+      
+      // Always fetch detailed inspection data to ensure we have the latest lab analysis
+      let detailedInspection = inspection;
+      console.log("🔍 DEBUG: Fetching detailed inspection data for report generation");
+      try {
+        detailedInspection = await MoldInspection.getDetailed(inspection.id);
+        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+        console.log("🔍 DEBUG: Lab conclusion:", detailedInspection.lab_conclusion);
+        console.log("🔍 DEBUG: Lab recommendations:", detailedInspection.lab_recommendations);
+        console.log("🔍 DEBUG: Lab analysis images:", detailedInspection.lab_analysis_images);
+      } catch (detailError) {
+        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+        // Continue with current data if detailed fetch fails
+      }
+      
+      // Parse lab_analysis_images if it's a string
+      if (detailedInspection.lab_analysis_images && typeof detailedInspection.lab_analysis_images === 'string') {
+        try {
+          detailedInspection.lab_analysis_images = JSON.parse(detailedInspection.lab_analysis_images);
+        } catch (parseError) {
+          console.error("❌ Error parsing lab images JSON:", parseError);
+          detailedInspection.lab_analysis_images = [];
+        }
+      }
+      
+      // Parse mold_images if it's a string
+      if (detailedInspection.mold_images && typeof detailedInspection.mold_images === 'string') {
+        try {
+          detailedInspection.mold_images = JSON.parse(detailedInspection.mold_images);
+        } catch (parseError) {
+          console.error("❌ Error parsing mold images JSON:", parseError);
+          detailedInspection.mold_images = [];
+        }
+      }
+      
+      // Parse water_damage_images if it's a string
+      if (detailedInspection.water_damage_images && typeof detailedInspection.water_damage_images === 'string') {
+        try {
+          detailedInspection.water_damage_images = JSON.parse(detailedInspection.water_damage_images);
+        } catch (parseError) {
+          console.error("❌ Error parsing water damage images JSON:", parseError);
+          detailedInspection.water_damage_images = [];
+        }
+      }
+      
       const samples = await Sample.findMany({ inspection_id: inspection.id });
       const displayNum = getDisplayNumber(inspection);
+      
+      console.log("🔍 DEBUG: Final data for report generation:");
+      console.log("🔍 DEBUG: - Lab conclusion:", detailedInspection.lab_conclusion);
+      console.log("🔍 DEBUG: - Lab recommendations:", detailedInspection.lab_recommendations);
+      console.log("🔍 DEBUG: - Lab analysis images:", detailedInspection.lab_analysis_images);
+      console.log("🔍 DEBUG: - Samples count:", samples.length);
       
       const disclaimerText = "The Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
       const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
@@ -243,16 +241,16 @@ export default function MyInspections() {
       };
 
       // Debug: Log inspection image data for report generation
-      console.log("🔍 DEBUG: Report generation - inspection.visible_mold_details:", inspection.visible_mold_details);
-      console.log("🔍 DEBUG: Report generation - inspection.water_damage_details:", inspection.water_damage_details);
-      console.log("🔍 DEBUG: Report generation - inspection.thermostat_image:", inspection.thermostat_image);
+      console.log("🔍 DEBUG: Report generation - detailedInspection.visible_mold_details:", detailedInspection.visible_mold_details);
+      console.log("🔍 DEBUG: Report generation - detailedInspection.water_damage_details:", detailedInspection.water_damage_details);
+      console.log("🔍 DEBUG: Report generation - detailedInspection.thermostat_image:", detailedInspection.thermostat_image);
       
-      const visibleMoldHtml = inspection.has_visible_mold && inspection.visible_mold_details && inspection.visible_mold_details.length > 0
+      const visibleMoldHtml = detailedInspection.has_visible_mold && detailedInspection.visible_mold_details && detailedInspection.visible_mold_details.length > 0
         ? `<div style="margin-bottom: 20px;">
             <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
               ⚠️ Visible Mold Detected
             </h3>
-            ${inspection.visible_mold_details.map((d, i) => `
+            ${detailedInspection.visible_mold_details.map((d, i) => `
               <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
@@ -272,12 +270,12 @@ export default function MyInspections() {
             <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
           </div>`;
 
-      const waterDamageHtml = inspection.has_water_damage && inspection.water_damage_details && inspection.water_damage_details.length > 0
+      const waterDamageHtml = detailedInspection.has_water_damage && detailedInspection.water_damage_details && detailedInspection.water_damage_details.length > 0
         ? `<div style="margin-bottom: 20px;">
             <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
               💧 Water Damage Detected
             </h3>
-            ${inspection.water_damage_details.map((d, i) => `
+            ${detailedInspection.water_damage_details.map((d, i) => `
               <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
@@ -298,7 +296,7 @@ export default function MyInspections() {
           </div>`;
       
       let environmentalHtml = '';
-      if (inspection.environmental_data_method === 'photo' && inspection.thermostat_image) {
+      if (detailedInspection.environmental_data_method === 'photo' && detailedInspection.thermostat_image) {
           environmentalHtml = `<div style="margin-bottom: 20px;">
             <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
               🌡️ Environmental Conditions
@@ -306,13 +304,13 @@ export default function MyInspections() {
             <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
               <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
               <div style="text-align: center;">
-                <img src="${inspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #bfdbfe;" />
+                <img src="${detailedInspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #bfdbfe;" />
               </div>
             </div>
           </div>`;
-      } else if (inspection.environmental_data_method === 'manual') {
-          const humidity = inspection.humidity || 'N/A';
-          const temperature = inspection.temperature || 'N/A';
+      } else if (detailedInspection.environmental_data_method === 'manual') {
+          const humidity = detailedInspection.humidity || 'N/A';
+          const temperature = detailedInspection.temperature || 'N/A';
           const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
           
           environmentalHtml = `<div style="margin-bottom: 20px;">
@@ -355,10 +353,10 @@ export default function MyInspections() {
       // Use AI-generated recommendations if available, otherwise generate based on findings
       const getRecommendationsHtml = () => {
           // First, check if we have AI-generated recommendations from lab analysis
-          if (inspection.recommendations && inspection.recommendations.trim().length > 0) {
-              console.log("🔍 DEBUG: Using AI-generated recommendations for report:", inspection.recommendations);
+          if (detailedInspection.recommendations && detailedInspection.recommendations.trim().length > 0) {
+              console.log("🔍 DEBUG: Using AI-generated recommendations for report:", detailedInspection.recommendations);
               // Format the AI recommendations as HTML, preserving line breaks
-              const formattedRecommendations = inspection.recommendations
+              const formattedRecommendations = detailedInspection.recommendations
                   .split('\n')
                   .filter(line => line.trim().length > 0)
                   .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
@@ -376,7 +374,7 @@ export default function MyInspections() {
           console.log("🔍 DEBUG: No AI recommendations found, using generic recommendations for report");
           const recommendations = [];
           
-          if (inspection.has_visible_mold) {
+          if (detailedInspection.has_visible_mold) {
               recommendations.push({
                   priority: 'high',
                   icon: '🔴',
@@ -385,7 +383,7 @@ export default function MyInspections() {
               });
           }
           
-          if (inspection.has_water_damage) {
+          if (detailedInspection.has_water_damage) {
               recommendations.push({
                   priority: 'medium',
                   icon: '🟠',
@@ -394,7 +392,7 @@ export default function MyInspections() {
               });
           }
           
-          if (inspection.humidity && parseFloat(inspection.humidity) > 60) {
+          if (detailedInspection.humidity && parseFloat(detailedInspection.humidity) > 60) {
               recommendations.push({
                   priority: 'medium',
                   icon: '🟡',
@@ -479,7 +477,7 @@ export default function MyInspections() {
       <body>
           <div class="cover-page">
               <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-              <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="MTH Logo" class="cover-image" />
+                <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
@@ -567,26 +565,8 @@ export default function MyInspections() {
     setDownloading(prev => ({ ...prev, [inspection.id]: true }));
     
     try {
-      if (inspection.report_html_url) {
-        // Instead of opening the URL directly, trigger a proper download
-        const displayNum = getDisplayNumber(inspection);
-        const fileName = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${inspection.full_name.replace(/\s+/g, '_')}.html`;
-        
-        // Fetch the file content and trigger download
-        const response = await fetch(inspection.report_html_url);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else {
-        // Fallback to on-demand generation for older reports
-        await generateAndDownloadReport(inspection);
-      }
+      // Always generate a fresh report to ensure latest lab analysis is included
+      await generateAndDownloadReport(inspection);
     } catch (error) {
       console.error("Error downloading report:", error);
       alert("Could not download the report. Please try again.");
@@ -638,9 +618,7 @@ export default function MyInspections() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">My Inspections</h1>
-            <p className="text-slate-600 mt-2">Welcome back, {user.full_name || user.email}</p>
-            {/* Debug info - remove this after testing */}
-            <p className="text-xs text-slate-400 mt-1">Debug: Found {inspections.length} inspections for {user.email}</p>
+            <p className="text-slate-600 mt-2">Welcome back, {user.name || user.email}</p>
           </div>
           
           <Button 
