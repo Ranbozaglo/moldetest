@@ -57,6 +57,13 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Define signOut function before using it in useEffect
+  const signOut = useCallback(() => {
+    console.log('🔍 AUTH DEBUG: signOut called - clearing user state and localStorage');
+    setUser(null);
+    localStorage.removeItem('mth_user');
+  }, []);
+
   // Initialize auth only once on mount
   useEffect(() => {
     if (initializationRef.current) return;
@@ -283,15 +290,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const signOut = useCallback(() => {
-    console.log('🔍 PROD DEBUG: signOut called - clearing user state and localStorage');
-    setUser(null);
-    localStorage.removeItem('mth_user');
-  }, []);
+
 
   // Function to refresh the user session
   const refreshSession = useCallback(async () => {
-    console.log('🔍 PROD DEBUG: Refreshing user session...');
+    console.log('🔍 AUTH DEBUG: Refreshing user session...');
     const savedUser = localStorage.getItem('mth_user');
     
     if (savedUser) {
@@ -300,7 +303,7 @@ export const AuthProvider = ({ children }) => {
         
         // Check if we need to refresh
         if (isTokenExpired(userData)) {
-          console.log('🔍 PROD DEBUG: Token expired, need to re-login');
+          console.log('🔍 AUTH DEBUG: Token expired, need to re-login');
           signOut();
           return false;
         }
@@ -310,17 +313,17 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('mth_user', JSON.stringify(userData));
         setUser(userData);
         
-        console.log('🔍 PROD DEBUG: Session refreshed successfully');
+        console.log('🔍 AUTH DEBUG: Session refreshed successfully');
         return true;
       } catch (error) {
-        console.error('🔍 PROD DEBUG: Error refreshing session:', error);
+        console.error('🔍 AUTH DEBUG: Error refreshing session:', error);
         signOut();
         return false;
       }
     }
     
     return false;
-  }, []);
+  }, [signOut]);
 
   // Debug helper function
   const debugAuthState = () => {
@@ -337,13 +340,13 @@ export const AuthProvider = ({ children }) => {
       }
     }
     
-    console.log('🔍 PROD DEBUG: === AUTH STATE DEBUG ===');
-    console.log('🔍 PROD DEBUG: React state user:', user);
-    console.log('🔍 PROD DEBUG: Loading state:', loading);
-    console.log('🔍 PROD DEBUG: localStorage mth_user:', savedUser ? 'exists' : 'none');
-    console.log('🔍 PROD DEBUG: Token status:', tokenStatus);
-    console.log('🔍 PROD DEBUG: Current URL:', window.location.href);
-    console.log('🔍 PROD DEBUG: ========================');
+    console.log('🔍 AUTH DEBUG: === AUTH STATE DEBUG ===');
+    console.log('🔍 AUTH DEBUG: React state user:', user);
+    console.log('🔍 AUTH DEBUG: Loading state:', loading);
+    console.log('🔍 AUTH DEBUG: localStorage mth_user:', savedUser ? 'exists' : 'none');
+    console.log('🔍 AUTH DEBUG: Token status:', tokenStatus);
+    console.log('🔍 AUTH DEBUG: Current URL:', window.location.href);
+    console.log('🔍 AUTH DEBUG: ========================');
     return { user, loading, savedUser, tokenStatus, currentUrl: window.location.href };
   };
 
