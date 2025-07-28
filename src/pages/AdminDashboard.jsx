@@ -600,7 +600,7 @@ export default function AdminDashboard() {
       ${recommendationsHtml}
     </div>`;
     
-    const samplesHtml = samples.sample_image && samples.sample_image.length > 0
+    const samplesHtml = samples && samples.length > 0
       ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location || 'N/A'}</h4><p>${s.description || ''}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
       : '<p>No samples were documented for this inspection.</p>';
       
