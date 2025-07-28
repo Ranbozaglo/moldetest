@@ -502,11 +502,23 @@ export default function AdminDashboard() {
         // First, check if we have AI-generated recommendations from lab analysis
         if (inspection.recommendations && inspection.recommendations.trim().length > 0) {
             console.log("🔍 DEBUG: Admin report using AI-generated recommendations:", inspection.recommendations);
-            // Format the AI recommendations as HTML, preserving line breaks
-            const formattedRecommendations = inspection.recommendations
-                .split('\n')
+            // Format the AI recommendations as HTML, preserving line breaks and ensuring proper spacing
+            const lines = inspection.recommendations.split('\n');
+            const formattedRecommendations = lines
                 .filter(line => line.trim().length > 0)
-                .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
+                .map((line, index) => {
+                    const trimmedLine = line.trim();
+                    // Check if this line is a bolded section header (contains **)
+                    const isBoldedSection = trimmedLine.includes('**') && trimmedLine.includes('**');
+                    
+                    if (isBoldedSection) {
+                        // Add extra spacing before bolded sections (except the first one)
+                        const extraSpacing = index > 0 ? '<div style="height: 20px;"></div>' : '';
+                        return `${extraSpacing}<p style="margin: 8px 0; line-height: 1.5; color: #374151; font-weight: bold;">${trimmedLine}</p>`;
+                    } else {
+                        return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${trimmedLine}</p>`;
+                    }
+                })
                 .join('');
             
             return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
@@ -588,7 +600,7 @@ export default function AdminDashboard() {
       ${recommendationsHtml}
     </div>`;
     
-    const samplesHtml = samples && samples.length > 0
+    const samplesHtml = samples.sample_image && samples.sample_image.length > 0
       ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location || 'N/A'}</h4><p>${s.description || ''}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
       : '<p>No samples were documented for this inspection.</p>';
       

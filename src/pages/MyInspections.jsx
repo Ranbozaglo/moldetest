@@ -355,11 +355,23 @@ export default function MyInspections() {
           // First, check if we have AI-generated recommendations from lab analysis
           if (detailedInspection.recommendations && detailedInspection.recommendations.trim().length > 0) {
               console.log("🔍 DEBUG: Using AI-generated recommendations for report:", detailedInspection.recommendations);
-              // Format the AI recommendations as HTML, preserving line breaks
-              const formattedRecommendations = detailedInspection.recommendations
-                  .split('\n')
+              // Format the AI recommendations as HTML, preserving line breaks and ensuring proper spacing
+              const lines = detailedInspection.recommendations.split('\n');
+              const formattedRecommendations = lines
                   .filter(line => line.trim().length > 0)
-                  .map(line => `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`)
+                  .map((line, index) => {
+                      const trimmedLine = line.trim();
+                      // Check if this line is a bolded section header (contains **)
+                      const isBoldedSection = trimmedLine.includes('**') && trimmedLine.includes('**');
+                      
+                      if (isBoldedSection) {
+                          // Add extra spacing before bolded sections (except the first one)
+                          const extraSpacing = index > 0 ? '<div style="height: 20px;"></div>' : '';
+                          return `${extraSpacing}<p style="margin: 8px 0; line-height: 1.5; color: #374151; font-weight: bold;">${trimmedLine}</p>`;
+                      } else {
+                          return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${trimmedLine}</p>`;
+                      }
+                  })
                   .join('');
               
               return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
