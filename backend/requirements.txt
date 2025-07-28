@@ -13,6 +13,7 @@ jinja2==3.1.2
 
 # Supabase
 supabase==2.0.2
+websockets==12.0
 
 # Flask (optional if still used)
 flask==3.0.0
