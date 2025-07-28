@@ -1049,6 +1049,7 @@ export default function InspectionDetails() {
                     {(() => {
                       // Parse mold_locations similar to AdminDashboard
                       let moldLocations = [];
+
                       try {
                         if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
                           moldLocations = JSON.parse(inspection.mold_locations);
@@ -1083,8 +1084,8 @@ export default function InspectionDetails() {
                           <Badge variant="destructive" className="ml-2">High Priority</Badge>
                         </div>
                           <div className="relative group">
-                                <img
-                                  src={image}
+                              <img
+                              src={image}
                               alt={`Mold image ${index + 1}`}
                               className="w-full h-32 object-cover rounded border-2 border-red-300"
                                 />
@@ -1100,6 +1101,72 @@ export default function InspectionDetails() {
                   </div>
                 </div>
               )}
+
+                            {/* Water Damage Images with Locations */}
+                            {inspection.water_damage_images && inspection.water_damage_images.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Water Damage Images with Locations</Label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(() => {
+                      // Parse mold_locations similar to AdminDashboard
+                      let moldLocations = [];
+
+                      try {
+                        if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+                          moldLocations = JSON.parse(inspection.mold_locations);
+                        } else if (Array.isArray(inspection.mold_locations)) {
+                          moldLocations = inspection.mold_locations;
+                        }
+                      } catch (e) {
+                        console.error("❌ Error parsing mold_locations:", e);
+                      }
+                      
+                      return inspection.water_damage_images.map((image, index) => (
+                      <div key={index} className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                          <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                              <p className="font-semibold text-red-800">
+                                Location: {(() => {
+                                  try {
+                                    if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
+                                      const parsed = JSON.parse(inspection.water_damage_locations);
+                                      return Array.isArray(parsed) ? parsed.join(', ') : parsed;
+                                    } else if (Array.isArray(inspection.water_damage_locations)) {
+                                      return inspection.water_damage_locations.join(', ');
+                                    } else {
+                                      return inspection.water_damage_locations || 'Unknown Location';
+                                    }
+                                  } catch (e) {
+                                    return inspection.water_damage_locations || 'Unknown Location';
+                                  }
+                                })()}
+                            </p>
+                          </div>
+                          <Badge variant="destructive" className="ml-2">Medium Priority</Badge>
+                        </div>
+                          <div className="relative group">
+                              <img
+                              src={image}
+                              alt={`Water damage image ${index + 1}`}
+                              className="w-full h-32 object-cover rounded border-2 border-red-300"
+                                />
+                                <div className="absolute inset-0 bg-red-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
+                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
+                                    Water Damage
+                                  </span>
+                                </div>
+                              </div>
+                          </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+              
+              
 
               {/* Environmental Conditions */}
               <div className="space-y-4">
@@ -1151,50 +1218,6 @@ export default function InspectionDetails() {
                 </div>
               </div>
 
-
-
-              {/* Water Damage Images */}
-              {inspection.has_water_damage && inspection.water_damage_details && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-5 h-5 text-orange-600" />
-                    <Label className="text-slate-700 font-semibold text-lg">Water Damage Images</Label>
-                  </div>
-                  <div className="space-y-3">
-                    {inspection.water_damage_details.map((detail, index) => (
-                      <div key={index} className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold text-orange-800">Location {index + 1}: {detail.location}</p>
-                            <p className="text-sm text-orange-600 mt-1">
-                              💧 Water damage detected - may contribute to mold growth
-                            </p>
-                          </div>
-                          <Badge variant="default" className="ml-2">Medium Priority</Badge>
-                        </div>
-                        {detail.images && detail.images.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
-                            {detail.images.map((image, imgIndex) => (
-                              <div key={imgIndex} className="relative group">
-                                <img
-                                  src={image}
-                                  alt={`Water damage evidence ${index + 1}-${imgIndex + 1}`}
-                                  className="w-full h-20 object-cover rounded border-2 border-orange-300"
-                                />
-                                <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
-                                  <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
-                                    Water Damage
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Recommendations */}
               <div className="space-y-3">
@@ -1641,31 +1664,6 @@ export default function InspectionDetails() {
           </Card>
 
 
-          {/* Water Damage Images from Database */}
-          {inspection.water_damage_images && inspection.water_damage_images.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Droplets className="w-5 h-5 text-orange-600" />
-                <Label className="text-slate-700 font-semibold text-lg">Water Damage Images</Label>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {inspection.water_damage_images.map((image, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={image}
-                      alt={`Water damage image ${index + 1}`}
-                      className="w-full h-24 object-cover rounded border-2 border-orange-300"
-                    />
-                    <div className="absolute inset-0 bg-orange-900 bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded flex items-center justify-center">
-                      <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100">
-                        Water Damage
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
 
         </div>
