@@ -686,26 +686,33 @@ export default function AdminDashboard() {
     ${
       (inspection.lab_recommendations || inspection.recommendations)
         ? (inspection.lab_recommendations || inspection.recommendations)
-            .replace(/\\n/g, '\n') // הסרת תווי \n כתובים
-            .split(/\n{2,}/) // פיצול לפי רווחים בין פסקאות
+            // הסרת תווי \n כתובים
+            .replace(/\\n/g, '')
+            // פיצול לפי רווחים כפולים (או מעבר שורה כפול)
+            .split(/\n{2,}/)
             .map(section => {
-              const match = section.match(/^([\w\s]+):\s*(.+)$/s); // תבנית: "כותרת: תוכן"
-              if (match) {
-                const title = match[1].trim();
-                const content = match[2].trim();
+              // הסרת כוכביות מיותרים
+              section = section.replace(/\*/g, '').trim();
+              // נניח שהתבנית היא "Heading: Content"
+              const indexOfColon = section.indexOf(':');
+              if (indexOfColon !== -1) {
+                const title = section.substring(0, indexOfColon).trim();
+                const content = section.substring(indexOfColon + 1).trim();
                 return `
                   <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
                   <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
+                  <br>
                 `;
-              } else {
-                return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section.trim()}</p>`;
               }
+              // אם לא נמצא כותרת, מחזירים את הטקסט כמפורט
+              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
             })
             .join('')
         : '<p>Pending recommendations.</p>'
     }
   </div>
 </div>
+
 
 
             
