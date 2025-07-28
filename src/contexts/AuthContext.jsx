@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }) => {
       lastValidationRef.current = now;
       
       // Make a simple API call to validate the token
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest.onrender.com/api'}/auth/validate`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api'}/auth/validate`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${userData.access_token}`,
