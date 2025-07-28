@@ -87,22 +87,26 @@ class LLMService:
     
     async def generate_recommendations(self, inspection_data: Dict[str, Any]) -> str:
         """
-        Generate recommendations based on inspection findings
+        Generate recommendations based on inspection findings using structured format
         """
         prompt = f"""
-        Based on this mold inspection, generate professional recommendations:
-        
-        Findings:
+        Based on this mold inspection, generate professional recommendations in clear, professional English using Markdown formatting. Use **bolded section headers** followed by bullet points under each.
+
+        Inspection Findings:
         - Visible Mold: {'Yes' if inspection_data.get('has_visible_mold') else 'No'}
         - Water Damage: {'Yes' if inspection_data.get('has_water_damage') else 'No'}
         - Mold Locations: {inspection_data.get('visible_mold_details', [])}
         - Water Damage Locations: {inspection_data.get('water_damage_details', [])}
+        - Lab Analysis: {inspection_data.get('lab_conclusion', 'Not available')}
         
-        Please provide:
-        1. Immediate actions needed
-        2. Long-term recommendations
-        3. Professional services recommended
-        4. Safety precautions
+        Structure your response with these 5 sections:
+        1. **Immediate Actions Needed**
+        2. **Preventive Measures**
+        3. **Professional Services Recommended**
+        4. **Timeline for Required Actions**
+        5. **Environmental Controls to Implement**
+        
+        Ensure each section includes at least 1–2 relevant bullet points. Do not add extra sections. Do not summarize or repeat the original text — only extract and organize actionable insights.
         """
         
         request = LLMRequest(prompt=prompt, context=inspection_data)
