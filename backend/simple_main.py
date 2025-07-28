@@ -225,13 +225,28 @@ TASK: Based on the inspection findings and lab analysis results above, provide a
 Please provide your response in the following JSON format:
 {
   "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
-  "recommendations": 
-*Immediate Actions Needed:*
-*Preventive Measures:*
-*Professional Services Recommended:* 
-*Timeline for Required Actions:*
-*Environmental Controls to Implement:*
+recommendations": [
+    "**Immediate Actions Needed:**",
+    "- [List immediate actions here]",
+    "",
+    "**Preventive Measures:**",
+    "- [List preventive steps here]",
+    "",
+    "**Professional Services Recommended:**",
+    "- [List recommended services here]",
+    "",
+    "**Timeline for Required Actions:**",
+    "- [Specify the timeline here]",
+    "",
+    "**Environmental Controls to Implement:**",
+    "- [List environmental control steps here]"
+  ]
 }
+
+
+
+Each recommendation section should begin with a bolded title using Markdown syntax (i.e. **Title:**), and each subpoint should start with a dash (-) and be listed on a new line. Use clear, actionable language for each item. Do not return any extra explanation—just return the JSON object as described.
+
 
 Focus on:
 1. Correlating lab results with inspection findings
