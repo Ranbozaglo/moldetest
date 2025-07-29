@@ -1,27 +1,18 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { User } from "@/api/entities";
-import { MoldInspection } from "@/api/entities";
-import { Sample } from "@/api/entities";
-import { EmailService, EmailTemplate } from "@/api/entities";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input  } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useNavigate, Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { format } from "date-fns";
-import { 
-  Download, Eye, FileText, Trash2, Mail, Star, FlaskConical, Search,
-  BarChart3, PieChart, TrendingUp, Users, MapPin, Calendar, AlertTriangle, CheckCircle,
-  Clock, Filter, RefreshCw, Database, Image, File, MoreHorizontal, Edit, Send, 
-  CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap
-} from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger , DropdownMenuLabel , DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database,Zap , CheckCircle2} from "lucide-react";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -78,10 +69,20 @@ export default function AdminDashboard() {
     try {
       const allInspections = await MoldInspection.list('-created_at', 50, false); // Use lightweight endpoint for better performance
       
+      console.log("🔍 DEBUG: Raw inspections data:", allInspections);
+      console.log("🔍 DEBUG: Number of inspections:", allInspections?.length);
+      
       // Check if allInspections is an array
       if (!Array.isArray(allInspections)) {
+        console.error("❌ ERROR: allInspections is not an array:", typeof allInspections);
         setInspections([]);
         return;
+      }
+      
+      // Debug: Check the first inspection object structure
+      if (allInspections.length > 0) {
+        console.log("🔍 DEBUG: First inspection object:", JSON.stringify(allInspections[0], null, 2));
+        console.log("🔍 DEBUG: First inspection keys:", Object.keys(allInspections[0]));
       }
       
       // For lightweight data, we don't need to parse heavy fields
@@ -96,35 +97,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Helper function to process email template placeholders
-  const processEmailTemplate = (template, inspection) => {
-    const displayNum = getDisplayNumber(inspection);
-    const placeholders = {
-      '{{client_name}}': inspection.full_name || 'Valued Customer',
-      '{{inspection_number}}': displayNum || inspection.id,
-      '{{property_address}}': `${inspection.street_address}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}`,
-      '{{received_date}}': new Date().toLocaleDateString(),
-      '{{report_date}}': new Date().toLocaleDateString(),
-      '{{report_link}}': `${window.location.origin}${createPageUrl("MyInspections")}`,
-      '{{review_link}}': 'https://g.page/r/moldtestinghouston/review'
-    };
-
-    let processedSubject = template.subject;
-    let processedBody = template.body;
-
-    // Replace placeholders in both subject and body
-    Object.entries(placeholders).forEach(([placeholder, value]) => {
-      const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
-      processedSubject = processedSubject.replace(regex, value);
-      processedBody = processedBody.replace(regex, value);
-    });
-
-    return {
-      subject: processedSubject,
-      body: processedBody
-    };
-  };
-  
   const getDisplayNumber = (inspection) => {
     const number = inspection.inspection_number || inspection.id;
     return `TT #${number}`;
@@ -736,19 +708,167 @@ export default function AdminDashboard() {
     `;
   };
 
-  const downloadPDF = async (inspection) => {
-    // Always generate a fresh report to ensure latest lab analysis is included
-    setDownloadStatus({ type: 'info', message: `Generating report for ${getDisplayNumber(inspection)}...` });
+  const sendLabReceivedEmail = async (inspection) => {
+    // Debug: Log the inspection object to see what fields are available
+    console.log("🔍 DEBUG: Full inspection object:", JSON.stringify(inspection, null, 2));
+    console.log("🔍 DEBUG: Inspection ID:", inspection.id);
+    console.log("🔍 DEBUG: Inspection Number:", inspection.inspection_number);
+    console.log("🔍 DEBUG: All inspection keys:", Object.keys(inspection));
+    
+    // Try multiple possible ID fields
+    const inspectionId = inspection.id || 
+                        inspection.inspection_number || 
+                        inspection.inspection_id ||
+                        inspection.number ||
+                        null;
+    
+    console.log("🔍 DEBUG: Final inspectionId being used:", inspectionId);
+    console.log("🔍 DEBUG: Type of inspectionId:", typeof inspectionId);
+    
+    if (!inspectionId) {
+      console.error("❌ ERROR: No valid inspection ID found");
+      console.error("❌ ERROR: Available fields:", Object.keys(inspection));
+      console.error("❌ ERROR: inspection.id =", inspection.id);
+      console.error("❌ ERROR: inspection.inspection_number =", inspection.inspection_number);
+      alert("Error: Could not identify the inspection. Please try again.");
+      return;
+    }
+    
+    const emailKey = `lab_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+    
     try {
-      if (!inspection) {
-        throw new Error("Could not find inspection details.");
-      }
+      console.log(`🔍 DEBUG: Sending lab received email for inspection ${inspectionId}`);
       
-      // Fetch detailed inspection data to ensure we have the latest lab analysis
+      // Send email using the backend email service
+      const emailResponse = await EmailService.sendLabReceivedEmail(inspectionId);
+      console.log("Email service response:", emailResponse);
+      
+      // Update inspection status to 'in_progress' in the database
+      console.log(`🔍 DEBUG: About to call MoldInspection.update with ID: ${inspectionId}`);
+      await MoldInspection.update(inspectionId, { 
+        status: 'in_progress',
+        client_status_detail: "Your samples have been received and are now in lab analysis." 
+      });
+
+      // Reload inspections to reflect the change
+      await loadInspections();
+      
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
+      setTimeout(() => {
+        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error("❌ Error sending lab received email:", error);
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
+      setTimeout(() => {
+        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
+      }, 5000);
+    }
+  };
+
+  const sendReportReadyEmail = async (inspection) => {
+    // Use inspection_number as fallback if id is undefined
+    const inspectionId = inspection.id || inspection.inspection_number;
+    
+    if (!inspectionId) {
+      console.error("❌ ERROR: No valid inspection ID found");
+      alert("Error: Could not identify the inspection. Please try again.");
+      return;
+    }
+    
+    const emailKey = `report_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+    
+    try {
+      const displayNum = getDisplayNumber(inspection);
+      
+      // Step 1: Generate and upload the report
+      setDownloadStatus({ type: 'info', message: `Generating and storing report for ${displayNum}...` });
+      const samples = await Sample.findMany({ inspection_id: inspectionId });
+      const reportHtml = await generateReportHtmlContent(inspection, samples);
+      const reportFile = new File([reportHtml], `report-${inspectionId}.html`, { type: 'text/html' });
+      
+      // Mock file upload since LLMService is removed
+      const reportUrl = `https://storage.moldtestinghouston.com/reports/report-${inspectionId}.html`;
+      setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
+      setTimeout(() => setDownloadStatus(null), 3000);
+
+      // Step 2: Send the email notification
+      console.log(`🔍 DEBUG: Sending report ready email for inspection ${inspectionId}`);
+      const emailResponse = await EmailService.sendReportReadyEmail(inspectionId);
+      console.log("Email service response:", emailResponse);
+      
+      // Step 3: Update the inspection record
+      await MoldInspection.update(inspectionId, { 
+        status: 'completed',
+        client_status_detail: "Your detailed analysis and report are complete and available for download.",
+        report_html_url: reportUrl
+      });
+      
+      // Step 4: Refresh the UI
+      await loadInspections();
+      
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
+      setTimeout(() => {
+        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error("❌ Error sending report ready email:", error);
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
+      setDownloadStatus({ type: 'error', message: `Failed to prepare report: ${error.message}` });
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  const sendReviewRequestEmail = async (inspection) => {
+    // Use inspection_number as fallback if id is undefined
+    const inspectionId = inspection.id || inspection.inspection_number;
+    
+    if (!inspectionId) {
+      console.error("❌ ERROR: No valid inspection ID found");
+      alert("Error: Could not identify the inspection. Please try again.");
+      return;
+    }
+    
+    const emailKey = `review_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+    
+    try {
+      console.log(`🔍 DEBUG: Sending review request email for inspection ${inspectionId}`);
+      const emailResponse = await EmailService.sendReviewRequestEmail(inspectionId);
+      console.log("Email service response:", emailResponse);
+      
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
+      setTimeout(() => {
+        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
+      }, 3000);
+      
+    } catch (error) {
+      console.error("❌ Error sending review request email:", error);
+      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
+      setTimeout(() => {
+        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
+      }, 5000);
+    }
+  };
+
+  const getEmailButtonStatus = (emailKey) => {
+    return emailStatus[emailKey] || 'idle';
+  };
+
+  const downloadPDF = async (inspection) => {
+    setDownloadStatus({ type: 'info', message: 'Generating detailed report...' });
+    
+    try {
       let detailedInspection = inspection;
+      
       console.log("🔍 DEBUG: Fetching detailed inspection data for report generation");
       try {
-        detailedInspection = await MoldInspection.getDetailed(inspection.id);
+        const inspectionId = inspection.id || inspection.inspection_number;
+        detailedInspection = await MoldInspection.getDetailed(inspectionId);
         console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
         console.log("🔍 DEBUG: Lab conclusion:", detailedInspection.lab_conclusion);
         console.log("🔍 DEBUG: Lab recommendations:", detailedInspection.lab_recommendations);
@@ -758,7 +878,8 @@ export default function AdminDashboard() {
         // Continue with current data if detailed fetch fails
       }
       
-      const samples = await Sample.findMany({ inspection_id: inspection.id });
+      const inspectionId = inspection.id || inspection.inspection_number;
+      const samples = await Sample.findMany({ inspection_id: inspectionId });
       
       const displayNum = getDisplayNumber(inspection);
       
@@ -782,117 +903,6 @@ export default function AdminDashboard() {
       setDownloadStatus({ type: 'error', message: `Failed to generate report: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
-  };
-
-  const sendLabReceivedEmail = async (inspection) => {
-    const emailKey = `lab_${inspection.id}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
-    
-    try {
-      // Get the email template
-      const template = await EmailTemplate.getByType('lab_received');
-      const processedEmail = processEmailTemplate(template, inspection);
-      
-      // Mock email service since specific methods don't exist
-      console.log(`Sending lab received email for inspection ${inspection.id}`);
-      console.log(`Subject: ${processedEmail.subject}`);
-      console.log(`Body: ${processedEmail.body}`);
-      
-      // Update inspection status to 'in_progress'
-      await MoldInspection.update(inspection.id, { 
-        status: 'in_progress',
-        client_status_detail: "Your samples have been received and are now in lab analysis." 
-      });
-
-      // Reload inspections to reflect the change
-      await loadInspections();
-      
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
-      
-    } catch (error) {
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 5000);
-    }
-  };
-
-  const sendReportReadyEmail = async (inspection) => {
-    const emailKey = `report_${inspection.id}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
-    
-    try {
-      const displayNum = getDisplayNumber(inspection);
-      
-      // Step 1: Generate and upload the report
-      setDownloadStatus({ type: 'info', message: `Generating and storing report for ${displayNum}...` });
-      const samples = await Sample.findMany({ inspection_id: inspection.id });
-      const reportHtml = await generateReportHtmlContent(inspection, samples);
-      const reportFile = new File([reportHtml], `report-${inspection.id}.html`, { type: 'text/html' });
-      
-      // Mock file upload since LLMService is removed
-      const reportUrl = `https://storage.moldtestinghouston.com/reports/report-${inspection.id}.html`;
-      setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
-      setTimeout(() => setDownloadStatus(null), 3000);
-
-      // Step 2: Get the email template and process it
-      const template = await EmailTemplate.getByType('report_ready');
-      const processedEmail = processEmailTemplate(template, inspection);
-
-      // Step 3: Send the email notification
-      console.log(`Sending report ready email for inspection ${inspection.id}`);
-      console.log(`Subject: ${processedEmail.subject}`);
-      console.log(`Body: ${processedEmail.body}`);
-      
-      // Step 4: Update the inspection record
-      await MoldInspection.update(inspection.id, { 
-        status: 'completed',
-        client_status_detail: "Your detailed analysis and report are complete and available for download.",
-        report_html_url: reportUrl
-      });
-      
-      // Step 5: Refresh the UI
-      await loadInspections();
-      
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
-      
-    } catch (error) {
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
-      setDownloadStatus({ type: 'error', message: `Failed to prepare report: ${error.message}` });
-      setTimeout(() => setDownloadStatus(null), 5000);
-    }
-  };
-
-  const sendReviewRequestEmail = async (inspection) => {
-    const emailKey = `review_${inspection.id}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
-    
-    try {
-      // Get the email template and process it
-      const template = await EmailTemplate.getByType('review_request');
-      const processedEmail = processEmailTemplate(template, inspection);
-      
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
-      
-    } catch (error) {
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 5000);
-    }
-  };
-
-  const getEmailButtonStatus = (emailKey) => {
-    return emailStatus[emailKey] || 'idle';
   };
 
   // Status switching functionality
@@ -1010,14 +1020,6 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button 
-              onClick={() => navigate('/EmailSettings')} 
-              variant="outline" 
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-            >
-              <Mail className="w-4 h-4" />
-              Email Settings
-            </Button>
             <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2">
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -1354,19 +1356,133 @@ export default function AdminDashboard() {
                                   Download Report
                                 </DropdownMenuItem>
                                 
+                                <DropdownMenuSeparator />
+                                
+                                {/* Email Actions */}
+                                <DropdownMenuItem 
+                                  onClick={() => sendLabReceivedEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                  {getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => sendReportReadyEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`report_${inspection.id || inspection.inspection_number}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Mail className="w-4 h-4" />
+                                  {getEmailButtonStatus(`report_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Report Ready Email'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => sendReviewRequestEmail(inspection)}
+                                  disabled={getEmailButtonStatus(`review_${inspection.id || inspection.inspection_number}`) === 'sending'}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Star className="w-4 h-4" />
+                                  {getEmailButtonStatus(`review_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Review Request'}
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator />
+                                
                                 <DropdownMenuItem 
                                   onClick={async () => {
                                     try {
-                                      // Fetch the latest detailed inspection data
-                                      const detailedInspection = await MoldInspection.getDetailed(inspection.id);
-                                      console.log("🔍 DEBUG: View Report - Fetched detailed inspection:", detailedInspection);
-                                      console.log("🔍 DEBUG: View Report - Lab conclusion:", detailedInspection.lab_conclusion);
-                                      console.log("🔍 DEBUG: View Report - Lab recommendations:", detailedInspection.lab_recommendations);
-                                      
-                                      const samples = await Sample.findMany({ inspection_id: inspection.id });
-                                      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
                                       const newWindow = window.open('', '_blank');
-                                      newWindow.document.write(reportHtml);
+                                      newWindow.document.write(`
+                                        <html>
+                                          <head>
+                                            <title>Report - ${getDisplayNumber(inspection)}</title>
+                                            <style>
+                                              body { font-family: Arial, sans-serif; margin: 20px; }
+                                              .header { text-align: center; margin-bottom: 30px; }
+                                              .section { margin-bottom: 20px; }
+                                              .section h2 { color: #2563eb; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }
+                                              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+                                              .info-item { background: #f9fafb; padding: 10px; border-radius: 5px; }
+                                              .info-label { font-weight: bold; color: #374151; }
+                                              .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+                                              .status-pending { background: #fef3c7; color: #92400e; }
+                                              .status-in-progress { background: #dbeafe; color: #1e40af; }
+                                              .status-completed { background: #d1fae5; color: #065f46; }
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <div class="header">
+                                              <h1>Mold Testing Report</h1>
+                                              <h2>${getDisplayNumber(inspection)}</h2>
+                                            </div>
+                                            
+                                            <div class="section">
+                                              <h2>Client Information</h2>
+                                              <div class="info-grid">
+                                                <div class="info-item">
+                                                  <div class="info-label">Name:</div>
+                                                  <div>${inspection.full_name || 'N/A'}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Email:</div>
+                                                  <div>${inspection.email || 'N/A'}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Phone:</div>
+                                                  <div>${inspection.phone || 'N/A'}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Status:</div>
+                                                  <div><span class="status-badge status-${inspection.status}">${getStatusDisplay(inspection.status)}</span></div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            
+                                            <div class="section">
+                                              <h2>Property Information</h2>
+                                              <div class="info-grid">
+                                                <div class="info-item">
+                                                  <div class="info-label">Address:</div>
+                                                  <div>${inspection.street_address}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Property Type:</div>
+                                                  <div>${inspection.property_type || 'N/A'}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Square Footage:</div>
+                                                  <div>${inspection.square_footage || 'N/A'} sq ft</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Client Type:</div>
+                                                  <div>${inspection.client_type || 'N/A'}</div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            
+                                            <div class="section">
+                                              <h2>Inspection Findings</h2>
+                                              <div class="info-grid">
+                                                <div class="info-item">
+                                                  <div class="info-label">Visible Mold:</div>
+                                                  <div>${inspection.has_visible_mold ? 'Yes' : 'No'}</div>
+                                                </div>
+                                                <div class="info-item">
+                                                  <div class="info-label">Water Damage:</div>
+                                                  <div>${inspection.has_water_damage ? 'Yes' : 'No'}</div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            
+                                            <div class="section">
+                                              <h2>Additional Details</h2>
+                                              <p><strong>Status Detail:</strong> ${inspection.client_status_detail || 'No additional details'}</p>
+                                              <p><strong>Created:</strong> ${format(new Date(inspection.created_date), 'PPP')}</p>
+                                              ${inspection.updated_date ? `<p><strong>Last Updated:</strong> ${format(new Date(inspection.updated_date), 'PPP')}</p>` : ''}
+                                            </div>
+                                          </body>
+                                        </html>
+                                      `);
                                       newWindow.document.close();
                                     } catch (error) {
                                       console.error("❌ Error viewing report:", error);
@@ -1377,36 +1493,6 @@ export default function AdminDashboard() {
                                 >
                                   <Eye className="w-4 h-4" />
                                   View Report
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuSeparator />
-                                
-                                {/* Email Actions */}
-                                <DropdownMenuItem 
-                                  onClick={() => sendLabReceivedEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`lab_received_${inspection.id}`) === 'sending'}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Mail className="w-4 h-4" />
-                                  {getEmailButtonStatus(`lab_received_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuItem 
-                                  onClick={() => sendReportReadyEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`report_ready_${inspection.id}`) === 'sending'}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Mail className="w-4 h-4" />
-                                  {getEmailButtonStatus(`report_ready_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Report Ready Email'}
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuItem 
-                                  onClick={() => sendReviewRequestEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`review_request_${inspection.id}`) === 'sending'}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Star className="w-4 h-4" />
-                                  {getEmailButtonStatus(`review_request_${inspection.id}`) === 'sending' ? 'Sending...' : 'Send Review Request'}
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuSeparator />

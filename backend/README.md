@@ -1,25 +1,27 @@
-# Mold Testing Houston Backend API
+# Mold Testing Houston Backend
 
-A FastAPI-based backend for the Mold Testing Houston DIY Mold Test Kit application.
+A Flask-based backend for the Mold Testing Houston DIY Mold Test Kit application.
 
 ## Features
 
-- **RESTful API** - Complete CRUD operations for inspections, users, and samples
-- **Authentication** - JWT-based authentication with user registration and login
-- **LLM Integration** - OpenAI GPT-4 integration for AI-powered features
-- **Email Service** - Automated email notifications and reports
-- **Database** - PostgreSQL with SQLAlchemy ORM
-- **Documentation** - Auto-generated API documentation with Swagger UI
+- **Flask** - Modern, fast web framework for building APIs
+- **Supabase** - Database and authentication
+- **Google Cloud Vision** - OCR for lab analysis
+- **OpenAI GPT** - AI-powered analysis and recommendations
+- **JWT Authentication** - Secure user authentication
+- **CORS Support** - Cross-origin resource sharing
+- **File Upload** - Image upload and processing
+- **Email Service** - SMTP email notifications
 
 ## Tech Stack
 
-- **FastAPI** - Modern, fast web framework for building APIs
-- **SQLAlchemy** - SQL toolkit and ORM
-- **PostgreSQL** - Primary database
-- **OpenAI GPT-4** - LLM for AI features
-- **JWT** - Authentication tokens
-- **Pydantic** - Data validation and serialization
-- **Uvicorn** - ASGI server
+- **Python 3.9+**
+- **Flask** - Web framework
+- **Supabase** - Database and auth
+- **Google Cloud Vision** - OCR
+- **OpenAI** - AI analysis
+- **JWT** - Authentication
+- **Gunicorn** - WSGI server
 
 ## Installation
 

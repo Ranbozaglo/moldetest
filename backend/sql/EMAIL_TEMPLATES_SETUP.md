@@ -1,170 +1,131 @@
-# Email Templates Setup Guide
+# Email System Setup Guide
 
-This guide explains how to set up the email templates feature for the Mold Testing Houston admin dashboard.
+This guide explains the email system for the Mold Testing Houston admin dashboard.
 
 ## Overview
 
-The email templates system allows administrators to customize the content of automated emails sent to customers during different stages of the inspection process.
+The email system sends automated notifications to customers during different stages of the inspection process.
 
 ## Features
 
-- **Template Management**: Create, edit, and reset email templates through the admin dashboard
-- **Placeholder Variables**: Use dynamic variables like `{{client_name}}`, `{{inspection_number}}`, etc.
-- **Rich Text Editor**: HTML-based email composition with formatting options
-- **Template Types**: Support for Lab Received, Report Ready, and Review Request emails
+- **Automated Emails**: Send notifications when samples are received, reports are ready, and for review requests
+- **SMTP Integration**: Uses SMTP for reliable email delivery
+- **Admin Dashboard**: Send emails directly from the admin dashboard
+- **Status Updates**: Automatically updates inspection status when emails are sent
 
-## Database Setup
+## Email Types
 
-### 1. Create the Email Templates Table
-
-Run the following SQL script in your Supabase SQL editor:
-
-```bash
-psql -h your-supabase-host -U postgres -d postgres -f backend/sql/create_email_templates_table.sql
-```
-
-Or execute the SQL commands directly in Supabase Dashboard > SQL Editor.
-
-### 2. Verify Table Creation
-
-Check that the table was created successfully:
-
-```sql
-SELECT * FROM public.email_templates;
-```
-
-You should see 3 default templates with types: `lab_received`, `report_ready`, and `review_request`.
-
-## Frontend Setup
-
-### 1. Install Dependencies
-
-Make sure you have React Quill installed:
-
-```bash
-npm install react-quill
-```
-
-### 2. Access Email Settings
-
-1. Log in as an admin user
-2. Navigate to Admin Dashboard
-3. Click "Email Settings" button in the header
-4. Edit templates using the rich text editor
-
-## API Endpoints
-
-The following API endpoints are available:
-
-- `GET /api/email-templates` - Get all email templates
-- `GET /api/email-templates/{type}` - Get specific template by type
-- `PUT /api/email-templates/{type}` - Update a specific template
-- `POST /api/email-templates/{type}/reset` - Reset template to default
-
-## Available Placeholder Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `{{client_name}}` | Customer's full name | John Smith |
-| `{{inspection_number}}` | Formatted inspection number | MTH #123 |
-| `{{property_address}}` | Full property address | 123 Main St, Houston, TX 77001 |
-| `{{received_date}}` | Date samples were received | 12/15/2023 |
-| `{{report_date}}` | Date report was generated | 12/18/2023 |
-| `{{report_link}}` | Link to customer portal | https://app.moldtestinghouston.com/MyInspections |
-| `{{review_link}}` | Link to Google review page | https://g.page/r/moldtestinghouston/review |
-
-## Template Types
-
-### 1. Lab Received (`lab_received`)
+### 1. Lab Received Email
 - **When sent**: After lab samples are received
 - **Purpose**: Notify customer that samples are being processed
 - **Status update**: Changes inspection status to 'in_progress'
+- **Endpoint**: `POST /api/email/send-lab-received/{inspection_id}`
 
-### 2. Report Ready (`report_ready`)
+### 2. Report Ready Email
 - **When sent**: When mold analysis report is complete
 - **Purpose**: Notify customer that report is available for download
 - **Status update**: Changes inspection status to 'completed'
+- **Endpoint**: `POST /api/email/send-report-ready/{inspection_id}`
 
-### 3. Review Request (`review_request`)
+### 3. Review Request Email
 - **When sent**: After inspection is completed (optional)
 - **Purpose**: Request customer feedback and reviews
 - **Status update**: No status change
+- **Endpoint**: `POST /api/email/send-review-request/{inspection_id}`
 
-## Customization
+## Configuration
 
-### Adding New Template Types
+### SMTP Settings
 
-1. Add new template type to the database:
-```sql
-INSERT INTO public.email_templates (type, subject, body) 
-VALUES ('new_type', 'Subject Here', '<p>Body content here</p>');
+Add these environment variables to your `.env` file:
+
+```env
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+FROM_EMAIL=your_email@gmail.com
 ```
 
-2. Update the frontend EmailSettings.jsx:
-```javascript
-const templateTypes = [
-  // ... existing types
-  {
-    id: 'new_type',
-    name: 'New Type Email',
-    description: 'Description of when this email is sent'
-  }
-];
-```
+### Gmail Setup
 
-3. Add backend integration in AdminDashboard.jsx:
-```javascript
-const sendNewTypeEmail = async (inspection) => {
-  const template = await EmailTemplate.getByType('new_type');
-  const processedEmail = processEmailTemplate(template, inspection);
-  // ... email sending logic
-};
-```
+1. Enable 2-factor authentication on your Gmail account
+2. Generate an App Password:
+   - Go to Google Account settings
+   - Security → 2-Step Verification → App passwords
+   - Generate password for "Mail"
+3. Use the generated password as `SMTP_PASSWORD`
 
-### Adding New Placeholder Variables
+## Usage
 
-Update the `processEmailTemplate` function in AdminDashboard.jsx:
+### From Admin Dashboard
 
-```javascript
-const placeholders = {
-  // ... existing placeholders
-  '{{new_variable}}': 'value_here'
-};
+1. Navigate to the Admin Dashboard
+2. Find the inspection you want to send an email for
+3. Click the dropdown menu (three dots)
+4. Select the appropriate email action:
+   - "Send Lab Received Email"
+   - "Send Report Ready Email"
+   - "Send Review Request"
+
+### API Endpoints
+
+```bash
+# Send lab received email
+curl -X POST http://localhost:5000/api/email/send-lab-received/123
+
+# Send report ready email
+curl -X POST http://localhost:5000/api/email/send-report-ready/123
+
+# Send review request email
+curl -X POST http://localhost:5000/api/email/send-review-request/123
 ```
 
 ## Troubleshooting
 
-### Template Not Loading
-- Check browser console for API errors
-- Verify admin user has proper permissions
-- Ensure backend server is running
+### Email Not Sending
+- Check SMTP settings in `.env` file
+- Verify Gmail app password is correct
+- Check server logs for SMTP errors
+- Ensure inspection ID exists in database
 
-### Variables Not Replacing
-- Check placeholder syntax: `{{variable_name}}`
-- Verify variable is defined in `processEmailTemplate` function
-- Ensure inspection data contains required fields
+### SMTP Authentication Errors
+- Verify Gmail 2FA is enabled
+- Check app password is correct
+- Try using Gmail's "Less secure app access" (not recommended for production)
 
 ### Database Errors
-- Verify table exists: `\dt email_templates`
-- Check table permissions for your database user
-- Ensure default templates were inserted correctly
+- Verify inspection exists in database
+- Check database connection
+- Ensure inspection has valid email address
 
 ## Security Notes
 
-- Email templates support HTML content - sanitize user input if allowing non-admin editing
-- Template variables are processed server-side for security
+- Emails are sent server-side for security
 - Admin-only access is enforced through route protection
+- SMTP credentials are stored securely in environment variables
 
-## Backup and Recovery
+## Customization
 
-To backup email templates:
+To customize email content, edit the email templates in `backend/app/services/email_service.py`:
 
-```sql
-COPY public.email_templates TO '/path/to/backup/email_templates.csv' DELIMITER ',' CSV HEADER;
-```
-
-To restore email templates:
-
-```sql
-COPY public.email_templates FROM '/path/to/backup/email_templates.csv' DELIMITER ',' CSV HEADER;
+```python
+def send_lab_received_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
+    subject = f"Mold Testing Houston - Samples Received (Inspection #{inspection_data.get('inspection_number', 'N/A')})"
+    
+    body = f"""
+    <html>
+    <body>
+        <h2>Mold Testing Houston - Samples Received</h2>
+        <p>Dear {inspection_data.get('full_name', 'Valued Customer')},</p>
+        <!-- Customize email content here -->
+    </body>
+    </html>
+    """
+    
+    return self.send_email(
+        inspection_data.get('email'),
+        subject,
+        body
+    )
 ``` 

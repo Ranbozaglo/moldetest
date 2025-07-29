@@ -36,6 +36,9 @@ except ImportError as e:
     print(f"⚠️  OCR libraries not available: {e}")
     print("   Install with: pip install google-cloud-vision openai pillow")
 
+# Import email endpoints
+from email_endpoints import register_email_endpoints
+
 app = Flask(__name__)
 CORS(app, origins=[
     "https://mold-testing.netlify.app",
@@ -1736,160 +1739,6 @@ def delete_lab_analysis_image(inspection_id, image_index):
         print(f"❌ Error in delete_lab_analysis_image: {e}")
         return jsonify({"error": f"Delete failed: {str(e)}"}), 500
 
-# Email Templates CRUD Endpoints
-@app.route('/api/email-templates', methods=['GET'])
-def get_email_templates():
-    """Get all email templates"""
-    try:
-        result = supabase.table('email_templates').select('*').execute()
-        
-        # If no templates exist, create default ones
-        if not result.data:
-            default_templates = [
-                {
-                    'type': 'lab_received',
-                    'subject': 'Lab Sample Received - {{inspection_number}}',
-                    'body': '''<p>Dear {{client_name}},</p>
-<p>We have received your mold testing samples for inspection <strong>{{inspection_number}}</strong>.</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p><strong>Date Received:</strong> {{received_date}}</p>
-<p>Your samples are now being processed in our laboratory. You can expect results within 3-5 business days.</p>
-<p>Thank you for choosing Mold Testing Houston!</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-                },
-                {
-                    'type': 'report_ready',
-                    'subject': 'Mold Analysis Report Ready - {{inspection_number}}',
-                    'body': '''<p>Dear {{client_name}},</p>
-<p>Your mold analysis report for inspection <strong>{{inspection_number}}</strong> is now ready!</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p><strong>Report Date:</strong> {{report_date}}</p>
-<p>You can download your complete report using the link below:</p>
-<p><a href="{{report_link}}" style="background-color: #004aac; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download Report</a></p>
-<p>If you have any questions about your results, please don't hesitate to contact us.</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-                },
-                {
-                    'type': 'review_request',
-                    'subject': 'Please Review Your Mold Testing Experience - {{inspection_number}}',
-                    'body': '''<p>Dear {{client_name}},</p>
-<p>Thank you for choosing Mold Testing Houston for your recent mold analysis (Inspection {{inspection_number}}).</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p>We hope you found our service helpful and professional. Your feedback is important to us and helps us improve our services.</p>
-<p>Would you mind taking a moment to leave us a review?</p>
-<p><a href="{{review_link}}" style="background-color: #004aac; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Leave a Review</a></p>
-<p>Thank you for your time and for trusting us with your mold testing needs.</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-                }
-            ]
-            
-            # Insert default templates
-            for template in default_templates:
-                supabase.table('email_templates').insert(template).execute()
-            
-            # Fetch the newly created templates
-            result = supabase.table('email_templates').select('*').execute()
-        
-        return jsonify({"templates": result.data})
-    except Exception as e:
-        print(f"❌ Error fetching email templates: {e}")
-        return jsonify({"error": "Failed to fetch email templates", "details": str(e)}), 500
-
-@app.route('/api/email-templates/<template_type>', methods=['GET'])
-def get_email_template(template_type):
-    """Get a specific email template by type"""
-    try:
-        result = supabase.table('email_templates').select('*').eq('type', template_type).execute()
-        
-        if not result.data:
-            return jsonify({"error": "Template not found"}), 404
-        
-        return jsonify({"template": result.data[0]})
-    except Exception as e:
-        print(f"❌ Error fetching email template: {e}")
-        return jsonify({"error": "Failed to fetch email template", "details": str(e)}), 500
-
-@app.route('/api/email-templates/<template_type>', methods=['PUT'])
-def update_email_template(template_type):
-    """Update an email template"""
-    data = request.get_json()
-    
-    try:
-        update_data = {
-            'subject': data.get('subject'),
-            'body': data.get('body'),
-            'updated_at': datetime.utcnow().isoformat()
-        }
-        
-        result = supabase.table('email_templates').update(update_data).eq('type', template_type).execute()
-        
-        if not result.data:
-            return jsonify({"error": "Template not found"}), 404
-        
-        return jsonify({"message": "Template updated successfully", "template": result.data[0]})
-    except Exception as e:
-        print(f"❌ Error updating email template: {e}")
-        return jsonify({"error": "Failed to update email template", "details": str(e)}), 500
-
-@app.route('/api/email-templates/<template_type>/reset', methods=['POST'])
-def reset_email_template(template_type):
-    """Reset email template to default content"""
-    try:
-        default_templates = {
-            'lab_received': {
-                'subject': 'Lab Sample Received - {{inspection_number}}',
-                'body': '''<p>Dear {{client_name}},</p>
-<p>We have received your mold testing samples for inspection <strong>{{inspection_number}}</strong>.</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p><strong>Date Received:</strong> {{received_date}}</p>
-<p>Your samples are now being processed in our laboratory. You can expect results within 3-5 business days.</p>
-<p>Thank you for choosing Mold Testing Houston!</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-            },
-            'report_ready': {
-                'subject': 'Mold Analysis Report Ready - {{inspection_number}}',
-                'body': '''<p>Dear {{client_name}},</p>
-<p>Your mold analysis report for inspection <strong>{{inspection_number}}</strong> is now ready!</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p><strong>Report Date:</strong> {{report_date}}</p>
-<p>You can download your complete report using the link below:</p>
-<p><a href="{{report_link}}" style="background-color: #004aac; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Download Report</a></p>
-<p>If you have any questions about your results, please don't hesitate to contact us.</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-            },
-            'review_request': {
-                'subject': 'Please Review Your Mold Testing Experience - {{inspection_number}}',
-                'body': '''<p>Dear {{client_name}},</p>
-<p>Thank you for choosing Mold Testing Houston for your recent mold analysis (Inspection {{inspection_number}}).</p>
-<p><strong>Property Address:</strong> {{property_address}}</p>
-<p>We hope you found our service helpful and professional. Your feedback is important to us and helps us improve our services.</p>
-<p>Would you mind taking a moment to leave us a review?</p>
-<p><a href="{{review_link}}" style="background-color: #004aac; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Leave a Review</a></p>
-<p>Thank you for your time and for trusting us with your mold testing needs.</p>
-<p>Best regards,<br>Mold Testing Houston Team</p>'''
-            }
-        }
-        
-        if template_type not in default_templates:
-            return jsonify({"error": "Invalid template type"}), 400
-        
-        default_template = default_templates[template_type]
-        update_data = {
-            'subject': default_template['subject'],
-            'body': default_template['body'],
-            'updated_at': datetime.utcnow().isoformat()
-        }
-        
-        result = supabase.table('email_templates').update(update_data).eq('type', template_type).execute()
-        
-        if not result.data:
-            return jsonify({"error": "Template not found"}), 404
-        
-        return jsonify({"message": "Template reset to default successfully", "template": result.data[0]})
-    except Exception as e:
-        print(f"❌ Error resetting email template: {e}")
-        return jsonify({"error": "Failed to reset email template", "details": str(e)}), 500
-
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     """General file upload endpoint for report files and other documents."""
@@ -1975,6 +1824,9 @@ if __name__ == '__main__':
     print("🚀 Starting Mold Testing Houston Backend...")
     print("📊 Database initialized with Supabase")
     
+    # Register email endpoints
+    register_email_endpoints(app, supabase)
+    
     # Show detailed OCR status after initialization
     print(f"\n🔬 OCR INTEGRATION FINAL STATUS:")
     print(f"   Vision Client: {'✅ Available' if ocr_integration.vision_client else '❌ Not initialized'}")
@@ -2031,11 +1883,9 @@ if __name__ == '__main__':
     print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
     print("   - POST /api/validate-lab-image (OCR validation before database save)")
     print("   - POST /api/ocr-gpt (Google Cloud Vision integration)")
-    print("   - POST /api/email/send")
-    print("   - GET  /api/email-templates")
-    print("   - GET  /api/email-templates/<template_type>")
-    print("   - PUT  /api/email-templates/<template_type>")
-    print("   - POST /api/email-templates/<template_type>/reset")
+    print("   - POST /api/email/send-lab-received/<inspection_id>")
+    print("   - POST /api/email/send-report-ready/<inspection_id>")
+    print("   - POST /api/email/send-review-request/<inspection_id>")
     print("   - POST /api/upload")
     print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
     print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision & OpenAI READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")

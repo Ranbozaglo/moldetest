@@ -233,6 +233,14 @@ export const MoldInspection = {
       token: token ? "present" : "missing"
     });
     
+    console.log("🔍 DEBUG: Final ID being used in API call:", id);
+    console.log("🔍 DEBUG: Type of ID:", typeof id);
+    
+    if (!id) {
+      console.error("❌ ERROR: No ID provided to MoldInspection.update");
+      throw new Error("No inspection ID provided");
+    }
+    
     const response = await apiCall(`/inspection/${id}`, {
       method: 'PUT',
       headers: {
@@ -508,15 +516,38 @@ export const User = {
 
 // Email service
 export const EmailService = {
-  send: async (to, subject, content) => {
+  sendLabReceivedEmail: async (inspectionId) => {
     const token = getAuthToken();
-    const response = await apiCall('/email/send', {
+    const response = await apiCall(`/email/send-lab-received/${inspectionId}`, {
       method: 'POST',
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ to, subject, content })
+      }
+    });
+    return response;
+  },
+
+  sendReportReadyEmail: async (inspectionId) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/email/send-report-ready/${inspectionId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    return response;
+  },
+
+  sendReviewRequestEmail: async (inspectionId) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/email/send-review-request/${inspectionId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
     });
     return response;
   }
@@ -575,59 +606,3 @@ if (typeof window !== 'undefined') {
   console.log('🔍 PROD DEBUG: Try: debugBackend.testHealth(), debugBackend.testLogin(), debugBackend.checkEnv(), debugBackend.checkAuth()');
 }
 
-// Email Templates entity
-export const EmailTemplate = {
-  getAll: async () => {
-    const token = getAuthToken();
-    const response = await apiCall('/api/email-templates', {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : ''
-      }
-    });
-    return response.templates;
-  },
-  
-  getByType: async (templateType) => {
-    const token = getAuthToken();
-    const response = await apiCall(`/api/email-templates/${templateType}`, {
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : ''
-      }
-    });
-    return response.template;
-  },
-  
-  update: async (templateType, data) => {
-    const token = getAuthToken();
-    const response = await apiCall(`/api/email-templates/${templateType}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    return response;
-  },
-  
-  reset: async (templateType) => {
-    const token = getAuthToken();
-    const response = await apiCall(`/api/email-templates/${templateType}/reset`, {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      }
-    });
-    return response;
-  }
-};
-
-// Default export for backward compatibility
-export default {
-  MoldInspection,
-  Sample,
-  User,
-  EmailService,
-  EmailTemplate
-};

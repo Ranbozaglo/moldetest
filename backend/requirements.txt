@@ -1,6 +1,4 @@
 # Core backend
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
 sqlalchemy==1.4.53
 python-dotenv==1.0.0
 pydantic==1.10.13
@@ -18,7 +16,7 @@ websockets==12.0
 # JWT
 PyJWT>=2.8.0,<2.11.0
 
-# Flask (optional if still used)
+# Flask
 flask==3.0.0
 flask-cors==4.0.0
 gunicorn==21.2.0

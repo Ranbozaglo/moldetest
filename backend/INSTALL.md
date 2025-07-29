@@ -1,156 +1,83 @@
-# Backend Installation Guide
+# Installation Guide
 
-## Quick Setup
+## Prerequisites
 
-### Option 1: Automated Setup
+- Python 3.9 or higher
+- pip (Python package installer)
+- Git
+
+## Installation Steps
+
+### 1. Clone the Repository
+
 ```bash
-cd backend
-python setup.py
+git clone <repository-url>
+cd mold-testing-houston-diy-mold-tes-adc96f7c
 ```
 
-### Option 2: Manual Setup
+### 2. Create Virtual Environment
 
-#### 1. Install Python Dependencies
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-#### 2. Create Environment File
+### 4. Environment Configuration
+
+Create a `.env` file in the backend directory:
+
 ```bash
-# Copy the template
-cp env_template.txt .env
+# Database
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
 
-# Edit with your settings
-nano .env  # or use your preferred editor
-```
+# Authentication
+JWT_SECRET_KEY=your_jwt_secret_key
 
-#### 3. Configure Database
-```bash
-# Create PostgreSQL database
-createdb mold_testing_db
-
-# Or use SQLite for development (update DATABASE_URL in .env)
-# DATABASE_URL=sqlite:///./mold_testing.db
-```
-
-#### 4. Run the Application
-```bash
-python main.py
-```
-
-## Environment Configuration
-
-Edit the `.env` file with your settings:
-
-```env
-# Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/mold_testing_db
-
-# JWT Configuration
-SECRET_KEY=your-secret-key-here-change-this-in-production
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-
-# OpenAI Configuration
-OPENAI_API_KEY=your-openai-api-key-here
-
-# Email Configuration
+# Email (SMTP)
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+FROM_EMAIL=your_email@gmail.com
 
-# Application Settings
-DEBUG=True
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+# Google Cloud Vision
+GOOGLE_APPLICATION_CREDENTIALS=path/to/your/credentials.json
+# OR
+GOOGLE_CREDENTIALS_JSON=your_google_credentials_json
+
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
 ```
 
-## Troubleshooting
+### 5. Run the Application
 
-### ModuleNotFoundError: No module named 'sqlalchemy'
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Or install individually
-pip install sqlalchemy fastapi uvicorn
+python simple_main.py
 ```
 
-### Database Connection Issues
-```bash
-# For PostgreSQL
-sudo apt-get install postgresql postgresql-contrib
-sudo -u postgres createdb mold_testing_db
-
-# For SQLite (easier for development)
-# Update DATABASE_URL in .env to: sqlite:///./mold_testing.db
-```
-
-### Port Already in Use
-```bash
-# Kill process on port 8000
-lsof -ti:8000 | xargs kill -9
-
-# Or use different port
-python main.py --port 8001
-```
+The server will start on `http://localhost:5000`
 
 ## Development
 
-### Run with Auto-reload
+For development with auto-reload:
+
 ```bash
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
+export FLASK_ENV=development
+python simple_main.py
 ```
 
-### Run Tests
+## Production
+
+For production deployment:
+
 ```bash
-# When tests are implemented
-pytest
-```
-
-### Database Migrations
-```bash
-# Tables are created automatically on first run
-# For manual migrations, use Alembic (future enhancement)
-```
-
-## Production Deployment
-
-### Using Docker
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-EXPOSE 8000
-
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Environment Variables for Production
-```env
-DATABASE_URL=postgresql://user:pass@host:5432/db
-SECRET_KEY=your-production-secret-key
-DEBUG=False
-OPENAI_API_KEY=your-openai-key
-```
-
-## API Documentation
-
-Once running, visit:
-- **API**: http://localhost:8000
-- **Swagger Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
-
-## Support
-
-For issues:
-1. Check the logs for error details
-2. Verify all dependencies are installed
-3. Ensure database is accessible
-4. Check environment variables are set correctly 
+gunicorn -w 4 -b 0.0.0.0:5000 simple_main:app
+``` 
