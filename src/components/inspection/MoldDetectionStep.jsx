@@ -110,14 +110,10 @@ function MoldLocationRow({ index, details, updateLocation, removeLocation }) {
 
 export default function MoldDetectionStep({ formData, updateFormData, onNext, onPrev }) {
   const handleVisibleMoldChange = (hasVisible) => {
-    if (hasVisible) {
-      const newDetails = formData.visible_mold_details.length > 0
-        ? formData.visible_mold_details
-        : [{ location: "", images: [] }];
-      updateFormData({ has_visible_mold: true, visible_mold_details: newDetails });
-    } else {
-      updateFormData({ has_visible_mold: false, visible_mold_details: [] });
-    }
+    updateFormData({ 
+      has_visible_mold: hasVisible,
+      visible_mold_details: hasVisible ? formData.visible_mold_details : []
+    });
   };
 
   const updateLocation = (index, field, value) => {
