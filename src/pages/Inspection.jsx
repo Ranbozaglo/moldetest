@@ -50,7 +50,19 @@ export default function Inspection() {
   
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
+  
+  // Load saved step from localStorage or default to 1
+  const getSavedStep = () => {
+    try {
+      const saved = localStorage.getItem('inspection_current_step');
+      return saved ? parseInt(saved, 10) : 1;
+    } catch (error) {
+      console.error('Error loading saved step:', error);
+      return 1;
+    }
+  };
+  
+  const [currentStep, setCurrentStep] = useState(getSavedStep);
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -76,6 +88,42 @@ export default function Inspection() {
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [newInspection, setNewInspection] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Save step to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('inspection_current_step', currentStep.toString());
+    console.log('🔍 DEBUG: Saved step to localStorage:', currentStep);
+  }, [currentStep]);
+
+  // Load saved form data from localStorage
+  useEffect(() => {
+    try {
+      const savedFormData = localStorage.getItem('inspection_form_data');
+      if (savedFormData) {
+        const parsedData = JSON.parse(savedFormData);
+        console.log('🔍 DEBUG: Loading saved form data:', parsedData);
+        setFormData(prev => ({ ...prev, ...parsedData }));
+      }
+    } catch (error) {
+      console.error('Error loading saved form data:', error);
+    }
+  }, []);
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('inspection_form_data', JSON.stringify(formData));
+    console.log('🔍 DEBUG: Saved form data to localStorage');
+  }, [formData]);
+
+  // Cleanup function to clear saved data when component unmounts
+  useEffect(() => {
+    return () => {
+      // Only clear if the inspection was not completed
+      if (!isSubmitted) {
+        console.log('🔍 DEBUG: Component unmounting - keeping saved data for potential return');
+      }
+    };
+  }, [isSubmitted]);
 
   useEffect(() => {
     const checkUserAndPreloadData = async () => {
@@ -131,6 +179,13 @@ export default function Inspection() {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  // Function to clear saved inspection data
+  const clearSavedInspectionData = () => {
+    localStorage.removeItem('inspection_current_step');
+    localStorage.removeItem('inspection_form_data');
+    console.log('🔍 DEBUG: Cleared saved inspection data');
   };
 
   const handleSubmit = async () => {
@@ -315,6 +370,9 @@ export default function Inspection() {
           console.log("🔍 DEBUG: Set newInspection state to:", newInspection);
           // Set isSubmitted to true on successful submission
           setIsSubmitted(true);
+          
+          // Clear saved inspection data after successful submission
+          clearSavedInspectionData();
       } else {
           // This case handles if creation fails to return a valid object with an ID
           console.error("🔍 DEBUG: Invalid inspection response:", newInspection);
@@ -344,10 +402,50 @@ export default function Inspection() {
       <div className="max-w-4xl mx-auto px-6">
         {/* Header */}
         <div className="mb-8">
-          <Link to={createPageUrl("Welcome")} className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6 group">
-            <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
-            Back to Home
-          </Link>
+          <div className="flex justify-between items-center mb-6">
+            <Link to={createPageUrl("Welcome")} className="inline-flex items-center text-blue-600 hover:text-blue-700 group">
+              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
+              Back to Home
+            </Link>
+            
+            {/* Reset Progress Button */}
+            {currentStep > 1 && !isSubmitted && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to start over? This will clear all your progress.')) {
+                    clearSavedInspectionData();
+                    setCurrentStep(1);
+                    setFormData({
+                      full_name: "",
+                      email: "",
+                      client_type: "",
+                      property_type: "",
+                      street_address: "",
+                      unit_number: "",
+                      city: "",
+                      state: "",
+                      zip_code: "",
+                      square_footage: "",
+                      background_info: "",
+                      has_visible_mold: false,
+                      visible_mold_details: [],
+                      has_water_damage: false,
+                      water_damage_details: [],
+                      thermostat_image: "",
+                      temperature: "",
+                      humidity: "",
+                      environmental_data_method: "manual"
+                    });
+                  }
+                }}
+                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+              >
+                Start Over
+              </Button>
+            )}
+          </div>
           
           <div className="glass-effect rounded-2xl p-6 mb-8">
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">

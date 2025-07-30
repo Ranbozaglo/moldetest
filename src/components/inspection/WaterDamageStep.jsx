@@ -112,13 +112,30 @@ function WaterDamageRow({ index, details, updateLocation, removeLocation }) {
 export default function WaterDamageStep({ formData, updateFormData, onNext, onPrev }) {
   const handleWaterDamageChange = (hasWaterDamage) => {
     if (hasWaterDamage) {
+      // If user selects "Yes, recent water issues", initialize with one empty location
       const newDetails = formData.water_damage_details.length > 0
         ? formData.water_damage_details
         : [{ location: "", images: [] }];
-      updateFormData({ has_water_damage: true, water_damage_details: newDetails });
+      updateFormData({ 
+        has_water_damage: true, 
+        water_damage_details: newDetails 
+      });
     } else {
-      updateFormData({ has_water_damage: false, water_damage_details: [] });
+      // If user selects "No recent water damage", clear the details
+      updateFormData({ 
+        has_water_damage: false, 
+        water_damage_details: [] 
+      });
     }
+  };
+
+  // Function to handle next with scroll to top
+  const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onNext function
+    onNext();
   };
 
   const updateLocation = (index, field, value) => {
@@ -231,7 +248,7 @@ export default function WaterDamageStep({ formData, updateFormData, onNext, onPr
         </Button>
         
         <Button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
         >

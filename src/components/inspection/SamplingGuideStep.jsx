@@ -184,6 +184,9 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
   }, []);
 
   const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     // Update formData with samples before proceeding to next step
     updateFormData({ samples: samples });
     onNext();

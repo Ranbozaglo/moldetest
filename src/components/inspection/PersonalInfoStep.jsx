@@ -65,6 +65,15 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, use
     updateFormData({ [field]: value });
   };
 
+  // Function to handle next with scroll to top
+  const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onNext function
+    onNext();
+  };
+
   const canProceed =
     formData.full_name.trim() &&
     formData.email.trim() &&
@@ -85,7 +94,6 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, use
           <Input
             id="full_name"
             type="text"
-            value={formData.full_name}
             onChange={(e) => handleInputChange("full_name", e.target.value)}
             placeholder="Enter your full name"
             className="h-12 rounded-xl border-slate-200 focus:border-blue-500 focus:ring-blue-500"
@@ -260,7 +268,7 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, use
 
       <div className="flex justify-end pt-4">
         <Button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
         >

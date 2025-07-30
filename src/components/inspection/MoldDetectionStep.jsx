@@ -110,10 +110,31 @@ function MoldLocationRow({ index, details, updateLocation, removeLocation }) {
 
 export default function MoldDetectionStep({ formData, updateFormData, onNext, onPrev }) {
   const handleVisibleMoldChange = (hasVisible) => {
-    updateFormData({ 
-      has_visible_mold: hasVisible,
-      visible_mold_details: hasVisible ? formData.visible_mold_details : []
-    });
+    if (hasVisible) {
+      // If user selects "Yes, I see mold", initialize with one empty location
+      const newDetails = formData.visible_mold_details.length > 0
+        ? formData.visible_mold_details
+        : [{ location: "", images: [] }];
+      updateFormData({ 
+        has_visible_mold: true, 
+        visible_mold_details: newDetails 
+      });
+    } else {
+      // If user selects "No visible mold", clear the details
+      updateFormData({ 
+        has_visible_mold: false, 
+        visible_mold_details: [] 
+      });
+    }
+  };
+
+  // Function to handle next with scroll to top
+  const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onNext function
+    onNext();
   };
 
   const updateLocation = (index, field, value) => {
@@ -223,7 +244,7 @@ export default function MoldDetectionStep({ formData, updateFormData, onNext, on
         </Button>
         
         <Button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
         >

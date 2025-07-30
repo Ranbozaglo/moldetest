@@ -9,6 +9,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 export default function ThermostatStep({ formData, updateFormData, onNext, onPrev }) {
   const [isUploading, setIsUploading] = useState(false);
 
+  // Function to handle next with scroll to top
+  const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onNext function
+    onNext();
+  };
+
   // Set default to manual if no method is set
   const currentMethod = formData.environmental_data_method || "manual";
 
@@ -249,7 +258,7 @@ export default function ThermostatStep({ formData, updateFormData, onNext, onPre
         </Button>
         
         <Button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
         >

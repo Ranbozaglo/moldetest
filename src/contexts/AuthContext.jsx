@@ -53,7 +53,9 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('🔍 AUTH DEBUG: Token validation error:', error);
-      return false;
+      // Don't log out on network errors - let the user continue with their session
+      // Only log out if it's a clear authentication error, not a network issue
+      return true; // Allow session to continue on network errors
     }
   }, []);
 
@@ -97,20 +99,26 @@ export const AuthProvider = ({ children }) => {
             return;
           }
           
-          // Validate token with server
-          console.log('🔍 AUTH DEBUG: Validating token with server...');
+          // For page refreshes, immediately restore the user session
+          // and validate in the background to avoid blocking the UI
+          console.log('🔍 AUTH DEBUG: Restoring user session immediately for better UX');
+          setUser(userData);
+          setLoading(false);
+          
+          // Validate token with server in the background (non-blocking)
+          console.log('🔍 AUTH DEBUG: Starting background token validation...');
           const isValid = await validateTokenWithServer(userData);
           
           if (!isValid) {
-            console.log('🔍 AUTH DEBUG: Server token validation failed, clearing session');
-            localStorage.removeItem('mth_user');
-            setLoading(false);
-            return;
+            console.log('🔍 AUTH DEBUG: Background token validation failed, but keeping session for now');
+            // Don't immediately log out - let the user continue their work
+            // The periodic validation will handle this later
+          } else {
+            console.log('🔍 AUTH DEBUG: Background token validation successful');
+            // Update last validation timestamp
+            userData.lastValidated = new Date().toISOString();
+            localStorage.setItem('mth_user', JSON.stringify(userData));
           }
-          
-          // Update last validation timestamp
-          userData.lastValidated = new Date().toISOString();
-          localStorage.setItem('mth_user', JSON.stringify(userData));
           
           // Update admin role for specific emails if needed
           const adminEmails = ['rotemiluz53@gmail.com'];
@@ -121,16 +129,16 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('mth_user', JSON.stringify(userData));
           }
           
-          console.log('🔍 AUTH DEBUG: Setting user state:', userData);
-          setUser(userData);
+          console.log('🔍 AUTH DEBUG: User session restored successfully');
         } catch (error) {
           console.error('🔍 AUTH DEBUG: Error parsing saved user:', error);
           localStorage.removeItem('mth_user');
+          setLoading(false);
         }
+      } else {
+        console.log('🔍 AUTH DEBUG: No saved user found, auth initialization complete');
+        setLoading(false);
       }
-      
-      console.log('🔍 AUTH DEBUG: AuthProvider loading complete, setting loading to false');
-      setLoading(false);
     };
     
     initializeAuth();
@@ -290,8 +298,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-
-
   // Function to refresh the user session
   const refreshSession = useCallback(async () => {
     console.log('🔍 AUTH DEBUG: Refreshing user session...');
@@ -380,4 +386,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-}; 
+};

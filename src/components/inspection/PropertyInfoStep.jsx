@@ -10,6 +10,15 @@ export default function PropertyInfoStep({ formData, updateFormData, onNext, onP
     updateFormData({ [field]: value });
   };
 
+  // Function to handle next with scroll to top
+  const handleNext = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onNext function
+    onNext();
+  };
+
   const canProceed = formData.square_footage && parseFloat(formData.square_footage) > 0;
 
   return (
@@ -71,7 +80,7 @@ export default function PropertyInfoStep({ formData, updateFormData, onNext, onP
         </Button>
         
         <Button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!canProceed}
           className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
         >

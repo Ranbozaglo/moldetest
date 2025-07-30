@@ -12,6 +12,16 @@ export default function ReviewStep({
   onSubmit, 
   isSubmitting 
 }) {
+  
+  // Function to handle submit with scroll to top
+  const handleSubmit = () => {
+    // Scroll to top of the page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Call the original onSubmit function
+    onSubmit();
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
@@ -227,15 +237,7 @@ export default function ReviewStep({
         </Card>
       
 
-      
-
-      <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-        <h3 className="font-semibold text-blue-900 mb-2">What Happens Next?</h3>
-        <p className="text-blue-700 text-sm">
-          After continuing, you'll be shown a guide on how to properly collect samples.
-          You will then document the collected samples and ship it to our lab.
-        </p>
-      </div>
+    
 
       <div className="flex justify-between pt-4">
         <Button
@@ -248,7 +250,7 @@ export default function ReviewStep({
         </Button>
         
         <Button
-          onClick={onSubmit}
+          onClick={handleSubmit}
           disabled={isSubmitting}
           className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-medium"
         >
