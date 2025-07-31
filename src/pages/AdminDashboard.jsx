@@ -30,6 +30,17 @@ export default function AdminDashboard() {
   const [moldFilter, setMoldFilter] = useState("all");
   const [waterDamageFilter, setWaterDamageFilter] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+  const [stats, setStats] = useState({
+    total: 0,
+    withMold: 0,
+    withWaterDamage: 0,
+    samples: 0,
+    pending: 0,
+    completed: 0,
+    propertyTypes: {},
+    clientTypes: {},
+    cities: {}
+  });
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
 
@@ -89,6 +100,10 @@ export default function AdminDashboard() {
       // For lightweight data, we don't need to parse heavy fields
       setInspections(allInspections);
       setSelectedInspections(new Set());
+      
+      // Load stats after inspections are loaded
+      const dashboardStats = await getDashboardStats(allInspections);
+      setStats(dashboardStats);
     } catch (error) {
       console.error("Error loading inspections:", error);
       console.error("Error details:", error.message);
@@ -104,20 +119,31 @@ export default function AdminDashboard() {
   };
 
   // Calculate dashboard statistics
-  const getDashboardStats = () => {
-    const total = inspections.length;
-    const withMold = inspections.filter(i => i.has_visible_mold).length;
-    const withWaterDamage = inspections.filter(i => i.has_water_damage).length;
-    const samples = inspections.filter(i => i.is_sample).length;
-    const pending = inspections.filter(i => i.status === 'pending').length;
-    const completed = inspections.filter(i => i.status === 'completed').length;
+  const getDashboardStats = async (inspectionsList = inspections) => {
+    const total = inspectionsList.length;
+    const withMold = inspectionsList.filter(i => i.has_visible_mold).length;
+    const withWaterDamage = inspectionsList.filter(i => i.has_water_damage).length;
+    const pending = inspectionsList.filter(i => i.status === 'pending').length;
+    const completed = inspectionsList.filter(i => i.status === 'completed').length;
 
+    // Count actual samples from all inspections
+    let totalSamples = 0;
+    try {
+      for (const inspection of inspectionsList) {
+        const samples = await Sample.findMany({ inspection_id: inspection.id });
+        totalSamples += samples.length;
+      }
+    } catch (error) {
+      console.error("Error fetching samples for stats:", error);
+      // Fallback to counting inspections with is_sample
+      totalSamples = inspectionsList.filter(i => i.is_sample).length;
+    }
     
     const propertyTypes = {};
     const clientTypes = {};
     const cities = {};
     
-    inspections.forEach(inspection => {
+    inspectionsList.forEach(inspection => {
       if (inspection.property_type) {
         propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
       }
@@ -129,12 +155,11 @@ export default function AdminDashboard() {
       }
     });
 
-
     return {
       total,
       withMold,
       withWaterDamage,
-      samples,
+      samples: totalSamples,
       pending,
       completed,
       propertyTypes,
@@ -169,8 +194,6 @@ export default function AdminDashboard() {
 
     return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
   });
-
-  const stats = getDashboardStats();
 
   const handleSelectAll = (checked) => {
     // Select/deselect all currently filtered inspections
