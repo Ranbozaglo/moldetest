@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { createPageUrl } from "@/utils";
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database,Zap , CheckCircle2} from "lucide-react";
 
 export default function AdminDashboard() {
@@ -96,7 +97,7 @@ export default function AdminDashboard() {
       alert("Failed to load inspections. Please refresh the page.");
     }
   };
-
+  
   const getDisplayNumber = (inspection) => {
     const number = inspection.inspection_number || inspection.id;
     return `TT #${number}`;
@@ -115,7 +116,7 @@ export default function AdminDashboard() {
     const propertyTypes = {};
     const clientTypes = {};
     const cities = {};
-        
+    
     inspections.forEach(inspection => {
       if (inspection.property_type) {
         propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
@@ -144,7 +145,7 @@ export default function AdminDashboard() {
 
 
 
-  
+
   // Filter inspections based on all filters
   const filteredInspections = inspections.filter(inspection => {
     const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
@@ -658,38 +659,35 @@ export default function AdminDashboard() {
                 <p>${inspection.lab_conclusion || inspection.conclusion || 'Pending conclusion.'}</p>
             </div>
 
-<div class="section">
-  <h2>Recommendations</h2>
-  <div>
-    ${
-      (inspection.lab_recommendations || inspection.recommendations)
-        ? (inspection.lab_recommendations || inspection.recommendations)
-            // הסרת תווי \n כתובים
-            .replace(/\\n/g, '')
-            // פיצול לפי רווחים כפולים (או מעבר שורה כפול)
-            .split(/\n{2,}/)
-            .map(section => {
-              // הסרת כוכביות מיותרים
-              section = section.replace(/\*/g, '').trim();
-              // נניח שהתבנית היא "Heading: Content"
-              const indexOfColon = section.indexOf(':');
-              if (indexOfColon !== -1) {
-                const title = section.substring(0, indexOfColon).trim();
-                const content = section.substring(indexOfColon + 1).trim();
-                return `
-                  <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
-                  <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
-                  <br>
-                `;
-              }
-              // אם לא נמצא כותרת, מחזירים את הטקסט כמפורט
-              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
-            })
-            .join('')
-        : '<p>Pending recommendations.</p>'
-    }
-  </div>
-</div>
+            <div class="section">
+                <h2>Recommendations</h2>
+                <div>
+                  ${(inspection.lab_recommendations || inspection.recommendations)
+                    ? (() => {
+                        const recommendations = (inspection.lab_recommendations || inspection.recommendations)
+                          .replace(/\\n/g, '')
+                          .split(/\n{2,}/)
+                          .map(section => {
+                            section = section.replace(/\*/g, '').trim();
+                            const indexOfColon = section.indexOf(':');
+                            if (indexOfColon !== -1) {
+                              const title = section.substring(0, indexOfColon).trim();
+                              const content = section.substring(indexOfColon + 1).trim();
+                              return `
+                                <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
+                                <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
+                                <br>
+                              `;
+                            }
+                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
+                          })
+                          .join('');
+                        return recommendations;
+                      })()
+                    : '<p>Pending recommendations.</p>'
+                  }
+                </div>
+            </div>
 
 
 
@@ -1339,8 +1337,19 @@ export default function AdminDashboard() {
                                 {/* View and Download Actions */}
                                 <DropdownMenuItem 
                                   onClick={() => {
-                                    const url = createPageUrl('InspectionDetails', { id: inspection.id });
-                                    window.open(url, '_blank');
+                                    try {
+                                      console.log("🔍 DEBUG: View Details clicked for inspection:", inspection);
+                                      console.log("🔍 DEBUG: Inspection ID:", inspection.id);
+                                      console.log("🔍 DEBUG: Inspection Number:", inspection.inspection_number);
+                                      
+                                      // Use React Router navigation instead of window.open
+                                      const url = createPageUrl('InspectionDetails', { id: inspection.id || inspection.inspection_number });
+                                      console.log("🔍 DEBUG: Navigating to URL:", url);
+                                      navigate(url);
+                                    } catch (error) {
+                                      console.error("🔍 ERROR: Failed to navigate to inspection details:", error);
+                                      alert("Failed to open inspection details. Please try again.");
+                                    }
                                   }}
                                   className="flex items-center gap-2"
                                 >
@@ -1391,98 +1400,29 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem 
                                   onClick={async () => {
                                     try {
+                                      console.log("🔍 DEBUG: Generating comprehensive report for inspection:", inspection.id);
+                                      
+                                      // Get detailed inspection data first
+                                      let detailedInspection = inspection;
+                                      try {
+                                        const inspectionId = inspection.id || inspection.inspection_number;
+                                        detailedInspection = await MoldInspection.getDetailed(inspectionId);
+                                        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+                                      } catch (detailError) {
+                                        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+                                        // Continue with current data if detailed fetch fails
+                                      }
+                                      
+                                      // Get samples for this inspection
+                                      const samples = await Sample.findMany({ inspection_id: inspection.id });
+                                      console.log("🔍 DEBUG: Retrieved samples for report:", samples);
+                                      
+                                      // Generate comprehensive report HTML
+                                      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
+                                      
+                                      // Open in new window
                                       const newWindow = window.open('', '_blank');
-                                      newWindow.document.write(`
-                                        <html>
-                                          <head>
-                                            <title>Report - ${getDisplayNumber(inspection)}</title>
-                                            <style>
-                                              body { font-family: Arial, sans-serif; margin: 20px; }
-                                              .header { text-align: center; margin-bottom: 30px; }
-                                              .section { margin-bottom: 20px; }
-                                              .section h2 { color: #2563eb; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }
-                                              .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
-                                              .info-item { background: #f9fafb; padding: 10px; border-radius: 5px; }
-                                              .info-label { font-weight: bold; color: #374151; }
-                                              .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
-                                              .status-pending { background: #fef3c7; color: #92400e; }
-                                              .status-in-progress { background: #dbeafe; color: #1e40af; }
-                                              .status-completed { background: #d1fae5; color: #065f46; }
-                                            </style>
-                                          </head>
-                                          <body>
-                                            <div class="header">
-                                              <h1>Mold Testing Report</h1>
-                                              <h2>${getDisplayNumber(inspection)}</h2>
-                                            </div>
-                                            
-                                            <div class="section">
-                                              <h2>Client Information</h2>
-                                              <div class="info-grid">
-                                                <div class="info-item">
-                                                  <div class="info-label">Name:</div>
-                                                  <div>${inspection.full_name || 'N/A'}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Email:</div>
-                                                  <div>${inspection.email || 'N/A'}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Phone:</div>
-                                                  <div>${inspection.phone || 'N/A'}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Status:</div>
-                                                  <div><span class="status-badge status-${inspection.status}">${getStatusDisplay(inspection.status)}</span></div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            
-                                            <div class="section">
-                                              <h2>Property Information</h2>
-                                              <div class="info-grid">
-                                                <div class="info-item">
-                                                  <div class="info-label">Address:</div>
-                                                  <div>${inspection.street_address}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Property Type:</div>
-                                                  <div>${inspection.property_type || 'N/A'}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Square Footage:</div>
-                                                  <div>${inspection.square_footage || 'N/A'} sq ft</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Client Type:</div>
-                                                  <div>${inspection.client_type || 'N/A'}</div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            
-                                            <div class="section">
-                                              <h2>Inspection Findings</h2>
-                                              <div class="info-grid">
-                                                <div class="info-item">
-                                                  <div class="info-label">Visible Mold:</div>
-                                                  <div>${inspection.has_visible_mold ? 'Yes' : 'No'}</div>
-                                                </div>
-                                                <div class="info-item">
-                                                  <div class="info-label">Water Damage:</div>
-                                                  <div>${inspection.has_water_damage ? 'Yes' : 'No'}</div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            
-                                            <div class="section">
-                                              <h2>Additional Details</h2>
-                                              <p><strong>Status Detail:</strong> ${inspection.client_status_detail || 'No additional details'}</p>
-                                              <p><strong>Created:</strong> ${format(new Date(inspection.created_date), 'PPP')}</p>
-                                              ${inspection.updated_date ? `<p><strong>Last Updated:</strong> ${format(new Date(inspection.updated_date), 'PPP')}</p>` : ''}
-                                            </div>
-                                          </body>
-                                        </html>
-                                      `);
+                                      newWindow.document.write(reportHtml);
                                       newWindow.document.close();
                                     } catch (error) {
                                       console.error("❌ Error viewing report:", error);
@@ -1496,7 +1436,7 @@ export default function AdminDashboard() {
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuSeparator />
-                                                                
+                                
                                 {/* Delete Action */}
                                 <DropdownMenuItem 
                                   onClick={() => {

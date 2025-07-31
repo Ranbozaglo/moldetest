@@ -20,6 +20,10 @@ import { Core } from "@/api/integrations";
 export default function InspectionDetails() {
   const location = useLocation();
   const inspectionId = getUrlParam(location.search, 'id');
+  
+  console.log("🔍 DEBUG: InspectionDetails component loaded");
+  console.log("🔍 DEBUG: Location search:", location.search);
+  console.log("🔍 DEBUG: Extracted inspectionId:", inspectionId);
 
   // Function to clean and filter extracted text for mold-related content
   const cleanExtractedText = (extractedText) => {
@@ -115,13 +119,19 @@ export default function InspectionDetails() {
           // Skip Supabase session check - using Flask backend authentication
         const checkUserAndLoadData = async () => {
           try {
-            if (currentUser && currentUser.role !== 'admin' && !currentUser.is_admin) {
-              setError("Access denied. Admin privileges required.");
+            // Allow admin users to view any inspection
+            if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
+              console.log("🔍 DEBUG: Admin user accessing inspection details");
+              await loadInspectionData();
               return;
             }
+            
+            // For regular users, we'll check if they own the inspection after loading it
+            console.log("🔍 DEBUG: Regular user accessing inspection details");
             await loadInspectionData();
           } catch (error) {
-            setError("Failed to verify admin access.");
+            console.error("🔍 ERROR: Failed to verify user access:", error);
+            setError("Failed to verify access.");
           } finally {
             setLoading(false);
           }
@@ -162,9 +172,38 @@ export default function InspectionDetails() {
 
   const loadInspectionData = async () => {
     try {
+      console.log("🔍 DEBUG: loadInspectionData called with inspectionId:", inspectionId);
+      
+      if (!inspectionId) {
+        console.error("❌ ERROR: No inspection ID provided");
+        setError("No inspection ID provided");
+        return;
+      }
+      
+      console.log("🔍 DEBUG: Calling MoldInspection.findUnique with ID:", inspectionId);
       const inspectionData = await MoldInspection.findUnique({ id: inspectionId });
+      
+      console.log("🔍 DEBUG: MoldInspection.findUnique response:", inspectionData);
+      
       if (inspectionData) {
         const inspection = inspectionData;
+        console.log("🔍 DEBUG: Successfully loaded inspection:", {
+          id: inspection.id,
+          inspection_number: inspection.inspection_number,
+          full_name: inspection.full_name,
+          email: inspection.email,
+          status: inspection.status
+        });
+
+        // Check if regular user is trying to access someone else's inspection
+        if (currentUser && 
+            currentUser.role !== 'admin' && 
+            !currentUser.is_admin && 
+            inspection.email !== currentUser.email) {
+          console.error("❌ ERROR: Regular user trying to access inspection not owned by them");
+          setError("Access denied. You can only view your own inspections.");
+          return;
+        }
 
         // Debug: Log the lab analysis fields from database
         console.log("🔍 DEBUG: Loading inspection data from database:");
@@ -207,13 +246,18 @@ export default function InspectionDetails() {
         
         setInspection(inspection);
         
+        console.log("🔍 DEBUG: Loading samples for inspection ID:", inspectionId);
         const samplesData = await Sample.findMany({ inspection_id: inspectionId });
+        console.log("🔍 DEBUG: Samples loaded:", samplesData);
         setSamples(samplesData || []);
       } else {
+        console.error("❌ ERROR: No inspection data returned from API");
         setError("Inspection not found");
       }
     } catch (error) {
-      console.error("Error loading inspection:", error);
+      console.error("❌ ERROR: Error loading inspection:", error);
+      console.error("❌ ERROR: Error details:", error.message);
+      console.error("❌ ERROR: Error stack:", error.stack);
       setError("Failed to load inspection data");
     }
   };
