@@ -13,6 +13,7 @@ import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
+import { generatePDFReport } from "@/utils/pdfGenerator";
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2} from "lucide-react";
 
 export default function AdminDashboard() {
@@ -439,29 +440,11 @@ export default function AdminDashboard() {
     console.log("🔍 DEBUG: Parsed waterDamageLocations:", waterDamageLocations);
     
     const visibleMoldHtml = inspection.mold_images && inspection.mold_images.length > 0 && moldLocations.length > 0
-      ? `<div style="margin-bottom: 20px;">
-          <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            ⚠️ Visible Mold Detected
-          </h3>
-          ${moldLocations.map((location, i) => `
-            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
-                ${createPriorityBadge('high', 'High Priority')}
-              </div>
-              <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
-              <div style="text-align: center; margin: 15px 0;">
-                ${createImageList(inspection.mold_images)}
-              </div>
-            </div>
-          `).join('')}
-        </div>`
-      : `<div style="margin-bottom: 20px;">
-          <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            ✅ No Visible Mold Detected
-          </h3>
-          <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
-        </div>`;
+      ? moldLocations.map((location, i) => {
+          const locationImage = inspection.mold_images[i] || null;
+          return `<h4>Location #${i + 1}: ${location || 'N/A'}</h4><p>Visible mold detected - requires immediate attention</p><div>${locationImage ? `<img src="${locationImage}" alt="Mold Photo" />` : ''}</div>`;
+        }).join('')
+      : '<p>No visible mold was reported during this inspection.</p>';
 
     const waterDamageHtml = inspection.water_damage_images && inspection.water_damage_images.length > 0 && waterDamageLocations.length > 0
       ? `<div style="margin-bottom: 20px;">
@@ -925,47 +908,18 @@ export default function AdminDashboard() {
   };
 
   const downloadPDF = async (inspection) => {
-    setDownloadStatus({ type: 'info', message: 'Generating detailed report...' });
-    
     try {
-      let detailedInspection = inspection;
-      
-      console.log("🔍 DEBUG: Fetching detailed inspection data for report generation");
-      try {
-        const inspectionId = inspection.id || inspection.inspection_number;
-        detailedInspection = await MoldInspection.getDetailed(inspectionId);
-        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
-        console.log("🔍 DEBUG: Lab conclusion:", detailedInspection.lab_conclusion);
-        console.log("🔍 DEBUG: Lab recommendations:", detailedInspection.lab_recommendations);
-        console.log("🔍 DEBUG: Lab analysis images:", detailedInspection.lab_analysis_images);
-      } catch (detailError) {
-        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
-        // Continue with current data if detailed fetch fails
-      }
-      
-      const inspectionId = inspection.id || inspection.inspection_number;
-      const samples = await Sample.findMany({ inspection_id: inspectionId });
-      
-      const displayNum = getDisplayNumber(inspection);
-      
-      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
-      
-      const blob = new Blob([reportHtml], { type: 'text/html' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      setDownloadStatus({ type: 'success', message: `Report ${displayNum} downloaded successfully!` });
-      setTimeout(() => setDownloadStatus(null), 3000);
-      
+      // Use the PDF generator utility function
+      await generatePDFReport(
+        inspection,
+        [], // samples will be fetched inside generatePDFReport
+        generateReportHtmlContent,
+        getDisplayNumber,
+        setDownloadStatus
+      );
     } catch (error) {
-      console.error("❌ Error generating report:", error);
-      setDownloadStatus({ type: 'error', message: `Failed to generate report: ${error.message}` });
+      console.error("❌ Error in downloadPDF:", error);
+      setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
   };
