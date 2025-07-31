@@ -54,7 +54,34 @@ export default function Inspection() {
   // Load saved step from localStorage or default to 1
   const getSavedStep = () => {
     try {
+      // For new users or fresh sessions, always start from step 1
       const saved = localStorage.getItem('inspection_current_step');
+      const savedFormData = localStorage.getItem('inspection_form_data');
+      
+      // If there's no saved form data, this is likely a new user
+      // Always start from step 1 for new users
+      if (!savedFormData) {
+        console.log('🔍 DEBUG: No saved form data found, starting from step 1 for new user');
+        return 1;
+      }
+      
+      // If there is saved data, check if it's for the current user
+      if (savedFormData && currentUser) {
+        try {
+          const parsedFormData = JSON.parse(savedFormData);
+          // If the saved email doesn't match current user, start fresh
+          if (parsedFormData.email && parsedFormData.email !== currentUser.email) {
+            console.log('🔍 DEBUG: Saved form data is for different user, starting fresh');
+            localStorage.removeItem('inspection_current_step');
+            localStorage.removeItem('inspection_form_data');
+            return 1;
+          }
+        } catch (error) {
+          console.error('Error parsing saved form data:', error);
+          return 1;
+        }
+      }
+      
       return saved ? parseInt(saved, 10) : 1;
     } catch (error) {
       console.error('Error loading saved step:', error);
@@ -63,6 +90,8 @@ export default function Inspection() {
   };
   
   const [currentStep, setCurrentStep] = useState(getSavedStep);
+  
+  // Debug: Log the initial step to help identify issues
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -84,6 +113,20 @@ export default function Inspection() {
     humidity: "",
     environmental_data_method: "manual"
   });
+
+  useEffect(() => {
+    console.log('🔍 DEBUG: Initial step loaded:', currentStep);
+    if (currentStep > 1) {
+      console.log('🔍 DEBUG: Warning: Starting from step', currentStep, 'instead of step 1');
+    }
+    
+    // Auto-reset to step 1 if user is on step 7 without proper form data
+    if (currentStep === 7 && formData && (!formData.full_name || !formData.email)) {
+      console.log('🔍 DEBUG: Auto-resetting to step 1 - user on step 7 without proper data');
+      setCurrentStep(1);
+      clearSavedInspectionData();
+    }
+  }, [currentStep, formData]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [newInspection, setNewInspection] = useState(null);
@@ -407,44 +450,6 @@ export default function Inspection() {
               <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
               Back to Home
             </Link>
-            
-            {/* Reset Progress Button */}
-            {currentStep > 1 && !isSubmitted && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (window.confirm('Are you sure you want to start over? This will clear all your progress.')) {
-                    clearSavedInspectionData();
-                    setCurrentStep(1);
-                    setFormData({
-                      full_name: "",
-                      email: "",
-                      client_type: "",
-                      property_type: "",
-                      street_address: "",
-                      unit_number: "",
-                      city: "",
-                      state: "",
-                      zip_code: "",
-                      square_footage: "",
-                      background_info: "",
-                      has_visible_mold: false,
-                      visible_mold_details: [],
-                      has_water_damage: false,
-                      water_damage_details: [],
-                      thermostat_image: "",
-                      temperature: "",
-                      humidity: "",
-                      environmental_data_method: "manual"
-                    });
-                  }
-                }}
-                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
-              >
-                Start Over
-              </Button>
-            )}
           </div>
           
           <div className="glass-effect rounded-2xl p-6 mb-8">

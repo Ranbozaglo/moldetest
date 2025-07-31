@@ -37,6 +37,10 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [stats, setStats] = useState({
     total: 0,
     withMold: 0,
@@ -243,13 +247,37 @@ export default function AdminDashboard() {
     return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredInspections.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentInspections = filteredInspections.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, propertyTypeFilter, clientTypeFilter, moldFilter, waterDamageFilter]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
   const handleSelectAll = (checked) => {
-    // Select/deselect all currently filtered inspections
-    const idsToSelect = filteredInspections.map(insp => insp.id);
+    // Select/deselect all currently visible inspections (current page)
+    const idsToSelect = currentInspections.map(insp => insp.id);
     if (checked) {
-      setSelectedInspections(new Set(idsToSelect));
+      setSelectedInspections(prev => new Set([...prev, ...idsToSelect]));
     } else {
-      setSelectedInspections(new Set());
+      setSelectedInspections(prev => {
+        const newSet = new Set(prev);
+        idsToSelect.forEach(id => newSet.delete(id));
+        return newSet;
+      });
     }
   };
 
@@ -1069,14 +1097,6 @@ export default function AdminDashboard() {
                 <FileText className="w-4 h-4" />
                 Export CSV
               </Button>
-              <Button 
-                onClick={() => testPDFDownload(setDownloadStatus)} 
-                variant="outline" 
-                className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300 transition-all duration-200"
-              >
-                <File className="w-4 h-4" />
-                Test PDF
-              </Button>
             </div>
           </div>
         </div>
@@ -1459,15 +1479,7 @@ export default function AdminDashboard() {
                       <CheckCircle className="w-4 h-4 mr-1" />
                       Select All
                     </Button>
-                    <Button
-                      onClick={() => handleSelectAll(false)}
-                      variant="outline"
-                      size="sm"
-                      className="hover:bg-slate-50 transition-all duration-200"
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Clear
-                    </Button>
+
                     {selectedInspections.size > 0 && (
                       <Button
                         onClick={handleDeleteSelected}
@@ -1499,7 +1511,7 @@ export default function AdminDashboard() {
                       <TableRow className="bg-slate-50 hover:bg-slate-100">
                         <TableHead className="w-12 bg-slate-100">
                           <Checkbox
-                            checked={selectedInspections.size === filteredInspections.length && filteredInspections.length > 0}
+                            checked={currentInspections.length > 0 && currentInspections.every(insp => selectedInspections.has(insp.id))}
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
@@ -1512,7 +1524,7 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInspections.map((inspection, index) => (
+                      {currentInspections.map((inspection, index) => (
                         <TableRow 
                           key={inspection.id} 
                           className={`hover:bg-slate-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`}
@@ -1747,6 +1759,82 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 </div>
+                
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-600">Show</span>
+                        <Select value={itemsPerPage.toString()} onValueChange={(value) => handleItemsPerPageChange(parseInt(value))}>
+                          <SelectTrigger className="w-20 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="10">10</SelectItem>
+                            <SelectItem value="20">20</SelectItem>
+                            <SelectItem value="50">50</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className="text-sm text-slate-600">per page</span>
+                      </div>
+                      
+                      <div className="text-sm text-slate-600">
+                        Showing {startIndex + 1} to {Math.min(endIndex, filteredInspections.length)} of {filteredInspections.length} inspections
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="h-8 px-3"
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= 3) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - 2) {
+                            pageNum = totalPages - 4 + i;
+                          } else {
+                            pageNum = currentPage - 2 + i;
+                          }
+                          
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePageChange(pageNum)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="h-8 px-3"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

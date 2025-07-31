@@ -214,7 +214,7 @@ export default function ReviewStep({
             <div className="flex justify-between">
               <span className="text-slate-600">Total Samples:</span>
               <span className="font-medium capitalize">
-                {formData.samples.length} samples
+                {formData.samples.filter(sample => sample.location && sample.location.trim() !== '').length} samples
               </span>
             </div>
             {formData.samples.map((sample, index) => (
@@ -224,12 +224,18 @@ export default function ReviewStep({
                 <p className="text-sm text-slate-600 mt-1 mb-2">{sample.location}</p>
                 </div>
                 <div>
-              <img
-                src={sample.sample_image}
-                alt={`Sample ${index + 1}`} 
-                className="w-32 h-24 object-cover rounded border"
-              />  
-              </div>
+                  {sample.sample_image ? (
+                    <img
+                      src={sample.sample_image}
+                      alt={`Sample ${index + 1}`} 
+                      className="w-32 h-24 object-cover rounded border"
+                    />
+                  ) : (
+                    <div className="w-32 h-24 bg-slate-100 rounded border flex items-center justify-center">
+                      <span className="text-xs text-slate-500">No image</span>
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </CardContent>

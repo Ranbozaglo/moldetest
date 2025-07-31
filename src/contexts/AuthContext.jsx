@@ -64,6 +64,11 @@ export const AuthProvider = ({ children }) => {
     console.log('🔍 AUTH DEBUG: signOut called - clearing user state and localStorage');
     setUser(null);
     localStorage.removeItem('mth_user');
+    
+    // Clear inspection data to prevent session mixing
+    localStorage.removeItem('inspection_current_step');
+    localStorage.removeItem('inspection_form_data');
+    console.log('🔍 AUTH DEBUG: Cleared inspection data on signout');
   }, []);
 
   // Initialize auth only once on mount
@@ -121,7 +126,7 @@ export const AuthProvider = ({ children }) => {
           }
           
           // Update admin role for specific emails if needed
-          const adminEmails = ['rotemiluz53@gmail.com'];
+          const adminEmails = ['rotemiluz53@gmail.com', 'totaltesting.info@gmail.com'];
           if (adminEmails.includes(userData.email) && userData.role !== 'admin') {
             console.log('🔍 AUTH DEBUG: Updating admin role for:', userData.email);
             userData.role = 'admin';
@@ -216,7 +221,8 @@ export const AuthProvider = ({ children }) => {
       // Check for admin role from multiple sources
       const isAdminUser = response.user.is_admin || 
                          response.user.role === 'admin' || 
-                         email === 'rotemiluz53@gmail.com';
+                         email === 'rotemiluz53@gmail.com' ||
+                         email === 'totaltesting.info@gmail.com';
       
       const userRole = isAdminUser ? 'admin' : (response.user.role || 'user');
       
@@ -248,14 +254,14 @@ export const AuthProvider = ({ children }) => {
       
       // Special handling for admin user login issue (development only)
       const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isDevelopment && email === 'rotemiluz53@gmail.com' && error.message.includes('Invalid credentials')) {
+      if (isDevelopment && (email === 'rotemiluz53@gmail.com' || email === 'totaltesting.info@gmail.com') && error.message.includes('Invalid credentials')) {
         console.log(`${logPrefix} Admin user login issue detected in development, creating fallback session`);
         
         // Create a fallback admin user session (development only)
         const fallbackUser = {
           id: 'admin-fallback',
-          email: 'rotemiluz53@gmail.com',
-          name: 'Admin User',
+          email: email,
+          name: email === 'totaltesting.info@gmail.com' ? 'Total Testing Admin' : 'Admin User',
           is_admin: true,
           role: 'admin',
           access_token: 'fallback-admin-token',

@@ -39,6 +39,11 @@ export default function SignIn() {
         // Small delay to ensure state is updated properly
         await new Promise(resolve => setTimeout(resolve, 100));
         
+        // Clear any existing inspection data to prevent session mixing
+        localStorage.removeItem('inspection_current_step');
+        localStorage.removeItem('inspection_form_data');
+        console.log('🔍 DEBUG: Cleared inspection data on signin');
+        
         // Redirect based on user role with direct paths
         if (result.user.is_admin || result.user.role === 'admin') {
           console.log('🔍 PROD DEBUG: SignIn - Redirecting admin user to AdminDashboard');
