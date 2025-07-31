@@ -13,7 +13,7 @@ import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
-import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database,Zap , CheckCircle2} from "lucide-react";
+import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2} from "lucide-react";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -46,6 +46,25 @@ export default function AdminDashboard() {
   });
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="pb-2">
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 
   // Optimize auth checking - only run when authUser ID changes, not on every property change
   useEffect(() => {
@@ -1036,12 +1055,11 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-slate-600">Loading admin dashboard...</p>
-            </div>
+          <div className="mb-8">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
           </div>
+          <LoadingSkeleton />
         </div>
       </div>
     );
@@ -1051,48 +1069,55 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-              <img 
-                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                  alt="Total Testing Logo" 
-                className="w-8 h-8 object-contain"
-              />
-              Admin Dashboard
-            </h1>
-            <p className="text-slate-600 mt-2">
-              Manage all inspections and generate comprehensive reports
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
-            <Button onClick={exportToCSV} className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              Export CSV
-            </Button>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+                <div className="p-2  rounded-lg">
+                  <img 
+                    src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
+                    alt="Total Testing Logo" 
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+                Admin Dashboard
+              </h1>
+              <p className="text-slate-600 mt-2 flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                Manage all inspections and generate comprehensive reports
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200">
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button onClick={exportToCSV} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200">
+                <FileText className="w-4 h-4" />
+                Export CSV
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="inspections" className="flex items-center gap-2">
-              <Database className="w-4 h-4" />
-              All Inspections
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Analytics
-            </TabsTrigger>
-          </TabsList>
+          <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+                <BarChart3 className="w-4 h-4" />
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="inspections" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+                <Database className="w-4 h-4" />
+                All Inspections
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+                <TrendingUp className="w-4 h-4" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
@@ -1182,67 +1207,82 @@ export default function AdminDashboard() {
 
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Inspections</CardTitle>
-                  <Database className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium text-blue-900">Total Inspections</CardTitle>
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <Database className="h-4 w-4 text-white" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.total}</div>
-                  <p className="text-xs text-muted-foreground">All time inspections</p>
+                  <div className="text-3xl font-bold text-blue-900 mb-1">{stats.total}</div>
+                  <p className="text-xs text-blue-700">All time inspections</p>
                 </CardContent>
               </Card>
               
-        
-              
-              <Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-200">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Samples</CardTitle>
-                  <FlaskConical className="h-4 w-4 text-blue-500" />
+                  <CardTitle className="text-sm font-medium text-green-900">Total Samples</CardTitle>
+                  <div className="p-2 bg-green-500 rounded-lg">
+                    <FlaskConical className="h-4 w-4 text-white" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats.samples}</div>
-                  <p className="text-xs text-muted-foreground">All time samples</p>
+                  <div className="text-3xl font-bold text-green-900 mb-1">{stats.samples}</div>
+                  <p className="text-xs text-green-700">All time samples</p>
                 </CardContent>
               </Card>
+
+    
             </div>
 
             {/* Status Overview */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
+              <Card className="border-l-4 border-l-yellow-500">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-yellow-800">
                     <Clock className="w-5 h-5" />
                     Status Overview
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Pending</span>
-                    <Badge variant="secondary">{stats.pending}</Badge>
+                  <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <span className="text-sm font-medium">Pending</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">{stats.pending}</Badge>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Completed</span>
-                    <Badge variant="default">{stats.completed}</Badge>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm font-medium">Completed</span>
+                    </div>
+                    <Badge variant="default" className="bg-green-100 text-green-800">{stats.completed}</Badge>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card>
+              <Card className="border-l-4 border-l-blue-500">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-blue-800">
                     <MapPin className="w-5 h-5" />
                     Top Cities
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-3">
                   {Object.entries(stats.cities)
                     .sort(([,a], [,b]) => b - a)
                     .slice(0, 5)
-                    .map(([city, count]) => (
-                      <div key={city} className="flex justify-between items-center">
-                        <span className="text-sm">{city}</span>
-                        <Badge variant="outline">{count}</Badge>
+                    .map(([city, count], index) => (
+                      <div key={city} className="flex justify-between items-center p-2 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-blue-600 bg-blue-200 px-2 py-1 rounded-full">
+                            #{index + 1}
+                          </span>
+                          <span className="text-sm font-medium">{city}</span>
+                        </div>
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800">{count}</Badge>
                       </div>
                     ))}
                 </CardContent>
@@ -1250,13 +1290,13 @@ export default function AdminDashboard() {
             </div>
 
             {/* Quick Actions */}
-            <Card>
+            <Card className="bg-gradient-to-br from-slate-50 to-slate-100">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-slate-800">
                   <Zap className="w-5 h-5" />
                   Quick Actions
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-slate-600">
                   Common admin tasks and shortcuts
                 </CardDescription>
               </CardHeader>
@@ -1265,28 +1305,41 @@ export default function AdminDashboard() {
                   <Button 
                     onClick={exportToCSV} 
                     variant="outline" 
-                    className="h-20 flex flex-col gap-2"
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
                   >
-                    <FileText className="w-6 h-6" />
-                    <span className="text-sm">Export All Data</span>
+                    <FileText className="w-8 h-8 text-blue-600" />
+                    <span className="text-sm font-medium">Export All Data</span>
+                    <span className="text-xs text-slate-500">Download CSV</span>
                   </Button>
                   
                   <Button 
                     onClick={() => setActiveTab("inspections")} 
                     variant="outline" 
-                    className="h-20 flex flex-col gap-2"
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-green-50 hover:border-green-300 transition-all duration-200"
                   >
-                    <Database className="w-6 h-6" />
-                    <span className="text-sm">Manage Inspections</span>
+                    <Database className="w-8 h-8 text-green-600" />
+                    <span className="text-sm font-medium">Manage Inspections</span>
+                    <span className="text-xs text-slate-500">View all inspections</span>
                   </Button>
                   
                   <Button 
                     onClick={() => setActiveTab("analytics")} 
                     variant="outline" 
-                    className="h-20 flex flex-col gap-2"
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-purple-50 hover:border-purple-300 transition-all duration-200"
                   >
-                    <BarChart3 className="w-6 h-6" />
-                    <span className="text-sm">View Analytics</span>
+                    <BarChart3 className="w-8 h-8 text-purple-600" />
+                    <span className="text-sm font-medium">View Analytics</span>
+                    <span className="text-xs text-slate-500">Detailed insights</span>
+                  </Button>
+
+                  <Button 
+                    onClick={loadInspections} 
+                    variant="outline" 
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-orange-50 hover:border-orange-300 transition-all duration-200"
+                  >
+                    <RefreshCw className="w-8 h-8 text-orange-600" />
+                    <span className="text-sm font-medium">Refresh Data</span>
+                    <span className="text-xs text-slate-500">Update dashboard</span>
                   </Button>
                 </div>
               </CardContent>
@@ -1296,63 +1349,112 @@ export default function AdminDashboard() {
           {/* Inspections Tab */}
           <TabsContent value="inspections" className="space-y-6">
             {/* Enhanced Filters */}
-            <Card>
+            <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-slate-800">
                   <Filter className="w-5 h-5" />
                   Advanced Filters
                 </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Filter and search through all inspections
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Search</label>
-                    <Input
-                      placeholder="Search inspections..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="h-9"
-                    />
+                    <label className="text-sm font-medium text-slate-700">Search</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input
+                        placeholder="Search inspections..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="h-10 pl-10 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Status</label>
+                    <label className="text-sm font-medium text-slate-700">Status</label>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-9">
+                      <SelectTrigger className="h-10 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Statuses</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="in_progress">In Progress</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="on_hold">On Hold</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
+
+
+
+
+
+
                 </div>
 
+                <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
+                  <div className="text-sm text-slate-600">
+                    Showing {filteredInspections.length} of {inspections.length} inspections
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("all");
+                      setPropertyTypeFilter("all");
+                      setClientTypeFilter("all");
+                      setMoldFilter("all");
+                      setWaterDamageFilter("all");
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Clear All Filters
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
             {/* Enhanced Inspections Table */}
-            <Card>
-              <CardHeader>
+            <Card className="border-slate-200">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
                 <div className="flex justify-between items-center">
-                  <CardTitle>All Inspections ({filteredInspections.length})</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500 rounded-lg">
+                      <Database className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-slate-800">All Inspections ({filteredInspections.length})</CardTitle>
+                      <p className="text-sm text-slate-600 mt-1">
+                        Manage and monitor all mold inspection records
+                      </p>
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button
                       onClick={() => handleSelectAll(true)}
                       variant="outline"
                       size="sm"
+                      className="hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
                     >
+                      <CheckCircle className="w-4 h-4 mr-1" />
                       Select All
                     </Button>
                     <Button
                       onClick={() => handleSelectAll(false)}
                       variant="outline"
                       size="sm"
+                      className="hover:bg-slate-50 transition-all duration-200"
                     >
+                      <X className="w-4 h-4 mr-1" />
                       Clear
                     </Button>
                     {selectedInspections.size > 0 && (
@@ -1361,76 +1463,112 @@ export default function AdminDashboard() {
                         variant="destructive"
                         size="sm"
                         disabled={isDeleting}
+                        className="hover:bg-red-700 transition-all duration-200"
                       >
-                        {isDeleting ? 'Deleting...' : `Delete ${selectedInspections.size}`}
+                        {isDeleting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete {selectedInspections.size}
+                          </>
+                        )}
                       </Button>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-12">
+                      <TableRow className="bg-slate-50 hover:bg-slate-100">
+                        <TableHead className="w-12 bg-slate-100">
                           <Checkbox
                             checked={selectedInspections.size === filteredInspections.length && filteredInspections.length > 0}
                             onCheckedChange={handleSelectAll}
                           />
                         </TableHead>
-                        <TableHead>Inspection #</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Property</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Inspection #</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Client</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Property</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Status</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Created</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInspections.map((inspection) => (
-                        <TableRow key={inspection.id}>
-                          <TableCell>
+                      {filteredInspections.map((inspection, index) => (
+                        <TableRow 
+                          key={inspection.id} 
+                          className={`hover:bg-slate-50 transition-all duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-25'}`}
+                        >
+                          <TableCell className="border-r border-slate-200">
                             <Checkbox
                               checked={selectedInspections.has(inspection.id)}
                               onCheckedChange={(checked) => handleSelectInspection(inspection.id, checked)}
                             />
                           </TableCell>
                           <TableCell className="font-medium">
-                            {getDisplayNumber(inspection)}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{inspection.full_name}</div>
-                              <div className="text-sm text-muted-foreground">{inspection.email}</div>
-                              <div className="text-xs text-muted-foreground">{inspection.client_type}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span className="text-blue-600 font-semibold">{getDisplayNumber(inspection)}</span>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div>
-                              <div className="font-medium">{inspection.street_address}</div>
-                              <div className="text-sm text-muted-foreground">
+                            <div className="space-y-1">
+                              <div className="font-medium text-slate-900">{inspection.full_name}</div>
+                              <div className="text-sm text-slate-600 flex items-center gap-1">
+                                <Mail className="w-3 h-3" />
+                                {inspection.email}
+                              </div>
+                              <div className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full inline-block">
+                                {inspection.client_type?.replace('_', ' ') || 'N/A'}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="font-medium text-slate-900">{inspection.street_address}</div>
+                              <div className="text-sm text-slate-600 flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
                                 {inspection.city}, {inspection.state} {inspection.zip_code}
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                {inspection.property_type} • {inspection.square_footage} sq ft
+                              <div className="text-xs text-slate-500">
+                                <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full mr-1">
+                                  {inspection.property_type || 'N/A'}
+                                </span>
+                                <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                  {inspection.square_footage} sq ft
+                                </span>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Badge variant={getStatusDisplay(inspection.status).variant}>
+                              <Badge 
+                                variant={getStatusDisplay(inspection.status).variant}
+                                className={`px-3 py-1 font-medium ${
+                                  inspection.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                                  inspection.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                  inspection.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                  'bg-slate-100 text-slate-800 border-slate-200'
+                                }`}
+                              >
                                 {React.createElement(getStatusDisplay(inspection.status).icon, { className: "w-3 h-3 mr-1" })}
                                 {getStatusDisplay(inspection.status).label}
                               </Badge>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-slate-100">
                                     <RotateCcw className="w-3 h-3" />
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  <DropdownMenuLabel className="font-semibold">Change Status</DropdownMenuLabel>
                                   <DropdownMenuSeparator />
                                   {getAvailableStatuses(inspection.status).map((status) => (
                                     <DropdownMenuItem 
@@ -1438,7 +1576,7 @@ export default function AdminDashboard() {
                                       onClick={() => {
                                         updateInspectionStatus(inspection.id, status);
                                       }}
-                                      className="flex items-center gap-2"
+                                      className="flex items-center gap-2 hover:bg-slate-50"
                                     >
                                       {React.createElement(getStatusDisplay(status).icon, { className: "w-4 h-4" })}
                                       {getStatusDisplay(status).label}
@@ -1451,19 +1589,20 @@ export default function AdminDashboard() {
              
                     
                           <TableCell>
-                            <div className="text-sm">
+                            <div className="text-sm text-slate-600 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
                               {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full">
                                   <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuContent align="end" className="w-64">
+                                <DropdownMenuLabel className="font-semibold text-slate-800">Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 
                                 {/* View and Download Actions */}
@@ -1483,7 +1622,7 @@ export default function AdminDashboard() {
                                       alert("Failed to open inspection details. Please try again.");
                                     }
                                   }}
-                                  className="flex items-center gap-2"
+                                  className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
                                 >
                                   <Eye className="w-4 h-4" />
                                   View Details
@@ -1491,7 +1630,7 @@ export default function AdminDashboard() {
                                 
                                 <DropdownMenuItem 
                                   onClick={() => downloadPDF(inspection)}
-                                  className="flex items-center gap-2"
+                                  className="flex items-center gap-2 hover:bg-green-50 text-green-700"
                                 >
                                   <File className="w-4 h-4" />
                                   Download Report
@@ -1503,7 +1642,7 @@ export default function AdminDashboard() {
                                 <DropdownMenuItem 
                                   onClick={() => sendLabReceivedEmail(inspection)}
                                   disabled={getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending'}
-                                  className="flex items-center gap-2"
+                                  className="flex items-center gap-2 hover:bg-purple-50 text-purple-700 disabled:opacity-50"
                                 >
                                   <Mail className="w-4 h-4" />
                                   {getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
