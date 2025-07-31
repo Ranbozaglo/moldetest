@@ -29,6 +29,9 @@ export default function AdminDashboard() {
   const [clientTypeFilter, setClientTypeFilter] = useState("all");
   const [moldFilter, setMoldFilter] = useState("all");
   const [waterDamageFilter, setWaterDamageFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedYear, setSelectedYear] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState({
     total: 0,
@@ -112,6 +115,15 @@ export default function AdminDashboard() {
       alert("Failed to load inspections. Please refresh the page.");
     }
   };
+
+  const refreshStats = async () => {
+    try {
+      const dashboardStats = await getDashboardStats(inspections);
+      setStats(dashboardStats);
+    } catch (error) {
+      console.error("Error refreshing stats:", error);
+    }
+  };
   
   const getDisplayNumber = (inspection) => {
     const number = inspection.inspection_number || inspection.id;
@@ -120,30 +132,43 @@ export default function AdminDashboard() {
 
   // Calculate dashboard statistics
   const getDashboardStats = async (inspectionsList = inspections) => {
-    const total = inspectionsList.length;
-    const withMold = inspectionsList.filter(i => i.has_visible_mold).length;
-    const withWaterDamage = inspectionsList.filter(i => i.has_water_damage).length;
-    const pending = inspectionsList.filter(i => i.status === 'pending').length;
-    const completed = inspectionsList.filter(i => i.status === 'completed').length;
+    // Apply month filtering
+    let filteredInspections = inspectionsList;
+    
+    if (selectedMonth !== "all" && selectedYear !== "all") {
+      filteredInspections = inspectionsList.filter(inspection => {
+        const inspectionDate = new Date(inspection.created_date);
+        const inspectionMonth = inspectionDate.getMonth() + 1; // getMonth() returns 0-11
+        const inspectionYear = inspectionDate.getFullYear();
+        
+        return inspectionMonth === parseInt(selectedMonth) && inspectionYear === parseInt(selectedYear);
+      });
+    }
+    
+    const total = filteredInspections.length;
+    const withMold = filteredInspections.filter(i => i.has_visible_mold).length;
+    const withWaterDamage = filteredInspections.filter(i => i.has_water_damage).length;
+    const pending = filteredInspections.filter(i => i.status === 'pending').length;
+    const completed = filteredInspections.filter(i => i.status === 'completed').length;
 
     // Count actual samples from all inspections
     let totalSamples = 0;
     try {
-      for (const inspection of inspectionsList) {
+      for (const inspection of filteredInspections) {
         const samples = await Sample.findMany({ inspection_id: inspection.id });
         totalSamples += samples.length;
       }
     } catch (error) {
       console.error("Error fetching samples for stats:", error);
       // Fallback to counting inspections with is_sample
-      totalSamples = inspectionsList.filter(i => i.is_sample).length;
+      totalSamples = filteredInspections.filter(i => i.is_sample).length;
     }
     
     const propertyTypes = {};
     const clientTypes = {};
     const cities = {};
     
-    inspectionsList.forEach(inspection => {
+    filteredInspections.forEach(inspection => {
       if (inspection.property_type) {
         propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
       }
@@ -1071,6 +1096,90 @@ export default function AdminDashboard() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Month Filter */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Month Filter
+                </CardTitle>
+                <CardDescription>
+                  Filter statistics by month and year
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Month</label>
+                    <Select
+                      value={selectedMonth}
+                      onValueChange={(value) => {
+                        setSelectedMonth(value);
+                        setTimeout(refreshStats, 100);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All months</SelectItem>
+                        <SelectItem value="1">January</SelectItem>
+                        <SelectItem value="2">February</SelectItem>
+                        <SelectItem value="3">March</SelectItem>
+                        <SelectItem value="4">April</SelectItem>
+                        <SelectItem value="5">May</SelectItem>
+                        <SelectItem value="6">June</SelectItem>
+                        <SelectItem value="7">July</SelectItem>
+                        <SelectItem value="8">August</SelectItem>
+                        <SelectItem value="9">September</SelectItem>
+                        <SelectItem value="10">October</SelectItem>
+                        <SelectItem value="11">November</SelectItem>
+                        <SelectItem value="12">December</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Year</label>
+                    <Select
+                      value={selectedYear}
+                      onValueChange={(value) => {
+                        setSelectedYear(value);
+                        setTimeout(refreshStats, 100);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All years</SelectItem>
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const year = new Date().getFullYear() - i;
+                          return (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedMonth("all");
+                        setSelectedYear("all");
+                        setTimeout(refreshStats, 100);
+                      }}
+                      className="w-full"
+                    >
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
