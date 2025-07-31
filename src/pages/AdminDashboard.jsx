@@ -8,13 +8,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger , DropdownMenuLabel , DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
-import { generatePDFReport } from "@/utils/pdfGenerator";
-import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2} from "lucide-react";
+import { downloadPDF, downloadHTML, testPDFDownload } from "@/utils/pdfDownload";
+
+import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
@@ -23,6 +25,7 @@ export default function AdminDashboard() {
   const [selectedInspections, setSelectedInspections] = useState(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
+
   const [emailStatus, setEmailStatus] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -907,19 +910,35 @@ export default function AdminDashboard() {
     return emailStatus[emailKey] || 'idle';
   };
 
-  const downloadPDF = async (inspection) => {
+  // Download functions
+  const handleDownloadPDF = async (inspection) => {
     try {
-      // Use the PDF generator utility function
-      await generatePDFReport(
+      await downloadPDF(
         inspection,
-        [], // samples will be fetched inside generatePDFReport
+        [], // samples will be fetched inside downloadPDF
         generateReportHtmlContent,
         getDisplayNumber,
         setDownloadStatus
       );
     } catch (error) {
-      console.error("❌ Error in downloadPDF:", error);
+      console.error("❌ Error in handleDownloadPDF:", error);
       setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  const handleDownloadHTML = async (inspection) => {
+    try {
+      await downloadHTML(
+        inspection,
+        [], // samples will be fetched inside downloadHTML
+        generateReportHtmlContent,
+        getDisplayNumber,
+        setDownloadStatus
+      );
+    } catch (error) {
+      console.error("❌ Error in handleDownloadHTML:", error);
+      setDownloadStatus({ type: 'error', message: `Failed to generate HTML: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
   };
@@ -1050,9 +1069,47 @@ export default function AdminDashboard() {
                 <FileText className="w-4 h-4" />
                 Export CSV
               </Button>
+              <Button 
+                onClick={() => testPDFDownload(setDownloadStatus)} 
+                variant="outline" 
+                className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300 transition-all duration-200"
+              >
+                <File className="w-4 h-4" />
+                Test PDF
+              </Button>
             </div>
           </div>
         </div>
+
+        {/* Status Messages */}
+        {downloadStatus && (
+          <Alert variant={downloadStatus.type === 'error' ? 'destructive' : downloadStatus.type === 'success' ? 'default' : 'default'}>
+            <AlertDescription className="flex items-center gap-2">
+              {downloadStatus.type === 'error' && <AlertTriangle className="w-4 h-4" />}
+              {downloadStatus.type === 'success' && <CheckCircle className="w-4 h-4" />}
+              {downloadStatus.type === 'info' && <Loader2 className="w-4 h-4 animate-spin" />}
+              {downloadStatus.message}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* PDF Download Instructions */}
+        {downloadStatus?.type === 'error' && downloadStatus.message.includes('PDF') && (
+          <Alert variant="default" className="bg-blue-50 border-blue-200">
+            <AlertDescription className="flex items-start gap-2">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium text-blue-800 mb-1">PDF Download Troubleshooting:</p>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Allow popups for this website in your browser settings</li>
+                  <li>• Try the "Download HTML" option instead - you can then print it as PDF</li>
+                  <li>• Use "View Report" and print directly from the browser</li>
+                  <li>• Check your browser's print dialog if it opened automatically</li>
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -1583,11 +1640,19 @@ export default function AdminDashboard() {
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuItem 
-                                  onClick={() => downloadPDF(inspection)}
+                                  onClick={() => handleDownloadPDF(inspection)}
                                   className="flex items-center gap-2 hover:bg-green-50 text-green-700"
                                 >
                                   <File className="w-4 h-4" />
-                                  Download Report
+                                  Download PDF
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuItem 
+                                  onClick={() => handleDownloadHTML(inspection)}
+                                  className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                  Download HTML
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuSeparator />

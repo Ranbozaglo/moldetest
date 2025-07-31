@@ -1,0 +1,686 @@
+import { format } from 'date-fns';
+import { MoldInspection, Sample } from '@/api/entities';
+
+/**
+ * Simple HTML to PDF download using browser's print functionality
+ * @param {Object} inspection - The inspection data
+ * @param {Array} samples - The samples data
+ * @param {Function} generateReportHtmlContent - Function to generate HTML content
+ * @param {Function} getDisplayNumber - Function to get display number
+ * @param {Function} setStatus - Function to update status
+ * @returns {Promise<void>}
+ */
+export const downloadPDF = async (
+  inspection,
+  samples,
+  generateReportHtmlContent,
+  getDisplayNumber,
+  setStatus
+) => {
+  setStatus({ type: 'info', message: 'Preparing PDF download...' });
+  
+  try {
+    // Fetch detailed inspection data
+    let detailedInspection = inspection;
+    try {
+      const inspectionId = inspection.id || inspection.inspection_number;
+      detailedInspection = await MoldInspection.getDetailed(inspectionId);
+      console.log("🔍 DEBUG: Retrieved detailed inspection data for PDF:", detailedInspection);
+    } catch (detailError) {
+      console.error("🔍 DEBUG: Error fetching detailed inspection data for PDF:", detailError);
+    }
+    
+    // Fetch samples for this inspection
+    let detailedSamples = samples;
+    if (!samples || samples.length === 0) {
+      try {
+        const inspectionId = inspection.id || inspection.inspection_number;
+        detailedSamples = await Sample.findMany({ inspection_id: inspectionId });
+        console.log("🔍 DEBUG: Retrieved samples for PDF:", detailedSamples);
+      } catch (samplesError) {
+        console.error("🔍 DEBUG: Error fetching samples for PDF:", samplesError);
+        detailedSamples = [];
+      }
+    }
+    
+    const displayNum = getDisplayNumber(inspection);
+    
+    // Generate the HTML report content
+    const reportHtml = await generateReportHtmlContent(detailedInspection, detailedSamples);
+    
+    console.log("🔍 DEBUG: Generated HTML length:", reportHtml.length);
+    
+    // Create a complete HTML document with print-friendly CSS
+    const completeHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Mold Inspection Report - ${displayNum}</title>
+        <style>
+          @media print {
+            @page {
+              margin: 1in;
+              size: A4;
+            }
+          }
+          
+          * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+          }
+          
+          body { 
+            font-family: 'Arial', sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #ffffff; 
+            color: #2c3e50; 
+            line-height: 1.6; 
+            font-size: 12px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          
+          @media print {
+            body { 
+              font-size: 10px; 
+              line-height: 1.5;
+              margin: 0;
+              padding: 0;
+            }
+          }
+          
+          .page-break { 
+            page-break-after: always; 
+          }
+          
+          .cover-page { 
+            min-height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            text-align: center; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            padding: 40px 20px; 
+            position: relative;
+            color: white;
+          }
+          
+          .cover-title { 
+            font-size: 28px; 
+            font-weight: 700; 
+            margin-bottom: 30px; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+          }
+          
+          .cover-subtitle {
+            font-size: 16px;
+            margin-bottom: 40px;
+            font-weight: 300;
+            opacity: 0.9;
+          }
+          
+          .cover-details { 
+            background: rgba(255,255,255,0.95); 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+            max-width: 500px; 
+            color: #2c3e50;
+          }
+          
+          .cover-detail-item { 
+            margin: 15px 0; 
+            font-size: 14px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+          }
+          
+          .cover-detail-item:last-child {
+            border-bottom: none;
+          }
+          
+          .cover-detail-label { 
+            font-weight: 600; 
+            color: #34495e; 
+            font-size: 13px;
+          }
+          
+          .cover-detail-value {
+            font-weight: 400;
+            color: #2c3e50;
+            text-align: right;
+            max-width: 60%;
+          }
+          
+          .section { 
+            margin-bottom: 30px; 
+            page-break-inside: avoid;
+          }
+          
+          .section h2 { 
+            font-size: 20px; 
+            color: #2c3e50; 
+            border-bottom: 3px solid #3498db; 
+            padding-bottom: 10px; 
+            margin-bottom: 20px; 
+            font-weight: 600;
+          }
+          
+          .section h3 {
+            font-size: 16px;
+            color: #34495e;
+            margin: 15px 0 10px 0;
+            font-weight: 600;
+          }
+          
+          .section h4 {
+            font-size: 14px;
+            color: #2c3e50;
+            margin: 12px 0 8px 0;
+            font-weight: 600;
+          }
+          
+          .disclaimer-box { 
+            background: #f8f9fa; 
+            border: 2px solid #3498db; 
+            border-radius: 10px; 
+            padding: 20px; 
+            margin: 20px 0; 
+          }
+          
+          .disclaimer-title { 
+            color: #2c3e50; 
+            font-size: 18px; 
+            font-weight: 700; 
+            margin-bottom: 15px; 
+            text-align: center; 
+          }
+          
+          .disclaimer-text { 
+            font-size: 12px; 
+            line-height: 1.6; 
+            text-align: justify; 
+            color: #34495e;
+          }
+          
+          .limitations-section { 
+            background: #fff5f5; 
+            border: 2px solid #e53e3e; 
+            border-radius: 10px; 
+            padding: 20px; 
+            margin: 20px 0; 
+          }
+          
+          .limitations-title { 
+            color: #c53030; 
+            font-size: 18px; 
+            font-weight: 700; 
+            margin-bottom: 15px; 
+            text-align: center; 
+          }
+          
+          .limitations-text { 
+            font-size: 12px; 
+            line-height: 1.6; 
+            text-align: justify; 
+            color: #2d3748;
+          }
+          
+          .client-info-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+          }
+          
+          .client-info-item { 
+            padding: 15px; 
+            background: #f7fafc; 
+            border-radius: 8px; 
+            border: 1px solid #e2e8f0;
+          }
+          
+          .client-info-label { 
+            font-weight: 700; 
+            color: #2c3e50; 
+            font-size: 11px; 
+            text-transform: uppercase;
+            margin-bottom: 5px;
+          }
+          
+          .client-info-value { 
+            margin-top: 5px; 
+            font-size: 13px; 
+            color: #34495e;
+            font-weight: 500;
+          }
+          
+          .footer { 
+            text-align: center; 
+            margin-top: 30px; 
+            padding-top: 20px; 
+            border-top: 2px solid #3498db; 
+            font-size: 11px; 
+            color: #7f8c8d; 
+            font-weight: 500;
+          }
+          
+          img { 
+            max-width: 100%; 
+            height: auto; 
+            border-radius: 8px; 
+            border: 1px solid #e2e8f0; 
+            margin: 10px 0; 
+          }
+          
+          p {
+            margin: 10px 0;
+            line-height: 1.5;
+            color: #2c3e50;
+          }
+          
+          .highlight-box {
+            background: #e8f5e8;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+          }
+          
+          .warning-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+          }
+          
+          .danger-box {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+          }
+          
+          .info-box {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+          }
+          
+          .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin: 3px;
+          }
+          
+          .badge-success {
+            background: #28a745;
+            color: white;
+          }
+          
+          .badge-warning {
+            background: #ffc107;
+            color: #212529;
+          }
+          
+          .badge-danger {
+            background: #dc3545;
+            color: white;
+          }
+          
+          .badge-info {
+            background: #17a2b8;
+            color: white;
+          }
+          
+          .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            border-radius: 6px;
+            overflow: hidden;
+            font-size: 11px;
+          }
+          
+          .table th {
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+          }
+          
+          .table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 10px;
+            color: #2c3e50;
+          }
+          
+          .table tr:nth-child(even) {
+            background-color: #f8f9fa;
+          }
+          
+          @media print {
+            .client-info-grid {
+              grid-template-columns: 1fr;
+            }
+            .cover-page {
+              min-height: 100vh;
+            }
+            .section h2 { 
+              font-size: 16px; 
+            }
+            .section h3 {
+              font-size: 14px;
+            }
+            .section h4 {
+              font-size: 12px;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        ${reportHtml}
+      </body>
+      </html>
+    `;
+    
+    console.log("🔍 DEBUG: Complete HTML length:", completeHtml.length);
+    
+    // Try to open a new window for printing
+    let printWindow;
+    try {
+      console.log("🔍 DEBUG: Attempting to open print window...");
+      
+      // First, try to open the window with a specific URL to avoid popup blockers
+      printWindow = window.open('about:blank', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+      
+      console.log("🔍 DEBUG: Print window result:", printWindow);
+      
+      if (!printWindow) {
+        throw new Error("Popup blocked by browser. Please allow popups for this site.");
+      }
+      
+      console.log("🔍 DEBUG: Writing content to print window...");
+      
+      // Write the content to the new window
+      printWindow.document.write(completeHtml);
+      printWindow.document.close();
+      
+      console.log("🔍 DEBUG: Content written to print window, setting up onload...");
+      
+      // Wait for content to load and then print
+      printWindow.onload = () => {
+        console.log("🔍 DEBUG: Print window loaded, triggering print");
+        try {
+          // Add a small delay to ensure content is fully rendered
+          setTimeout(() => {
+            printWindow.print();
+            // Don't close immediately - let user interact with print dialog
+            setTimeout(() => {
+              if (printWindow && !printWindow.closed) {
+                printWindow.close();
+              }
+            }, 1000);
+          }, 500);
+          
+          setStatus({ type: 'success', message: `PDF download initiated for ${displayNum}. Check your print dialog.` });
+          setTimeout(() => setStatus(null), 5000);
+        } catch (printError) {
+          console.error("❌ Error during print:", printError);
+          setStatus({ type: 'error', message: `Print failed: ${printError.message}. Please try printing manually from the opened window.` });
+          setTimeout(() => setStatus(null), 5000);
+        }
+      };
+      
+      // Fallback: if onload doesn't fire, try printing after a delay
+      setTimeout(() => {
+        if (printWindow && !printWindow.closed) {
+          console.log("🔍 DEBUG: Fallback print attempt");
+          try {
+            // Add a small delay to ensure content is fully rendered
+            setTimeout(() => {
+              printWindow.print();
+              // Don't close immediately - let user interact with print dialog
+              setTimeout(() => {
+                if (printWindow && !printWindow.closed) {
+                  printWindow.close();
+                }
+              }, 1000);
+            }, 500);
+            
+            setStatus({ type: 'success', message: `PDF download initiated for ${displayNum}. Check your print dialog.` });
+            setTimeout(() => setStatus(null), 5000);
+          } catch (printError) {
+            console.error("❌ Error during fallback print:", printError);
+            setStatus({ type: 'error', message: `Print failed: ${printError.message}. Please try printing manually from the opened window.` });
+            setTimeout(() => setStatus(null), 5000);
+          }
+        } else {
+          console.log("🔍 DEBUG: Print window was closed or null during fallback");
+        }
+      }, 2000);
+      
+    } catch (windowError) {
+      console.error("❌ Error opening print window:", windowError);
+      
+      // Alternative approach: create a temporary iframe
+      try {
+        console.log("🔍 DEBUG: Trying iframe approach...");
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'absolute';
+        iframe.style.left = '-9999px';
+        iframe.style.top = '-9999px';
+        iframe.style.width = '800px';
+        iframe.style.height = '600px';
+        document.body.appendChild(iframe);
+        
+        console.log("🔍 DEBUG: Iframe created, writing content...");
+        
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(completeHtml);
+        iframeDoc.close();
+        
+        console.log("🔍 DEBUG: Content written to iframe, waiting for load...");
+        
+        // Wait a bit for content to load
+        setTimeout(() => {
+          try {
+            console.log("🔍 DEBUG: Attempting iframe print...");
+            iframe.contentWindow.print();
+            // Don't remove iframe immediately - let print dialog work
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+            }, 2000);
+            
+            setStatus({ type: 'success', message: `PDF download initiated for ${displayNum}. Check your print dialog.` });
+            setTimeout(() => setStatus(null), 5000);
+          } catch (iframePrintError) {
+            console.error("❌ Error during iframe print:", iframePrintError);
+            document.body.removeChild(iframe);
+            setStatus({ type: 'error', message: `Print failed: ${iframePrintError.message}. Please try the HTML download option instead.` });
+            setTimeout(() => setStatus(null), 5000);
+          }
+        }, 1000);
+        
+      } catch (iframeError) {
+        console.error("❌ Error with iframe approach:", iframeError);
+        setStatus({ type: 'error', message: `Failed to open print window: ${windowError.message}. Please try the HTML download option instead.` });
+        setTimeout(() => setStatus(null), 5000);
+      }
+    }
+    
+  } catch (error) {
+    console.error("❌ Error generating PDF:", error);
+    setStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+    setTimeout(() => setStatus(null), 5000);
+  }
+};
+
+/**
+ * Alternative method: Download as HTML file
+ * @param {Object} inspection - The inspection data
+ * @param {Array} samples - The samples data
+ * @param {Function} generateReportHtmlContent - Function to generate HTML content
+ * @param {Function} getDisplayNumber - Function to get display number
+ * @param {Function} setStatus - Function to update status
+ * @returns {Promise<void>}
+ */
+export const downloadHTML = async (
+  inspection,
+  samples,
+  generateReportHtmlContent,
+  getDisplayNumber,
+  setStatus
+) => {
+  setStatus({ type: 'info', message: 'Preparing HTML download...' });
+  
+  try {
+    // Fetch detailed inspection data
+    let detailedInspection = inspection;
+    try {
+      const inspectionId = inspection.id || inspection.inspection_number;
+      detailedInspection = await MoldInspection.getDetailed(inspectionId);
+    } catch (detailError) {
+      console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+    }
+    
+    // Fetch samples for this inspection
+    let detailedSamples = samples;
+    if (!samples || samples.length === 0) {
+      try {
+        const inspectionId = inspection.id || inspection.inspection_number;
+        detailedSamples = await Sample.findMany({ inspection_id: inspectionId });
+      } catch (samplesError) {
+        console.error("🔍 DEBUG: Error fetching samples:", samplesError);
+        detailedSamples = [];
+      }
+    }
+    
+    const displayNum = getDisplayNumber(inspection);
+    
+    // Generate the HTML report content
+    const reportHtml = await generateReportHtmlContent(detailedInspection, detailedSamples);
+    
+    // Create and download HTML file
+    const blob = new Blob([reportHtml], { type: 'text/html' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    setStatus({ type: 'success', message: `HTML report downloaded for ${displayNum}` });
+    setTimeout(() => setStatus(null), 3000);
+    
+  } catch (error) {
+    console.error("❌ Error generating HTML:", error);
+    setStatus({ type: 'error', message: `Failed to generate HTML: ${error.message}` });
+    setTimeout(() => setStatus(null), 5000);
+  }
+};
+
+/**
+ * Test function to debug PDF download issues
+ * @param {Function} setStatus - Function to update status
+ */
+export const testPDFDownload = async (setStatus) => {
+  setStatus({ type: 'info', message: 'Testing PDF download functionality...' });
+  
+  try {
+    console.log("🔍 DEBUG: Testing PDF download...");
+    
+    // Simple test HTML
+    const testHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Test PDF</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { color: #333; }
+        </style>
+      </head>
+      <body>
+        <h1>Test PDF Download</h1>
+        <p>This is a test to see if PDF download works.</p>
+        <p>If you can see this, the print dialog should open.</p>
+      </body>
+      </html>
+    `;
+    
+    console.log("🔍 DEBUG: Opening test window...");
+    const testWindow = window.open('about:blank', '_blank', 'width=600,height=400');
+    
+    if (!testWindow) {
+      throw new Error("Popup blocked by browser");
+    }
+    
+    console.log("🔍 DEBUG: Writing test content...");
+    testWindow.document.write(testHtml);
+    testWindow.document.close();
+    
+         testWindow.onload = () => {
+       console.log("🔍 DEBUG: Test window loaded, printing...");
+       // Add a small delay to ensure content is fully rendered
+       setTimeout(() => {
+         testWindow.print();
+         // Don't close immediately - let user interact with print dialog
+         setTimeout(() => {
+           if (testWindow && !testWindow.closed) {
+             testWindow.close();
+           }
+         }, 1000);
+       }, 500);
+       setStatus({ type: 'success', message: 'Test PDF download successful! Check your print dialog.' });
+       setTimeout(() => setStatus(null), 3000);
+     };
+    
+         // Fallback
+     setTimeout(() => {
+       if (testWindow && !testWindow.closed) {
+         console.log("🔍 DEBUG: Fallback test print...");
+         // Add a small delay to ensure content is fully rendered
+         setTimeout(() => {
+           testWindow.print();
+           // Don't close immediately - let user interact with print dialog
+           setTimeout(() => {
+             if (testWindow && !testWindow.closed) {
+               testWindow.close();
+             }
+           }, 1000);
+         }, 500);
+         setStatus({ type: 'success', message: 'Test PDF download successful! Check your print dialog.' });
+         setTimeout(() => setStatus(null), 3000);
+       }
+     }, 1000);
+    
+  } catch (error) {
+    console.error("❌ Test PDF download failed:", error);
+    setStatus({ type: 'error', message: `Test failed: ${error.message}` });
+    setTimeout(() => setStatus(null), 5000);
+  }
+}; 
