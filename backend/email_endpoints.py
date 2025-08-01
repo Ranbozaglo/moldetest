@@ -10,12 +10,22 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting lab received email for inspection {inspection_id}")
             
-            # Fetch inspection data from database
-            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            # Fetch inspection data from database using inspection_number
+            print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
+            result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
             
             if not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection {inspection_id} not found in database")
-                return jsonify({"error": f"Inspection {inspection_id} not found"}), 404
+                print(f"❌ EMAIL DEBUG: Inspection with number {inspection_id} not found in database")
+                # Debug: Let's see what inspections are available
+                try:
+                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
+                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
+                    for insp in all_inspections.data:
+                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
+                except Exception as debug_error:
+                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
+                
+                return jsonify({"error": f"Inspection with number {inspection_id} not found"}), 404
             
             inspection_data = {
                 "email": result.data.get('email'),
@@ -43,12 +53,22 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting report ready email for inspection {inspection_id}")
             
-            # Fetch inspection data from database
-            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            # Fetch inspection data from database using inspection_number
+            print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
+            result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
             
             if not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection {inspection_id} not found in database")
-                return jsonify({"error": f"Inspection {inspection_id} not found"}), 404
+                print(f"❌ EMAIL DEBUG: Inspection with number {inspection_id} not found in database")
+                # Debug: Let's see what inspections are available
+                try:
+                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
+                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
+                    for insp in all_inspections.data:
+                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
+                except Exception as debug_error:
+                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
+                
+                return jsonify({"error": f"Inspection with number {inspection_id} not found"}), 404
             
             inspection_data = {
                 "email": result.data.get('email'),
@@ -76,8 +96,8 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting review request email for inspection {inspection_id}")
             
-            # Fetch inspection data from database
-            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            # Fetch inspection data from database using inspection_number
+            result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
             
             if not result.data:
                 print(f"❌ EMAIL DEBUG: Inspection {inspection_id} not found in database")

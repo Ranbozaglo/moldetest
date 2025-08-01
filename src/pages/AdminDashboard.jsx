@@ -25,8 +25,8 @@ export default function AdminDashboard() {
   const [selectedInspections, setSelectedInspections] = useState(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
-
   const [emailStatus, setEmailStatus] = useState({});
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
@@ -813,8 +813,7 @@ export default function AdminDashboard() {
       return;
     }
     
-    const emailKey = `lab_${inspectionId}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+
     
     try {
       console.log(`🔍 DEBUG: Sending lab received email for inspection ${inspectionId}`);
@@ -824,41 +823,64 @@ export default function AdminDashboard() {
       console.log("Email service response:", emailResponse);
       
       // Update inspection status to 'in_progress' in the database
-      console.log(`🔍 DEBUG: About to call MoldInspection.update with ID: ${inspectionId}`);
-      const updatedInspection = await MoldInspection.update(inspectionId, { 
-        status: 'in_progress',
-        client_status_detail: "Your samples have been received and are now in lab analysis.",
-        updated_date: new Date().toISOString()
-      });
+      // Debug the inspection object to see what's available
+      console.log(`🔍 DEBUG: Full inspection object:`, inspection);
+      console.log(`🔍 DEBUG: inspection.id:`, inspection.id);
+      console.log(`🔍 DEBUG: inspection.inspection_number:`, inspection.inspection_number);
+      console.log(`🔍 DEBUG: Available keys:`, Object.keys(inspection));
       
-      console.log("🔍 DEBUG: MoldInspection.update response:", updatedInspection);
+      // Use the database ID for the update, not the inspection_number
+      let dbId = inspection.id;
       
-      // Update the local state immediately
-      setInspections(prevInspections => 
-        prevInspections.map(insp => {
-          const inspId = insp.inspection_number || insp.id;
-          return inspId === inspectionId
-            ? { ...insp, status: 'in_progress', client_status_detail: "Your samples have been received and are now in lab analysis." }
-            : insp;
-        })
-      );
+      // If database ID is not available, try to get it by fetching detailed inspection data
+      if (!dbId) {
+        console.log(`🔍 DEBUG: Database ID not found, trying to get detailed inspection data using inspection_number: ${inspectionId}`);
+        try {
+          const detailedInspection = await MoldInspection.getDetailed(inspectionId);
+          dbId = detailedInspection.id;
+          console.log(`🔍 DEBUG: Retrieved database ID from detailed inspection: ${dbId}`);
+        } catch (detailError) {
+          console.error(`🔍 DEBUG: Error getting detailed inspection:`, detailError);
+          console.log(`🔍 DEBUG: Skipping status update due to missing database ID, but email was sent successfully`);
+          // Don't throw error - email was sent successfully, just skip the status update
+          dbId = null;
+        }
+      }
+      
+      console.log(`🔍 DEBUG: About to call MoldInspection.update with database ID: ${dbId}`);
+      console.log(`🔍 DEBUG: inspection_number being used for email: ${inspectionId}`);
+      
+      // Only update status if we have a valid database ID
+      if (dbId) {
+        const updatedInspection = await MoldInspection.update(dbId, { 
+          status: 'in_progress',
+          client_status_detail: "Your samples have been received and are now in lab analysis.",
+          updated_date: new Date().toISOString()
+        });
+        
+        console.log("🔍 DEBUG: MoldInspection.update response:", updatedInspection);
+        
+        // Update the local state immediately
+        // Use the same database ID for matching
+        setInspections(prevInspections => 
+          prevInspections.map(insp => 
+            insp.id === dbId
+              ? { ...insp, status: 'in_progress', client_status_detail: "Your samples have been received and are now in lab analysis." }
+              : insp
+          )
+        );
+      } else {
+        console.log(`🔍 DEBUG: Skipping status update - no valid database ID available`);
+        alert("Email sent successfully, but status update failed. Please refresh the page to see the latest status.");
+      }
       
       // Reload inspections to ensure we have the latest data
       await loadInspections();
-      
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
       
       console.log("🔍 DEBUG: Successfully updated inspection status to 'in_progress'");
       
     } catch (error) {
       console.error("❌ Error sending lab received email:", error);
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 5000);
       
       // Show error to user
       alert(`Failed to send lab email and update status: ${error.message}`);
@@ -866,8 +888,16 @@ export default function AdminDashboard() {
   };
 
   const sendReportReadyEmail = async (inspection) => {
+    // Debug the inspection object
+    console.log("🔍 DEBUG: sendReportReadyEmail inspection object:", inspection);
+    console.log("🔍 DEBUG: inspection.id:", inspection.id);
+    console.log("🔍 DEBUG: inspection.inspection_number:", inspection.inspection_number);
+    console.log("🔍 DEBUG: Available keys:", Object.keys(inspection));
+    
     // Use inspection_number as fallback if id is undefined
-    const inspectionId = inspection.id || inspection.inspection_number;
+    const inspectionId = inspection.inspection_number || inspection.id;
+    
+    console.log("🔍 DEBUG: Final inspectionId being sent to backend:", inspectionId);
     
     if (!inspectionId) {
       console.error("❌ ERROR: No valid inspection ID found");
@@ -875,21 +905,20 @@ export default function AdminDashboard() {
       return;
     }
     
-    const emailKey = `report_${inspectionId}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+
+    setEmailSending(inspectionId, 'report');
     
     try {
       const displayNum = getDisplayNumber(inspection);
       
-      // Step 1: Generate and upload the report
-      setDownloadStatus({ type: 'info', message: `Generating and storing report for ${displayNum}...` });
+      // Step 1: Generate the report
+      setDownloadStatus({ type: 'info', message: `Generating report for ${displayNum}...` });
       const samples = await Sample.findMany({ inspection_id: inspectionId });
       const reportHtml = await generateReportHtmlContent(inspection, samples);
-      const reportFile = new File([reportHtml], `report-${inspectionId}.html`, { type: 'text/html' });
       
       // Mock file upload since LLMService is removed
       const reportUrl = `https://storage.moldtestinghouston.com/reports/report-${inspectionId}.html`;
-      setDownloadStatus({ type: 'success', message: 'Report stored successfully.' });
+      setDownloadStatus({ type: 'success', message: 'Report generated successfully.' });
       setTimeout(() => setDownloadStatus(null), 3000);
 
       // Step 2: Send the email notification
@@ -897,24 +926,34 @@ export default function AdminDashboard() {
       const emailResponse = await EmailService.sendReportReadyEmail(inspectionId);
       console.log("Email service response:", emailResponse);
       
-      // Step 3: Update the inspection record
-      await MoldInspection.update(inspectionId, { 
-        status: 'completed',
-        client_status_detail: "Your detailed analysis and report are complete and available for download.",
-        report_html_url: reportUrl
-      });
+      // Step 3: Update the inspection status to 'completed' in the database
+      const dbId = inspection.id;
+      if (dbId) {
+        await MoldInspection.update(dbId, { 
+          status: 'completed',
+          client_status_detail: "Your detailed analysis and report are complete and available for download.",
+          report_html_url: reportUrl,
+          updated_date: new Date().toISOString()
+        });
+        
+        // Step 4: Update the local state immediately
+        setInspections(prevInspections => 
+          prevInspections.map(insp => 
+            insp.id === dbId
+              ? { ...insp, status: 'completed', client_status_detail: "Your detailed analysis and report are complete and available for download." }
+              : insp
+          )
+        );
+      }
       
-      // Step 4: Refresh the UI
+      // Step 5: Refresh the UI to ensure we have the latest data
       await loadInspections();
       
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
+      setEmailComplete(inspectionId, 'report');
       
     } catch (error) {
       console.error("❌ Error sending report ready email:", error);
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
+      setEmailError(inspectionId, 'report');
       setDownloadStatus({ type: 'error', message: `Failed to prepare report: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }
@@ -930,30 +969,43 @@ export default function AdminDashboard() {
       return;
     }
     
-    const emailKey = `review_${inspectionId}`;
-    setEmailStatus(prev => ({ ...prev, [emailKey]: 'sending' }));
+
     
     try {
       console.log(`🔍 DEBUG: Sending review request email for inspection ${inspectionId}`);
       const emailResponse = await EmailService.sendReviewRequestEmail(inspectionId);
       console.log("Email service response:", emailResponse);
       
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 3000);
-      
     } catch (error) {
       console.error("❌ Error sending review request email:", error);
-      setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
-      setTimeout(() => {
-        setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
-      }, 5000);
     }
   };
 
-  const getEmailButtonStatus = (emailKey) => {
-    return emailStatus[emailKey] || 'idle';
+  // Email status management
+  const setEmailSending = (inspectionId, emailType) => {
+    const key = `${emailType}_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [key]: 'sending' }));
+  };
+
+  const setEmailComplete = (inspectionId, emailType) => {
+    const key = `${emailType}_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [key]: 'sent' }));
+    setTimeout(() => {
+      setEmailStatus(prev => ({ ...prev, [key]: null }));
+    }, 2000);
+  };
+
+  const setEmailError = (inspectionId, emailType) => {
+    const key = `${emailType}_${inspectionId}`;
+    setEmailStatus(prev => ({ ...prev, [key]: 'error' }));
+    setTimeout(() => {
+      setEmailStatus(prev => ({ ...prev, [key]: null }));
+    }, 3000);
+  };
+
+  const getEmailStatus = (inspectionId, emailType) => {
+    const key = `${emailType}_${inspectionId}`;
+    return emailStatus[key] || 'idle';
   };
 
   // Download functions
@@ -1690,29 +1742,28 @@ export default function AdminDashboard() {
                                 {/* Email Actions */}
                                 <DropdownMenuItem 
                                   onClick={() => sendLabReceivedEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending'}
+                                  disabled={getEmailStatus(inspection.inspection_number || inspection.id, 'lab') === 'sending'}
                                   className="flex items-center gap-2 hover:bg-purple-50 text-purple-700 disabled:opacity-50"
                                 >
                                   <Mail className="w-4 h-4" />
-                                  {getEmailButtonStatus(`lab_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
+                                  {getEmailStatus(inspection.inspection_number || inspection.id, 'lab') === 'sending' ? 'Sending...' : 'Send Lab Received Email'}
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuItem 
                                   onClick={() => sendReportReadyEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`report_${inspection.id || inspection.inspection_number}`) === 'sending'}
-                                  className="flex items-center gap-2"
+                                  disabled={getEmailStatus(inspection.inspection_number || inspection.id, 'report') === 'sending'}
+                                  className="flex items-center gap-2 disabled:opacity-50"
                                 >
                                   <Mail className="w-4 h-4" />
-                                  {getEmailButtonStatus(`report_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Report Ready Email'}
+                                  {getEmailStatus(inspection.inspection_number || inspection.id, 'report') === 'sending' ? 'Sending...' : 'Send Report Ready Email'}
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuItem 
                                   onClick={() => sendReviewRequestEmail(inspection)}
-                                  disabled={getEmailButtonStatus(`review_${inspection.id || inspection.inspection_number}`) === 'sending'}
                                   className="flex items-center gap-2"
                                 >
                                   <Star className="w-4 h-4" />
-                                  {getEmailButtonStatus(`review_${inspection.id || inspection.inspection_number}`) === 'sending' ? 'Sending...' : 'Send Review Request'}
+                                  Send Review Request
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuSeparator />

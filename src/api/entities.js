@@ -21,10 +21,7 @@ const apiCall = async (endpoint, options = {}) => {
   // Enhanced logging for production debugging
   const isProduction = window.location.hostname !== 'localhost';
   const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
-  
-  console.log(`${logPrefix} API Call: ${options.method || 'GET'} ${url}`);
-  console.log(`${logPrefix} Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
-  console.log(`${logPrefix} Backend URL: ${API_CONFIG.BASE_URL}`);
+
   
   if (options.body) {
     console.log(`${logPrefix} Request body:`, JSON.parse(options.body));
@@ -37,15 +34,9 @@ const apiCall = async (endpoint, options = {}) => {
   );
 
   try {
-    console.log(`${logPrefix} Starting fetch request...`);
     const response = await Promise.race([fetch(url, config), timeoutPromise]);
     
-    console.log(`${logPrefix} Response received:`, {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries())
-    });
+
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -79,13 +70,7 @@ const apiCall = async (endpoint, options = {}) => {
     }
     
     const data = await response.json();
-    
-    console.log(`${logPrefix} API Success:`, {
-      url,
-      method: options.method || 'GET',
-      dataReceived: !!data,
-      dataKeys: data ? Object.keys(data) : []
-    });
+
     
     return data;
   } catch (error) {
@@ -217,28 +202,11 @@ export const MoldInspection = {
     return response;
   },
   
-  update: async (idOrFilters, data) => {
+  update: async (id, data) => {
     const token = getAuthToken();
-    let id;
-    if (typeof idOrFilters === 'string') {
-      id = idOrFilters;
-    } else {
-      id = idOrFilters.id;
-    }
-    
-    console.log("🔍 DEBUG: MoldInspection.update called with:", {
-      idOrFilters,
-      id,
-      data,
-      token: token ? "present" : "missing"
-    });
-    
-    console.log("🔍 DEBUG: Final ID being used in API call:", id);
-    console.log("🔍 DEBUG: Type of ID:", typeof id);
     
     if (!id) {
-      console.error("❌ ERROR: No ID provided to MoldInspection.update");
-      throw new Error("No inspection ID provided");
+      throw new Error("Inspection ID is required");
     }
     
     const response = await apiCall(`/inspection/${id}`, {
@@ -250,7 +218,6 @@ export const MoldInspection = {
       body: JSON.stringify(data)
     });
     
-    console.log("🔍 DEBUG: MoldInspection.update response:", response);
     return response;
   },
   
