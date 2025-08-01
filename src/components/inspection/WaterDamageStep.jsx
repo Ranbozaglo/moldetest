@@ -84,22 +84,22 @@ function WaterDamageRow({ index, details, updateLocation, removeLocation }) {
       </div>
 
       {details.images.length > 0 && (
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
           {details.images.map((imageUrl, imageIndex) => (
             <div key={imageIndex} className="relative group">
               <img
                 src={imageUrl}
                 alt={`Water damage evidence ${imageIndex + 1}`}
-                className="w-full h-20 object-cover rounded-lg border border-slate-200"
+                className="w-full h-16 sm:h-20 object-cover rounded-lg border border-slate-200"
               />
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
                 onClick={() => removeImage(imageIndex)}
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute -top-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3 h-3 sm:w-4 sm:h-4" />
               </Button>
             </div>
           ))}
@@ -168,18 +168,18 @@ export default function WaterDamageStep({ formData, updateFormData, onNext, onPr
           This includes flooding, roof leaks, pipe bursts, or any moisture issues in the past 6 months.
         </p>
         
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 px-2 sm:px-0">
           <Button
             type="button"
             variant={formData.has_water_damage === true ? "default" : "outline"}
             onClick={() => handleWaterDamageChange(true)}
-            className={`h-16 rounded-xl font-medium ${
+            className={`h-14 sm:h-16 rounded-xl font-medium text-sm sm:text-base ${
               formData.has_water_damage === true 
                 ? 'bg-blue-500 hover:bg-blue-600 text-white' 
                 : 'border-slate-200 hover:bg-blue-50 hover:border-blue-200'
             }`}
           >
-            <Droplets className="w-5 h-5 mr-2" />
+            <Droplets className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
             Yes, recent water issues
           </Button>
           
@@ -187,7 +187,7 @@ export default function WaterDamageStep({ formData, updateFormData, onNext, onPr
             type="button"
             variant={formData.has_water_damage === false ? "default" : "outline"}
             onClick={() => handleWaterDamageChange(false)}
-            className={`h-16 rounded-xl font-medium ${
+            className={`h-14 sm:h-16 rounded-xl font-medium text-sm sm:text-base ${
               formData.has_water_damage === false 
                 ? 'bg-green-500 hover:bg-green-600 text-white' 
                 : 'border-slate-200 hover:bg-green-50 hover:border-green-200'
@@ -237,11 +237,11 @@ export default function WaterDamageStep({ formData, updateFormData, onNext, onPr
         </p>
       </div>
 
-      <div className="flex justify-between pt-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 pt-4">
         <Button
           onClick={onPrev}
           variant="outline"
-          className="px-8 py-3 rounded-xl font-medium border-slate-200 hover:bg-slate-50"
+          className="px-6 sm:px-8 py-3 rounded-xl font-medium border-slate-200 hover:bg-slate-50 w-full sm:w-auto order-2 sm:order-1"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Previous
@@ -250,7 +250,7 @@ export default function WaterDamageStep({ formData, updateFormData, onNext, onPr
         <Button
           onClick={handleNext}
           disabled={!canProceed}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 rounded-xl font-medium w-full sm:w-auto order-1 sm:order-2"
         >
           Continue
           <ArrowRight className="w-4 h-4 ml-2" />

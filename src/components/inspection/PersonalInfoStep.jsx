@@ -266,11 +266,11 @@ export default function PersonalInfoStep({ formData, updateFormData, onNext, use
         </p>
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 px-2 sm:px-0">
         <Button
           onClick={handleNext}
           disabled={!canProceed}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-medium"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 rounded-xl font-medium w-full sm:w-auto"
         >
           Continue
           <ArrowRight className="w-4 h-4 ml-2" />

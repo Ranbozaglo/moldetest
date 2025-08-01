@@ -245,11 +245,11 @@ export default function ReviewStep({
 
     
 
-      <div className="flex justify-between pt-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 pt-4">
         <Button
           onClick={onPrev}
           variant="outline"
-          className="px-8 py-3 rounded-xl font-medium border-slate-200 hover:bg-slate-50"
+          className="px-6 sm:px-8 py-3 rounded-xl font-medium border-slate-200 hover:bg-slate-50 w-full sm:w-auto order-2 sm:order-1"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Previous
@@ -258,7 +258,7 @@ export default function ReviewStep({
         <Button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-medium"
+          className="bg-green-600 hover:bg-green-700 text-white px-6 sm:px-8 py-3 rounded-xl font-medium w-full sm:w-auto order-1 sm:order-2"
         >
           {isSubmitting ? (
             "Processing..."

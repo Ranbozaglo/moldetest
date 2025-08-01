@@ -26,6 +26,11 @@ export default function AdminDashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
   const [emailStatus, setEmailStatus] = useState({});
+  
+  // Cache management
+  const [cacheTimestamp, setCacheTimestamp] = useState(null);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -99,7 +104,7 @@ export default function AdminDashboard() {
       }
       
       setUser(authUser);
-      loadInspections();
+      smartRefresh();
     } catch (error) {
       navigate(createPageUrl("Welcome"));
     } finally {
@@ -107,8 +112,22 @@ export default function AdminDashboard() {
     }
   }, [authUser, navigate]);
 
-  const loadInspections = async () => {
+  const loadInspections = async (forceRefresh = false) => {
     try {
+      const now = Date.now();
+      
+      // Check if we have cached data and it's still valid
+      if (!forceRefresh && cacheTimestamp && inspections.length > 0) {
+        const cacheAge = now - cacheTimestamp;
+        if (cacheAge < CACHE_DURATION) {
+          console.log("🔍 CACHE: Using cached inspections data (age:", Math.round(cacheAge / 1000), "seconds)");
+          return;
+        }
+      }
+      
+      console.log("🔍 CACHE: Loading fresh inspections data from server");
+      setLoading(true);
+      
       const allInspections = await MoldInspection.list('-created_at', 50, false); // Use lightweight endpoint for better performance
       
       console.log("🔍 DEBUG: Raw inspections data:", allInspections);
@@ -130,6 +149,8 @@ export default function AdminDashboard() {
       // For lightweight data, we don't need to parse heavy fields
       setInspections(allInspections);
       setSelectedInspections(new Set());
+      setCacheTimestamp(now);
+      setLastUpdateCheck(now);
       
       // Load stats after inspections are loaded
       const dashboardStats = await getDashboardStats(allInspections);
@@ -140,6 +161,8 @@ export default function AdminDashboard() {
       console.error("Error stack:", error.stack);
       setInspections([]);
       alert("Failed to load inspections. Please refresh the page.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -150,6 +173,18 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Error refreshing stats:", error);
     }
+  };
+
+  // Cache invalidation function
+  const invalidateCache = () => {
+    console.log("🔍 CACHE: Invalidating cache due to data changes");
+    setCacheTimestamp(null);
+    setLastUpdateCheck(null);
+  };
+
+  // Smart refresh function that only loads if cache is invalid
+  const smartRefresh = async () => {
+    await loadInspections(false); // Don't force refresh, let cache logic decide
   };
   
   const getDisplayNumber = (inspection) => {
@@ -258,6 +293,21 @@ export default function AdminDashboard() {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, propertyTypeFilter, clientTypeFilter, moldFilter, waterDamageFilter]);
 
+  // Periodic cache refresh every 10 minutes when page is active
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && cacheTimestamp) {
+        const cacheAge = Date.now() - cacheTimestamp;
+        if (cacheAge > CACHE_DURATION) {
+          console.log("🔍 CACHE: Auto-refreshing expired cache");
+          smartRefresh();
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [cacheTimestamp]);
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
   };
@@ -309,8 +359,9 @@ export default function AdminDashboard() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      // Reload the inspections list
-      await loadInspections();
+      // Invalidate cache and reload the inspections list
+      invalidateCache();
+      await smartRefresh();
       
       alert(`Successfully deleted ${ids.length} inspection(s).`);
     } catch (error) {
@@ -746,26 +797,26 @@ export default function AdminDashboard() {
                   ${(inspection.lab_recommendations || inspection.recommendations)
                     ? (() => {
                         const recommendations = (inspection.lab_recommendations || inspection.recommendations)
-                          .replace(/\\n/g, '')
-                          .split(/\n{2,}/)
-                          .map(section => {
-                            section = section.replace(/\*/g, '').trim();
-                            const indexOfColon = section.indexOf(':');
-                            if (indexOfColon !== -1) {
-                              const title = section.substring(0, indexOfColon).trim();
-                              const content = section.substring(indexOfColon + 1).trim();
-                              return `
-                                <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
-                                <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
-                                <br>
-                              `;
-                            }
-                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
-                          })
+            .replace(/\\n/g, '')
+            .split(/\n{2,}/)
+            .map(section => {
+              section = section.replace(/\*/g, '').trim();
+              const indexOfColon = section.indexOf(':');
+              if (indexOfColon !== -1) {
+                const title = section.substring(0, indexOfColon).trim();
+                const content = section.substring(indexOfColon + 1).trim();
+                return `
+                  <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
+                  <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
+                  <br>
+                `;
+              }
+              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
+            })
                           .join('');
                         return recommendations;
                       })()
-                    : '<p>Pending recommendations.</p>'
+                      : '<p>Pending recommendations.</p>'
                   }
                 </div>
             </div>
@@ -853,7 +904,7 @@ export default function AdminDashboard() {
       // Only update status if we have a valid database ID
       if (dbId) {
         const updatedInspection = await MoldInspection.update(dbId, { 
-          status: 'in_progress',
+        status: 'in_progress',
           client_status_detail: "Your samples have been received and are now in lab analysis.",
           updated_date: new Date().toISOString()
         });
@@ -874,8 +925,9 @@ export default function AdminDashboard() {
         alert("Email sent successfully, but status update failed. Please refresh the page to see the latest status.");
       }
       
-      // Reload inspections to ensure we have the latest data
-      await loadInspections();
+      // Invalidate cache and reload inspections to ensure we have the latest data
+      invalidateCache();
+      await smartRefresh();
       
       console.log("🔍 DEBUG: Successfully updated inspection status to 'in_progress'");
       
@@ -930,8 +982,8 @@ export default function AdminDashboard() {
       const dbId = inspection.id;
       if (dbId) {
         await MoldInspection.update(dbId, { 
-          status: 'completed',
-          client_status_detail: "Your detailed analysis and report are complete and available for download.",
+        status: 'completed',
+        client_status_detail: "Your detailed analysis and report are complete and available for download.",
           report_html_url: reportUrl,
           updated_date: new Date().toISOString()
         });
@@ -946,8 +998,9 @@ export default function AdminDashboard() {
         );
       }
       
-      // Step 5: Refresh the UI to ensure we have the latest data
-      await loadInspections();
+      // Step 5: Invalidate cache and refresh the UI to ensure we have the latest data
+      invalidateCache();
+      await smartRefresh();
       
       setEmailComplete(inspectionId, 'report');
       
@@ -1129,7 +1182,7 @@ export default function AdminDashboard() {
           <div className="mb-8">
             <div className="h-8 bg-gray-200 rounded w-1/3 mb-4 animate-pulse"></div>
             <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-          </div>
+            </div>
           <LoadingSkeleton />
         </div>
       </div>
@@ -1141,32 +1194,40 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
                 <div className="p-2  rounded-lg">
-                  <img 
-                    src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
-                    alt="Total Testing Logo" 
-                    className="w-8 h-8 object-contain"
-                  />
+              <img 
+                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
+                  alt="Total Testing Logo" 
+                className="w-8 h-8 object-contain"
+              />
                 </div>
-                Admin Dashboard
-              </h1>
+              Admin Dashboard
+            </h1>
               <p className="text-slate-600 mt-2 flex items-center gap-2">
                 <Database className="w-4 h-4" />
-                Manage all inspections and generate comprehensive reports
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button onClick={loadInspections} variant="outline" className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200">
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
+              Manage all inspections and generate comprehensive reports
+            </p>
+              {cacheTimestamp && (
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                    <Zap className="w-3 h-3 text-green-500" />
+                    <span>Data cached {Math.round((Date.now() - cacheTimestamp) / 1000)}s ago</span>
+                  </div>
+                </div>
+              )}
+          </div>
+          <div className="flex gap-3">
+                              <Button onClick={() => loadInspections(true)} variant="outline" className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200">
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
               <Button onClick={exportToCSV} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200">
-                <FileText className="w-4 h-4" />
-                Export CSV
-              </Button>
+              <FileText className="w-4 h-4" />
+              Export CSV
+            </Button>
             </div>
           </div>
         </div>
@@ -1206,18 +1267,18 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200">
             <TabsList className="grid w-full grid-cols-3 bg-slate-100">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
-                <BarChart3 className="w-4 h-4" />
-                Overview
-              </TabsTrigger>
+              <BarChart3 className="w-4 h-4" />
+              Overview
+            </TabsTrigger>
               <TabsTrigger value="inspections" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
-                <Database className="w-4 h-4" />
-                All Inspections
-              </TabsTrigger>
+              <Database className="w-4 h-4" />
+              All Inspections
+            </TabsTrigger>
               <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
-                <TrendingUp className="w-4 h-4" />
-                Analytics
-              </TabsTrigger>
-            </TabsList>
+              <TrendingUp className="w-4 h-4" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
           </div>
 
           {/* Overview Tab */}
@@ -1351,7 +1412,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                       <span className="text-sm font-medium">Pending</span>
-                    </div>
+                  </div>
                     <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">{stats.pending}</Badge>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
@@ -1434,7 +1495,7 @@ export default function AdminDashboard() {
                   </Button>
 
                   <Button 
-                    onClick={loadInspections} 
+                    onClick={() => loadInspections(true)} 
                     variant="outline" 
                     className="h-24 flex flex-col gap-3 bg-white hover:bg-orange-50 hover:border-orange-300 transition-all duration-200"
                   >
@@ -1466,12 +1527,12 @@ export default function AdminDashboard() {
                     <label className="text-sm font-medium text-slate-700">Search</label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <Input
-                        placeholder="Search inspections..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                    <Input
+                      placeholder="Search inspections..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                         className="h-10 pl-10 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500"
-                      />
+                    />
                     </div>
                   </div>
                   
@@ -1491,7 +1552,7 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-
+                  
 
 
 
@@ -1575,7 +1636,140 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                {/* Mobile Card Layout */}
+                <div className="block md:hidden">
+                  <div className="p-4 border-b bg-slate-50">
+                    <Checkbox
+                      checked={currentInspections.length > 0 && currentInspections.every(insp => selectedInspections.has(insp.id))}
+                      onCheckedChange={handleSelectAll}
+                      className="mr-2"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Select All</span>
+                  </div>
+                  <div className="space-y-4 p-4">
+                    {currentInspections.map((inspection, index) => (
+                      <div 
+                        key={inspection.id} 
+                        className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <Checkbox
+                              checked={selectedInspections.has(inspection.id)}
+                              onCheckedChange={(checked) => handleSelectInspection(inspection.id, checked)}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-blue-600 font-semibold text-sm">{getDisplayNumber(inspection)}</span>
+                              </div>
+                              <div className="text-xs text-slate-500 mt-1">
+                                {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge 
+                            variant={getStatusDisplay(inspection.status).variant}
+                            className={`px-2 py-1 text-xs font-medium ${
+                              inspection.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                              inspection.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                              inspection.status === 'in_progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                              'bg-slate-100 text-slate-800 border-slate-200'
+                            }`}
+                          >
+                            {React.createElement(getStatusDisplay(inspection.status).icon, { className: "w-3 h-3 mr-1" })}
+                            {getStatusDisplay(inspection.status).label}
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div>
+                            <div className="font-medium text-slate-900 text-sm">{inspection.full_name}</div>
+                            <div className="text-xs text-slate-600 flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {inspection.email}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <div className="font-medium text-slate-900 text-sm">{inspection.street_address}</div>
+                            <div className="text-xs text-slate-600 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {inspection.city}, {inspection.state} {inspection.zip_code}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                          <div className="flex gap-1">
+                            <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs">
+                              {inspection.property_type || 'N/A'}
+                            </span>
+                            <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs">
+                              {inspection.client_type?.replace('_', ' ') || 'N/A'}
+                            </span>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-full">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64">
+                              <DropdownMenuLabel className="font-semibold text-slate-800">Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  try {
+                                    const url = createPageUrl('InspectionDetails', { id: inspection.id || inspection.inspection_number });
+                                    navigate(url);
+                                  } catch (error) {
+                                    console.error("Failed to navigate to inspection details:", error);
+                                    alert("Failed to open inspection details. Please try again.");
+                                  }
+                                }}
+                                className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem 
+                                onClick={() => handleDownloadPDF(inspection)}
+                                className="flex items-center gap-2 hover:bg-green-50 text-green-700"
+                              >
+                                <File className="w-4 h-4" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem 
+                                onClick={() => sendLabReceivedEmail(inspection)}
+                                disabled={getEmailStatus(inspection.inspection_number || inspection.id, 'lab') === 'sending'}
+                                className="flex items-center gap-2 hover:bg-purple-50 text-purple-700 disabled:opacity-50"
+                              >
+                                <Mail className="w-4 h-4" />
+                                {getEmailStatus(inspection.inspection_number || inspection.id, 'lab') === 'sending' ? 'Sending...' : 'Send Lab Email'}
+                              </DropdownMenuItem>
+                              
+                              <DropdownMenuItem 
+                                onClick={() => sendReportReadyEmail(inspection)}
+                                disabled={getEmailStatus(inspection.inspection_number || inspection.id, 'report') === 'sending'}
+                                className="flex items-center gap-2 hover:bg-green-50 text-green-700 disabled:opacity-50"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                {getEmailStatus(inspection.inspection_number || inspection.id, 'report') === 'sending' ? 'Sending...' : 'Send Report Email'}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Desktop Table Layout */}
+                <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50 hover:bg-slate-100">
@@ -1784,8 +1978,8 @@ export default function AdminDashboard() {
                                         // Continue with current data if detailed fetch fails
                                       }
                                       
-                                      // Get samples for this inspection
-                                      const samples = await Sample.findMany({ inspection_id: inspection.id });
+                                                                              // Get samples for this inspection
+                                        const samples = await Sample.findMany({ inspection_id: inspection.id });
                                       console.log("🔍 DEBUG: Retrieved samples for report:", samples);
                                       
                                       // Generate comprehensive report HTML
@@ -1831,12 +2025,12 @@ export default function AdminDashboard() {
                 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-4 sm:px-6 py-4 border-t border-slate-200 bg-slate-50">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600">Show</span>
+                        <span className="text-xs sm:text-sm text-slate-600">Show</span>
                         <Select value={itemsPerPage.toString()} onValueChange={(value) => handleItemsPerPageChange(parseInt(value))}>
-                          <SelectTrigger className="w-20 h-8">
+                          <SelectTrigger className="w-16 sm:w-20 h-8 text-xs sm:text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1846,50 +2040,86 @@ export default function AdminDashboard() {
                             <SelectItem value="50">50</SelectItem>
                           </SelectContent>
                         </Select>
-                        <span className="text-sm text-slate-600">per page</span>
+                        <span className="text-xs sm:text-sm text-slate-600">per page</span>
                       </div>
                       
-                      <div className="text-sm text-slate-600">
-                        Showing {startIndex + 1} to {Math.min(endIndex, filteredInspections.length)} of {filteredInspections.length} inspections
+                      <div className="text-xs sm:text-sm text-slate-600">
+                        <span className="hidden sm:inline">Showing </span>
+                        <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredInspections.length)}</span>
+                        <span className="hidden sm:inline"> of </span>
+                        <span className="sm:hidden"> / </span>
+                        <span className="font-medium">{filteredInspections.length}</span>
+                        <span className="hidden sm:inline"> inspections</span>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="h-8 px-3"
+                        className="h-8 px-2 sm:px-3 text-xs sm:text-sm"
                       >
-                        Previous
+                        <span className="hidden sm:inline">Previous</span>
+                        <span className="sm:hidden">Prev</span>
                       </Button>
                       
                       <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          let pageNum;
-                          if (totalPages <= 5) {
-                            pageNum = i + 1;
-                          } else if (currentPage <= 3) {
-                            pageNum = i + 1;
-                          } else if (currentPage >= totalPages - 2) {
-                            pageNum = totalPages - 4 + i;
-                          } else {
-                            pageNum = currentPage - 2 + i;
-                          }
-                          
-                          return (
-                            <Button
-                              key={pageNum}
-                              variant={currentPage === pageNum ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handlePageChange(pageNum)}
-                              className="h-8 w-8 p-0"
-                            >
-                              {pageNum}
-                            </Button>
-                          );
-                        })}
+                        {/* Mobile: Show 3 pages, Desktop: Show 5 pages */}
+                        <div className="flex items-center gap-1 sm:hidden">
+                          {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 2) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 1) {
+                              pageNum = totalPages - 2 + i;
+                            } else {
+                              pageNum = currentPage - 1 + i;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(pageNum)}
+                                className="h-8 w-7 p-0 text-xs"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        
+                        <div className="hidden sm:flex items-center gap-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = currentPage - 2 + i;
+                            }
+                            
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handlePageChange(pageNum)}
+                                className="h-8 w-8 p-0 text-sm"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          })}
+                        </div>
                       </div>
                       
                       <Button
@@ -1897,9 +2127,10 @@ export default function AdminDashboard() {
                         size="sm"
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="h-8 px-3"
+                        className="h-8 px-2 sm:px-3 text-xs sm:text-sm"
                       >
-                        Next
+                        <span className="hidden sm:inline">Next</span>
+                        <span className="sm:hidden">Next</span>
                       </Button>
                     </div>
                   </div>

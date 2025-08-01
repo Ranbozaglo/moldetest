@@ -37,6 +37,29 @@ export default function MyInspections() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
+  // SECURITY: Early return if user is not authenticated
+  if (!currentUser) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6">
+        <div className="text-center">
+          <div className="text-lg text-slate-600">Please sign in to view your inspections.</div>
+          <Button 
+            onClick={() => navigate(createPageUrl("SignIn"))}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // SECURITY: Redirect admin users immediately
+  if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
+    navigate(createPageUrl("AdminDashboard"));
+    return null;
+  }
+
   useEffect(() => {
     (async () => {
       try {
@@ -53,25 +76,44 @@ export default function MyInspections() {
             }
             
             if (currentUser && currentUser.email) {
-              console.log("🔍 DEBUG: Searching for inspections with email:", currentUser.email);
+              console.log("🔍 SECURITY: Fetching inspections for user:", currentUser.email);
               
-              // Use the new lightweight endpoint for better performance
+              // SECURITY: Use findMany with proper user filtering (not list which is for admins)
               try {
-                const userInspections = await MoldInspection.list("-created_at", 10, false); // Lightweight by default
-                console.log("🔍 DEBUG: Found inspections with lightweight endpoint:", userInspections);
+                const userInspections = await MoldInspection.findMany({
+                  email: currentUser.email // Explicitly filter by current user's email
+                });
+                console.log("🔍 SECURITY: Found user-specific inspections:", userInspections?.length || 0);
                 
-                if (userInspections && userInspections.length > 0) {
-                  setInspections(userInspections);
+                // SECURITY: Double-check that all returned inspections belong to current user
+                if (userInspections && Array.isArray(userInspections)) {
+                  const filteredInspections = userInspections.filter(inspection => 
+                    inspection.email === currentUser.email
+                  );
+                  
+                  if (filteredInspections.length !== userInspections.length) {
+                    console.warn("🔍 SECURITY WARNING: Some inspections filtered out due to email mismatch");
+                  }
+                  
+                  setInspections(filteredInspections);
+                  console.log("🔍 SECURITY: Set", filteredInspections.length, "verified user inspections");
                 } else {
-                  console.log("🔍 DEBUG: No inspections found for user");
+                  console.log("🔍 SECURITY: No inspections found for user");
                   setInspections([]);
                 }
               } catch (inspectionError) {
-                console.error("🔍 DEBUG: Error fetching inspections:", inspectionError);
-                setError("Failed to load inspections. Please try refreshing the page.");
+                console.error("🔍 SECURITY: Error fetching user inspections:", inspectionError);
+                
+                // Handle authentication errors
+                if (inspectionError.message.includes('401') || inspectionError.message.includes('403')) {
+                  setError("Authentication failed. Please sign in again.");
+                  navigate(createPageUrl("SignIn"));
+                } else {
+                  setError("Failed to load your inspections. Please try refreshing the page.");
+                }
               }
             } else {
-              console.log("🔍 DEBUG: No current user email found, redirecting to Welcome");
+              console.log("🔍 SECURITY: No authenticated user found, redirecting to Welcome");
               navigate(createPageUrl("Welcome"));
             }
           } catch (err) {
@@ -113,20 +155,42 @@ export default function MyInspections() {
   
   const generateAndDownloadReport = async (inspection) => {
     try {
-      console.log("🔍 DEBUG: Generating report for inspection:", inspection.id);
+      // SECURITY: Verify inspection belongs to current user
+      if (inspection.email !== currentUser.email) {
+        console.error("🔍 SECURITY: Unauthorized report generation attempt for inspection:", inspection.id);
+        alert("Access denied. You can only generate reports for your own inspections.");
+        return;
+      }
+
+      console.log("🔍 SECURITY: Generating report for user's inspection:", inspection.id);
       
       // Always fetch detailed inspection data to ensure we have the latest lab analysis
       let detailedInspection = inspection;
-      console.log("🔍 DEBUG: Fetching detailed inspection data for report generation");
+      console.log("🔍 SECURITY: Fetching detailed inspection data for report generation");
       try {
         detailedInspection = await MoldInspection.getDetailed(inspection.id);
-        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+        
+        // SECURITY: Double-check ownership after fetching detailed data
+        if (detailedInspection.email !== currentUser.email) {
+          console.error("🔍 SECURITY: Detailed inspection email mismatch in report generation");
+          alert("Access denied. Inspection ownership verification failed.");
+          return;
+        }
+        
+        console.log("🔍 SECURITY: Retrieved and verified detailed inspection data");
         console.log("🔍 DEBUG: Lab conclusion:", detailedInspection.lab_conclusion);
         console.log("🔍 DEBUG: Lab recommendations:", detailedInspection.lab_recommendations);
         console.log("🔍 DEBUG: Lab analysis images:", detailedInspection.lab_analysis_images);
       } catch (detailError) {
-        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
-        // Continue with current data if detailed fetch fails
+        console.error("🔍 SECURITY: Error fetching detailed inspection data:", detailError);
+        
+        // Handle authentication errors
+        if (detailError.message.includes('401') || detailError.message.includes('403')) {
+          alert("Authentication failed. Please sign in again.");
+          navigate(createPageUrl("SignIn"));
+          return;
+        }
+        // Continue with current data if detailed fetch fails for other reasons
       }
       
       // Parse lab_analysis_images if it's a string
@@ -592,16 +656,38 @@ export default function MyInspections() {
 
   const handleViewReport = async (inspection) => {
     try {
-      console.log("🔍 DEBUG: Generating view report for inspection:", inspection.id);
+      // SECURITY: Verify inspection belongs to current user
+      if (inspection.email !== currentUser.email) {
+        console.error("🔍 SECURITY: Unauthorized access attempt to inspection:", inspection.id);
+        alert("Access denied. You can only view your own inspection reports.");
+        return;
+      }
+
+      console.log("🔍 SECURITY: Generating view report for user's inspection:", inspection.id);
       
       // Get detailed inspection data first
       let detailedInspection = inspection;
       try {
         detailedInspection = await MoldInspection.getDetailed(inspection.id);
-        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+        
+        // SECURITY: Double-check ownership after fetching detailed data
+        if (detailedInspection.email !== currentUser.email) {
+          console.error("🔍 SECURITY: Detailed inspection email mismatch");
+          alert("Access denied. Inspection ownership verification failed.");
+          return;
+        }
+        
+        console.log("🔍 SECURITY: Retrieved and verified detailed inspection data");
       } catch (detailError) {
-        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
-        // Continue with current data if detailed fetch fails
+        console.error("🔍 SECURITY: Error fetching detailed inspection data:", detailError);
+        
+        // Handle authentication errors
+        if (detailError.message.includes('401') || detailError.message.includes('403')) {
+          alert("Authentication failed. Please sign in again.");
+          navigate(createPageUrl("SignIn"));
+          return;
+        }
+        // Continue with current data if detailed fetch fails for other reasons
       }
       
       // Get samples for this inspection
@@ -623,6 +709,15 @@ export default function MyInspections() {
 
   const handleDownloadPDF = async (inspection) => {
     try {
+      // SECURITY: Verify inspection belongs to current user
+      if (inspection.email !== currentUser.email) {
+        console.error("🔍 SECURITY: Unauthorized PDF download attempt for inspection:", inspection.id);
+        alert("Access denied. You can only download your own inspection reports.");
+        return;
+      }
+
+      console.log("🔍 SECURITY: Generating PDF for user's inspection:", inspection.id);
+      
       // Use the existing generateReportHtmlContent function from MyInspections
       await downloadPDF(
         inspection,
@@ -633,7 +728,14 @@ export default function MyInspections() {
       );
     } catch (error) {
       console.error("❌ Error in handleDownloadPDF:", error);
-      setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+      
+      // Handle authentication errors
+      if (error.message.includes('401') || error.message.includes('403')) {
+        setDownloadStatus({ type: 'error', message: 'Authentication failed. Please sign in again.' });
+        setTimeout(() => navigate(createPageUrl("SignIn")), 2000);
+      } else {
+        setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+      }
       setTimeout(() => setDownloadStatus(null), 5000);
     }
   };
@@ -826,18 +928,18 @@ export default function MyInspections() {
         transition={{ duration: 0.5 }}
       >
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Inspections</h1>
-            <p className="text-slate-600 mt-2">Welcome back, {user.name || user.email}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Inspections</h1>
+            <p className="text-slate-600 mt-2 text-sm sm:text-base">Welcome back, {user.name || user.email}</p>
           </div>
           
           <Button 
             onClick={() => window.open('https://buy.stripe.com/YOUR_STRIPE_PAYMENT_LINK', '_blank')}
             size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
           >
-            <Plus className="w-5 h-5 mr-2" />
+            <Plus className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
             Start New Testing
           </Button>
         </div>

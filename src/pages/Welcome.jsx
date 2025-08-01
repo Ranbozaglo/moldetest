@@ -75,14 +75,13 @@ export default function Welcome() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center"
+              className="flex flex-col sm:flex-row gap-4 justify-center px-4 sm:px-0"
             >
                 <Button 
                 onClick={handleStartInspection}
                   size="lg" 
-                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-12 py-6 text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 sm:px-14 py-4 sm:py-6 text-lg sm:text-xl font-semibold rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 w-full sm:w-auto"
                 >
-               
                   Start Your Mold Inspection & Testing
                 </Button>
             </motion.div>
@@ -139,27 +138,30 @@ export default function Welcome() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-slate-900 to-blue-900">
-        <div className="max-w-4xl mx-auto px-6 text-center">
+      <section className="py-16 sm:py-20 bg-gradient-to-r from-slate-900 to-blue-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
+            className="flex flex-col items-center"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6 px-2">
               Ready to Test Your Property?
             </h2>
-            <p className="text-xl text-blue-100 mb-10">
-              Join thousands of homeowners who trust Total Testing .
+            <p className="text-lg sm:text-xl text-blue-100 mb-8 sm:mb-10 px-2 max-w-2xl">
+              Join thousands of homeowners who trust Total Testing.
             </p>
+            <div className="w-full max-w-md sm:max-w-none px-4 sm:px-0">
               <Button 
-              onClick={handleStartInspection}
+                onClick={handleStartInspection}
                 size="lg" 
-                className="bg-white text-blue-900 hover:bg-blue-50 px-12 py-6 text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300"
+                className="bg-white text-blue-900 hover:bg-blue-50 px-8 sm:px-12 py-4 sm:py-6 text-lg sm:text-xl font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 w-full sm:w-auto"
               >
                 Begin Your Inspection Process
               </Button>
+            </div>
           </motion.div>
         </div>
       </section>

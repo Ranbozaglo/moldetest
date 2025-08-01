@@ -264,14 +264,17 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
             </div>
           </div>
 
-          <div className="text-center">
+          <div className="text-center px-2 sm:px-0">
             <Button
               onClick={() => setDisclaimerAccepted(true)}
               size="lg"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-4 rounded-xl text-lg font-medium"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-12 py-4 rounded-xl text-xs sm:text-lg font-medium w-full sm:w-auto min-h-[3rem]"
             >
-              <CheckCircle className="w-5 h-5 mr-3" />
-              I Agree & Continue to Collection Guide
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-3 flex-shrink-0" />
+              <span className="block sm:inline">
+                <span className="block sm:inline">I Agree & Continue</span>
+                <span className="block sm:inline sm:ml-1">to Collection Guide</span>
+              </span>
             </Button>
           </div>
         </motion.div>
@@ -289,7 +292,7 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
   const hasVisibleMold = formData && formData.has_visible_mold && formData.visible_mold_details && formData.visible_mold_details.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-0">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
         <div className="text-center mb-12">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -301,57 +304,57 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
           </p>
         </div>
         
-        <div className="glass-effect p-8 rounded-2xl mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Step-by-Step Collection Process</h2>
-          <div className="space-y-6">
+        <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Step-by-Step Collection Process</h2>
+          <div className="space-y-4 sm:space-y-6">
             {guideSteps.map((step, index) => (
-              <motion.div key={index} className="flex items-start gap-4" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }}>
-                <div className="flex-shrink-0 w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center">
-                  <step.icon className="w-6 h-6 text-blue-500" />
+              <motion.div key={index} className="flex items-start gap-3 sm:gap-4" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.1 }}>
+                <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center">
+                  <step.icon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-800">{step.title}</h3>
-                  <p className="text-slate-600">{step.description}</p>
+                  <h3 className="font-semibold text-slate-800 text-sm sm:text-base">{step.title}</h3>
+                  <p className="text-slate-600 text-sm sm:text-base">{step.description}</p>
                 </div>
               </motion.div>
             ))}
           </div>
         </div>
 
-        <div className="glass-effect p-8 rounded-2xl mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Sample Documentation</h2>
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5" />
+        <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Sample Documentation</h2>
+          <div className="space-y-4 sm:space-y-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 sm:p-6">
+              <h3 className="font-semibold text-blue-900 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" />
                 Documentation Requirements
               </h3>
-              <div className="space-y-4 text-blue-800">
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+              <div className="space-y-3 sm:space-y-4 text-blue-800 text-sm sm:text-base">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                   <p><strong>Location Details:</strong> Record the specific room, area, and surface where each sample was collected (e.g., "Master Bathroom - Ceiling behind toilet", "Kitchen - Under sink cabinet")</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                   <p><strong>Visual Description:</strong> Note the appearance of the mold growth (color, texture, size of affected area)</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                   <p><strong>Environmental Conditions:</strong> Document any moisture sources, water damage, or humidity issues in the area</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                   <p><strong>Collection Time:</strong> Note the date and time of sample collection for tracking purposes</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-              <h3 className="font-semibold text-amber-900 mb-4 flex items-center gap-2">
-                <Archive className="w-5 h-5" />
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-6">
+              <h3 className="font-semibold text-amber-900 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+                <Archive className="w-4 h-4 sm:w-5 sm:h-5" />
                 Sample Labeling Best Practices
               </h3>
-              <div className="space-y-3 text-amber-800">
+              <div className="space-y-2 sm:space-y-3 text-amber-800 text-sm sm:text-base">
                 <p><strong>Clear Labeling:</strong> Use permanent marker to label each Ziploc bag before collection</p>
                 <p><strong>Unique Identifiers:</strong> Include room name, surface type, and sample number (e.g., "Bathroom-Ceiling-01")</p>
                 <p><strong>Date & Time:</strong> Add collection date and time to each sample label</p>
@@ -359,12 +362,12 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
               </div>
             </div>
 
-            <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-              <h3 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
-                <CheckCircle className="w-5 h-5" />
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 sm:p-6">
+              <h3 className="font-semibold text-green-900 mb-3 sm:mb-4 flex items-center gap-2 text-sm sm:text-base">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 Quality Control Checklist
               </h3>
-              <div className="space-y-2 text-green-800">
+              <div className="space-y-2 text-green-800 text-sm sm:text-base">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600" />
                   <span>Each sample has a unique, clearly written label</span>
@@ -447,9 +450,9 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
         </div>
 
         {/* Sample Collection Form */}
-        <div className="glass-effect p-8 rounded-2xl mb-8">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Sample Collection Form</h2>
-          <p className="text-slate-600 mb-6">
+        <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Sample Collection Form</h2>
+          <p className="text-slate-600 mb-4 sm:mb-6 text-sm sm:text-base">
             Document your sample collection details below. Add as many samples as needed for each location where you collected swab samples.
           </p>
           
@@ -478,11 +481,11 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
           </div>
         </div>
         
-        <div className="flex justify-between pt-6">
+        <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4 pt-6">
           <Button
             onClick={onPrev}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center justify-center gap-2 px-6 sm:px-8 py-3 rounded-xl font-medium border-slate-200 hover:bg-slate-50 w-full sm:w-auto order-2 sm:order-1"
           >
             <ArrowLeft className="w-4 h-4" />
             Previous
@@ -490,7 +493,7 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
           
           <Button
             onClick={handleNext}
-            className="flex items-center gap-2"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 rounded-xl font-medium w-full sm:w-auto order-1 sm:order-2"
           >
             Continue
             <ArrowRight className="w-4 h-4" />
