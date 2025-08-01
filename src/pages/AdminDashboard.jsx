@@ -794,9 +794,9 @@ export default function AdminDashboard() {
     console.log("🔍 DEBUG: Inspection Number:", inspection.inspection_number);
     console.log("🔍 DEBUG: All inspection keys:", Object.keys(inspection));
     
-    // Try multiple possible ID fields
-    const inspectionId = inspection.id || 
-                        inspection.inspection_number || 
+    // Try multiple possible ID fields - prioritize inspection_number as it's the primary identifier
+    const inspectionId = inspection.inspection_number || 
+                        inspection.id || 
                         inspection.inspection_id ||
                         inspection.number ||
                         null;
@@ -825,12 +825,25 @@ export default function AdminDashboard() {
       
       // Update inspection status to 'in_progress' in the database
       console.log(`🔍 DEBUG: About to call MoldInspection.update with ID: ${inspectionId}`);
-      await MoldInspection.update(inspectionId, { 
+      const updatedInspection = await MoldInspection.update(inspectionId, { 
         status: 'in_progress',
-        client_status_detail: "Your samples have been received and are now in lab analysis." 
+        client_status_detail: "Your samples have been received and are now in lab analysis.",
+        updated_date: new Date().toISOString()
       });
-
-      // Reload inspections to reflect the change
+      
+      console.log("🔍 DEBUG: MoldInspection.update response:", updatedInspection);
+      
+      // Update the local state immediately
+      setInspections(prevInspections => 
+        prevInspections.map(insp => {
+          const inspId = insp.inspection_number || insp.id;
+          return inspId === inspectionId
+            ? { ...insp, status: 'in_progress', client_status_detail: "Your samples have been received and are now in lab analysis." }
+            : insp;
+        })
+      );
+      
+      // Reload inspections to ensure we have the latest data
       await loadInspections();
       
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'sent' }));
@@ -838,12 +851,17 @@ export default function AdminDashboard() {
         setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
       }, 3000);
       
+      console.log("🔍 DEBUG: Successfully updated inspection status to 'in_progress'");
+      
     } catch (error) {
       console.error("❌ Error sending lab received email:", error);
       setEmailStatus(prev => ({ ...prev, [emailKey]: 'error' }));
       setTimeout(() => {
         setEmailStatus(prev => ({ ...prev, [emailKey]: null }));
       }, 5000);
+      
+      // Show error to user
+      alert(`Failed to send lab email and update status: ${error.message}`);
     }
   };
 
