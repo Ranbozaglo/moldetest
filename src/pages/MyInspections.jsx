@@ -19,10 +19,12 @@ import {
   FlaskConical,
   Calendar,
   MapPin,
-  Loader2
+  Loader2,
+  Eye
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from '@/contexts/AuthContext';
+import { downloadPDF } from "@/utils/pdfDownload";
 // Removed requireSupabaseSession - using Flask backend authentication
 
 export default function MyInspections() {
@@ -31,6 +33,7 @@ export default function MyInspections() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState({});
+  const [downloadStatus, setDownloadStatus] = useState(null);
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
@@ -587,6 +590,202 @@ export default function MyInspections() {
     }
   };
 
+  const handleViewReport = async (inspection) => {
+    try {
+      console.log("🔍 DEBUG: Generating view report for inspection:", inspection.id);
+      
+      // Get detailed inspection data first
+      let detailedInspection = inspection;
+      try {
+        detailedInspection = await MoldInspection.getDetailed(inspection.id);
+        console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
+      } catch (detailError) {
+        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+        // Continue with current data if detailed fetch fails
+      }
+      
+      // Get samples for this inspection
+      const samples = await Sample.findMany({ inspection_id: inspection.id });
+      console.log("🔍 DEBUG: Retrieved samples for view report:", samples);
+      
+      // Generate the same HTML content as the download function
+      const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
+      
+      // Open in new window
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write(reportHtml);
+      newWindow.document.close();
+    } catch (error) {
+      console.error("❌ Error viewing report:", error);
+      alert("Failed to generate report view. Please try again.");
+    }
+  };
+
+  const handleDownloadPDF = async (inspection) => {
+    try {
+      // Use the existing generateReportHtmlContent function from MyInspections
+      await downloadPDF(
+        inspection,
+        [], // samples will be fetched inside downloadPDF
+        generateReportHtmlContent,
+        getDisplayNumber,
+        setDownloadStatus
+      );
+    } catch (error) {
+      console.error("❌ Error in handleDownloadPDF:", error);
+      setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  // Extract the report generation logic into a separate function for reuse
+  const generateReportHtmlContent = async (inspection, samples) => {
+    try {
+      // Get detailed inspection data first
+      let detailedInspection = inspection;
+      try {
+        detailedInspection = await MoldInspection.getDetailed(inspection.id);
+      } catch (detailError) {
+        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
+      }
+      
+      // Parse JSON fields if they're strings
+      if (detailedInspection.mold_images && typeof detailedInspection.mold_images === 'string') {
+        try {
+          detailedInspection.mold_images = JSON.parse(detailedInspection.mold_images);
+        } catch (parseError) {
+          detailedInspection.mold_images = [];
+        }
+      }
+      
+      if (detailedInspection.mold_locations && typeof detailedInspection.mold_locations === 'string') {
+        try {
+          detailedInspection.mold_locations = JSON.parse(detailedInspection.mold_locations);
+        } catch (parseError) {
+          detailedInspection.mold_locations = [];
+        }
+      }
+      
+      if (!samples) {
+        samples = await Sample.findMany({ inspection_id: inspection.id });
+      }
+      
+      const displayNum = getDisplayNumber(inspection);
+      
+      // Helper functions
+      const createImageList = (images) => {
+        if (!images || images.length === 0) return '<p>No photos provided.</p>';
+        return images.map(img => `<img src="${img}" alt="Evidence" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
+      };
+
+      const createPriorityBadge = (priority, text) => {
+        const colors = {
+          high: 'background-color: #dc2626; color: white;',
+          medium: 'background-color: #ea580c; color: white;',
+          low: 'background-color: #059669; color: white;'
+        };
+        return `<span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; ${colors[priority]}">${text}</span>`;
+      };
+      
+      // Generate high priority mold section
+      const visibleMoldHtml = detailedInspection.has_visible_mold && detailedInspection.mold_images && detailedInspection.mold_images.length > 0 && detailedInspection.mold_locations && detailedInspection.mold_locations.length > 0
+        ? `<div style="margin-bottom: 20px;">
+            <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+              ⚠️ Visible Mold Detected
+            </h3>
+            ${detailedInspection.mold_locations.map((location, i) => `
+              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                  <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
+                  ${createPriorityBadge('high', 'High Priority')}
+                </div>
+                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
+                <div style="text-align: center; margin: 15px 0;">
+                  ${detailedInspection.mold_images[i] ? `<img src="${detailedInspection.mold_images[i]}" alt="Mold Photo" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>`
+        : `<div style="margin-bottom: 20px;">
+            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+              ✅ No Visible Mold Detected
+            </h3>
+            <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
+          </div>`;
+      
+      const reportHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Mold Inspection Report - ${displayNum}</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .section { margin-bottom: 25px; }
+                .section h2 { color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; }
+                .section h3 { color: #004aac; margin-bottom: 15px; }
+                img { max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; }
+                .priority-high { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+                .priority-medium { background: #fff7ed; border: 1px solid #fed7aa; color: #ea580c; }
+                .priority-low { background: #f0fdf4; border: 1px solid #bbf7d0; color: #059669; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>DIY Mold Inspection Report</h1>
+                <h2>${displayNum}</h2>
+                <p><strong>Inspection Date:</strong> ${format(new Date(detailedInspection.created_date), "MMMM d, yyyy")}</p>
+                <p><strong>Property:</strong> ${detailedInspection.street_address || 'N/A'}</p>
+            </div>
+            
+            <div class="section">
+                <h2>Client Information</h2>
+                <p><strong>Name:</strong> ${detailedInspection.full_name || 'N/A'}</p>
+                <p><strong>Email:</strong> ${detailedInspection.email || 'N/A'}</p>
+                <p><strong>Property Type:</strong> ${detailedInspection.property_type || 'N/A'}</p>
+            </div>
+            
+            <div class="section">
+                <h2>Inspection Results</h2>
+                ${visibleMoldHtml}
+                <p><strong>Water Damage:</strong> ${detailedInspection.has_water_damage ? 'Yes' : 'No'}</p>
+                <p><strong>Temperature:</strong> ${detailedInspection.temperature || 'N/A'}°F</p>
+                <p><strong>Humidity:</strong> ${detailedInspection.humidity || 'N/A'}%</p>
+            </div>
+            
+            ${samples && samples.length > 0 ? `
+            <div class="section">
+                <h2>Samples Collected</h2>
+                ${samples.map((sample, index) => `
+                    <div style="margin-bottom: 15px;">
+                        <h3>Sample #${index + 1}: ${sample.location || 'Unknown Location'}</h3>
+                        <p>${sample.description || 'No description provided.'}</p>
+                        ${sample.sample_image ? `<img src="${sample.sample_image}" alt="Sample Photo" />` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
+            
+            ${detailedInspection.lab_conclusion ? `
+            <div class="section">
+                <h2>Laboratory Analysis</h2>
+                <p>${detailedInspection.lab_conclusion}</p>
+                ${detailedInspection.lab_recommendations ? `<p><strong>Recommendations:</strong> ${detailedInspection.lab_recommendations}</p>` : ''}
+            </div>
+            ` : ''}
+        </body>
+        </html>
+      `;
+      
+      return reportHtml;
+    } catch (error) {
+      console.error("❌ Error generating report HTML:", error);
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto py-12 px-6">
@@ -700,26 +899,26 @@ export default function MyInspections() {
                           <p><strong>Submission Date:</strong> {format(new Date(inspection.created_date), "MMMM d, yyyy")}</p>
                         </div>
 
-                        {/* Action Button */}
-                        <div className="flex justify-end pt-2">
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-2 pt-2">
                           {isReportReady ? (
-                            <Button
-                              onClick={() => handleDownloadReport(inspection)}
-                              disabled={downloading[inspection.id]}
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              {downloading[inspection.id] ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Preparing...
-                                </>
-                              ) : (
-                                <>
-                                  <FileText className="w-4 h-4 mr-2" />
-                                  Download Report
-                                </>
-                              )}
-                            </Button>
+                            <>
+                              <Button
+                                onClick={() => handleViewReport(inspection)}
+                                variant="outline"
+                                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Report
+                              </Button>
+                              <Button
+                                onClick={() => handleDownloadPDF(inspection)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                <Download className="w-4 h-4 mr-2" />
+                                Download PDF
+                              </Button>
+                            </>
                           ) : (
                              <Button variant="outline" disabled>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
