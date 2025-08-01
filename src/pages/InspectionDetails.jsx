@@ -916,7 +916,7 @@ export default function InspectionDetails() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-6">
+      <div className="max-w-4xl mx-auto py-12 px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
           <div className="text-lg text-slate-600">Loading inspection details...</div>
@@ -927,7 +927,7 @@ export default function InspectionDetails() {
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-6">
+      <div className="max-w-4xl mx-auto py-12 px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-lg text-red-600 mb-4">{error}</div>
           <Link to={createPageUrl("AdminDashboard")}>
@@ -940,7 +940,7 @@ export default function InspectionDetails() {
 
   if (!inspection) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-6">
+      <div className="max-w-4xl mx-auto py-12 px-6 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-lg text-slate-600">Inspection not found</div>
         </div>
