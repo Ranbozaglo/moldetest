@@ -417,7 +417,7 @@ export default function AdminDashboard() {
         .page-break { page-break-after: always; }
         .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; }
         .cover-title { font-size: 28px; font-weight: bold; color: #004aac; margin-bottom: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-        .cover-image { max-width: 100%; height: auto; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
+        .cover-image { max-width: 80%; height: 80%; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
         .cover-details { background: rgba(255,255,255,0.9); padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 100%; }
         .cover-detail-item { margin: 10px 0; font-size: 16px; }
         .cover-detail-label { font-weight: bold; color: #004aac; }
@@ -435,7 +435,7 @@ export default function AdminDashboard() {
         .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
         .client-info-value { margin-top: 5px; font-size: 16px; }
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
-        img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
+        img { max-width: 350px; max-height: 350px ; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
         
         /* Mobile-specific improvements */
         @media (max-width: 768px) {
@@ -524,7 +524,16 @@ export default function AdminDashboard() {
     const visibleMoldHtml = inspection.mold_images && inspection.mold_images.length > 0 && moldLocations.length > 0
       ? moldLocations.map((location, i) => {
           const locationImage = inspection.mold_images[i] || null;
-          return `<h4>Location #${i + 1}: ${location || 'N/A'}</h4><p>Visible mold detected - requires immediate attention</p><div>${locationImage ? `<img src="${locationImage}" alt="Mold Photo" />` : ''}</div>`;
+          return `<div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+              <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
+              ${createPriorityBadge('medium', 'high Priority')}
+            </div>
+            <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
+            <div style="text-align: center; margin: 15px 0;">
+              ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #fecaca;" />` : ''}
+            </div>
+          </div>`;
         }).join('')
       : '<p>No visible mold was reported during this inspection.</p>';
 
@@ -743,7 +752,8 @@ export default function AdminDashboard() {
     <body>
         <div class="cover-page">
             <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="TT Logo" class="cover-image" />            <div class="cover-details">
+<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="TT Logo" class="cover-image" />    
+           <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
@@ -756,8 +766,6 @@ export default function AdminDashboard() {
                 <h3 class="disclaimer-title">Disclaimer</h3>
                 <p class="disclaimer-text">${disclaimerText}</p>
             </div>
-
-            <div class="section">
                 <h2>Client Information</h2>
                 <div class="client-info-grid">
                     <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${inspection.full_name || 'N/A'}</div></div>
@@ -767,7 +775,6 @@ export default function AdminDashboard() {
                     <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${inspection.property_type || 'N/A'}</div></div>
                     <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage || 'N/A'} sq ft</div></div>
                 </div>
-            </div>
             
             <div class="section">
                 <h2>Findings</h2>
@@ -820,17 +827,9 @@ export default function AdminDashboard() {
                   }
                 </div>
             </div>
-
-
-
-            
             <div class="limitations-section">
                 <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
                 <p class="limitations-text">${limitationsText}</p>
-            </div>
-
-            <div class="footer">
-                <p>Powered by Total Testing</p>
             </div>
         </div>
     </body>
@@ -1210,14 +1209,6 @@ export default function AdminDashboard() {
                 <Database className="w-4 h-4" />
               Manage all inspections and generate comprehensive reports
             </p>
-              {cacheTimestamp && (
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex items-center gap-1 text-xs text-slate-500">
-                    <Zap className="w-3 h-3 text-green-500" />
-                    <span>Data cached {Math.round((Date.now() - cacheTimestamp) / 1000)}s ago</span>
-                  </div>
-                </div>
-              )}
           </div>
           <div className="flex gap-3">
                               <Button onClick={() => loadInspections(true)} variant="outline" className="flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200">
