@@ -16,8 +16,9 @@ import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { downloadPDF, downloadHTML, testPDFDownload } from "@/utils/pdfDownload";
+import EmailTemplateManager from "@/components/EmailTemplateManager";
 
-import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
+import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 
 // Export this function for use in other components
 export const generateReportHtmlContent = async (inspection, samples) => {
@@ -1289,9 +1290,10 @@ export default function AdminDashboard() {
               <Database className="w-4 h-4" />
               All Inspections
             </TabsTrigger>
-              <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
-              <TrendingUp className="w-4 h-4" />
-              Analytics
+
+              <TabsTrigger value="emails" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <Mail className="w-4 h-4" />
+              Email Settings
             </TabsTrigger>
           </TabsList>
           </div>
@@ -1498,16 +1500,7 @@ export default function AdminDashboard() {
                     <span className="text-sm font-medium">Manage Inspections</span>
                     <span className="text-xs text-slate-500">View all inspections</span>
                   </Button>
-                  
-                  <Button 
-                    onClick={() => setActiveTab("analytics")} 
-                    variant="outline" 
-                    className="h-24 flex flex-col gap-3 bg-white hover:bg-purple-50 hover:border-purple-300 transition-all duration-200"
-                  >
-                    <BarChart3 className="w-8 h-8 text-purple-600" />
-                    <span className="text-sm font-medium">View Analytics</span>
-                    <span className="text-xs text-slate-500">Detailed insights</span>
-                  </Button>
+
 
                   <Button 
                     onClick={() => loadInspections(true)} 
@@ -1526,7 +1519,7 @@ export default function AdminDashboard() {
           {/* Inspections Tab */}
           <TabsContent value="inspections" className="space-y-6">
             {/* Enhanced Filters */}
-            <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200">
+            <Card className="bg-white from-slate-50 to-slate-100 border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-slate-800">
                   <Filter className="w-5 h-5" />
@@ -2154,38 +2147,22 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* Email Settings Tab */}
+          <TabsContent value="emails" className="space-y-6">
+            <div className="grid gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Property Type Distribution</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="w-5 h-5" />
+                    Email Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Edit email settings for different stages of the inspection process
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {Object.entries(stats.propertyTypes).map(([type, count]) => (
-                      <div key={type} className="flex justify-between items-center">
-                        <span className="capitalize">{type}</span>
-                        <Badge variant="outline">{count}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Client Type Distribution</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {Object.entries(stats.clientTypes).map(([type, count]) => (
-                      <div key={type} className="flex justify-between items-center">
-                        <span className="capitalize">{type.replace('_', ' ')}</span>
-                        <Badge variant="outline">{count}</Badge>
-                      </div>
-                    ))}
-                  </div>
+                  <EmailTemplateManager />
                 </CardContent>
               </Card>
             </div>

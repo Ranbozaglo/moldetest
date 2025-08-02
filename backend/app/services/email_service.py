@@ -3,6 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, Any, Optional
 import os
+import json
 from datetime import datetime
 
 class EmailService:
@@ -13,12 +14,64 @@ class EmailService:
         self.password = os.getenv("SMTP_PASSWORD", "")
         self.from_email = os.getenv("FROM_EMAIL", self.username)
         
+        # Template storage file path
+        self.templates_file = os.path.join(os.path.dirname(__file__), '..', '..', 'email_templates.json')
+        
+        # Default templates
+        self.default_templates = {
+            "lab_received": {
+                "subject": "Total Testing - Lab Samples Received (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <h2>Total Testing - Lab Samples Received</h2>
+    <p>Dear {full_name},</p>
+    <p>We have received your mold testing samples for inspection #{inspection_number}.</p>
+    <p>Our laboratory is now processing your samples and will provide results within 3-5 business days.</p>
+    <p>We will notify you as soon as your report is ready.</p>
+    <p>Thank you for choosing Total Testing.</p>
+    <br>
+    <p>Best regards,<br>Total Testing Team</p>
+</body>
+</html>"""
+            },
+            "report_ready": {
+                "subject": "Total Testing - Report Ready (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <h2>Total Testing - Report Ready</h2>
+    <p>Dear {full_name},</p>
+    <p>Your Total Testing report for inspection #{inspection_number} is now ready.</p>
+    <p>You can download your report from your account dashboard.</p>
+    <p>If you have any questions about your results, please don't hesitate to contact us.</p>
+    <p>Thank you for choosing Total Testing.</p>
+    <br>
+    <p>Best regards,<br>Total Testing Team</p>
+</body>
+</html>"""
+            },
+            "review_request": {
+                "subject": "Total Testing - Review Request (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <h2>Total Testing - Review Request</h2>
+    <p>Dear {full_name},</p>
+    <p>Thank you for using our mold testing services. We hope you found our service helpful.</p>
+    <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
+    <p>Thank you for choosing Total Testing.</p>
+    <br>
+    <p>Best regards,<br>Total Testing Team</p>
+</body>
+</html>"""
+            }
+        }
+        
         # Debug logging
         print(f"🔧 EMAIL DEBUG: SMTP Server: {self.smtp_server}")
         print(f"🔧 EMAIL DEBUG: SMTP Port: {self.smtp_port}")
         print(f"🔧 EMAIL DEBUG: Username: {self.username}")
         print(f"🔧 EMAIL DEBUG: Password set: {'Yes' if self.password else 'No'}")
         print(f"🔧 EMAIL DEBUG: From Email: {self.from_email}")
+        print(f"🔧 EMAIL DEBUG: Templates file: {self.templates_file}")
     
     def send_email(self, to_email: str, subject: str, body: str) -> Dict[str, Any]:
         """
@@ -180,6 +233,138 @@ class EmailService:
             subject,
             body
         )
+    
+    def get_templates(self) -> Dict[str, Any]:
+        """
+        Get email templates from storage or return defaults
+        """
+        try:
+            if os.path.exists(self.templates_file):
+                with open(self.templates_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            else:
+                # Return default templates if no file exists
+                return self.default_templates
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error loading templates: {e}")
+            return self.default_templates
+    
+    def save_templates(self, templates: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Save email templates to storage
+        """
+        try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(self.templates_file), exist_ok=True)
+            
+            # Save templates to file
+            with open(self.templates_file, 'w', encoding='utf-8') as f:
+                json.dump(templates, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ EMAIL DEBUG: Templates saved successfully to {self.templates_file}")
+            return {
+                "success": True,
+                "message": "Email templates saved successfully",
+                "templates": templates
+            }
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error saving templates: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to save email templates"
+            }
+    
+    def reset_templates(self) -> Dict[str, Any]:
+        """
+        Reset email templates to defaults
+        """
+        try:
+            # Save default templates
+            result = self.save_templates(self.default_templates)
+            if result.get('success'):
+                print(f"✅ EMAIL DEBUG: Templates reset to defaults")
+                return {
+                    "success": True,
+                    "message": "Email templates reset to defaults",
+                    "templates": self.default_templates
+                }
+            else:
+                return result
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error resetting templates: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to reset email templates"
+            }
+    
+    def format_template(self, template: str, data: Dict[str, Any]) -> str:
+        """
+        Format template string with data variables
+        """
+        try:
+            # Replace template variables with actual data
+            formatted = template
+            for key, value in data.items():
+                placeholder = f"{{{key}}}"
+                if placeholder in formatted:
+                    formatted = formatted.replace(placeholder, str(value or ''))
+            return formatted
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error formatting template: {e}")
+            return template
+    
+    def send_lab_received_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send lab received notification email using stored template
+        """
+        try:
+            templates = self.get_templates()
+            template = templates.get('lab_received', self.default_templates['lab_received'])
+            
+            subject = self.format_template(template['subject'], inspection_data)
+            body = self.format_template(template['body'], inspection_data)
+            
+            return self.send_email(inspection_data.get('email'), subject, body)
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error sending templated lab received email: {e}")
+            # Fallback to original method
+            return self.send_lab_received_email(inspection_data)
+    
+    def send_report_ready_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send report ready notification email using stored template
+        """
+        try:
+            templates = self.get_templates()
+            template = templates.get('report_ready', self.default_templates['report_ready'])
+            
+            subject = self.format_template(template['subject'], inspection_data)
+            body = self.format_template(template['body'], inspection_data)
+            
+            return self.send_email(inspection_data.get('email'), subject, body)
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error sending templated report ready email: {e}")
+            # Fallback to original method
+            return self.send_report_ready_email(inspection_data)
+    
+    def send_review_request_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send review request email using stored template
+        """
+        try:
+            templates = self.get_templates()
+            template = templates.get('review_request', self.default_templates['review_request'])
+            
+            subject = self.format_template(template['subject'], inspection_data)
+            body = self.format_template(template['body'], inspection_data)
+            
+            return self.send_email(inspection_data.get('email'), subject, body)
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error sending templated review request email: {e}")
+            # Fallback to original method
+            return self.send_review_request_email(inspection_data)
 
 # Create service instance
 email_service = EmailService()

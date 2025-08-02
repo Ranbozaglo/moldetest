@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, request
 from app.services.email_service import email_service
 
 def register_email_endpoints(app, supabase):
@@ -33,8 +33,8 @@ def register_email_endpoints(app, supabase):
                 "inspection_number": result.data.get('inspection_number', inspection_id)
             }
             
-            # Send email
-            email_result = email_service.send_lab_received_email(inspection_data)
+            # Send email using template
+            email_result = email_service.send_lab_received_email_with_template(inspection_data)
             
             if email_result.get('success'):
                 print(f"✅ EMAIL DEBUG: Lab received email sent successfully for inspection {inspection_id}")
@@ -76,8 +76,8 @@ def register_email_endpoints(app, supabase):
                 "inspection_number": result.data.get('inspection_number', inspection_id)
             }
             
-            # Send email
-            email_result = email_service.send_report_ready_email(inspection_data)
+            # Send email using template
+            email_result = email_service.send_report_ready_email_with_template(inspection_data)
             
             if email_result.get('success'):
                 print(f"✅ EMAIL DEBUG: Report ready email sent successfully for inspection {inspection_id}")
@@ -109,8 +109,8 @@ def register_email_endpoints(app, supabase):
                 "inspection_number": result.data.get('inspection_number', inspection_id)
             }
             
-            # Send email
-            email_result = email_service.send_review_request_email(inspection_data)
+            # Send email using template
+            email_result = email_service.send_review_request_email_with_template(inspection_data)
             
             if email_result.get('success'):
                 print(f"✅ EMAIL DEBUG: Review request email sent successfully for inspection {inspection_id}")
@@ -122,3 +122,45 @@ def register_email_endpoints(app, supabase):
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error in send_review_request_email: {e}")
             return jsonify({"error": f"Failed to send review request email: {str(e)}"}), 500
+
+    @app.route('/api/email/templates', methods=['GET'])
+    def get_email_templates():
+        """Get all email templates"""
+        try:
+            templates = email_service.get_templates()
+            return jsonify(templates)
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error getting templates: {e}")
+            return jsonify({"error": f"Failed to get email templates: {str(e)}"}), 500
+
+    @app.route('/api/email/templates', methods=['PUT'])
+    def save_email_templates():
+        """Save email templates"""
+        try:
+            templates_data = request.get_json()
+            if not templates_data:
+                return jsonify({"error": "No template data provided"}), 400
+            
+            result = email_service.save_templates(templates_data)
+            if result.get('success'):
+                return jsonify(result)
+            else:
+                return jsonify({"error": f"Failed to save templates: {result.get('error')}"}), 500
+                
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error saving templates: {e}")
+            return jsonify({"error": f"Failed to save email templates: {str(e)}"}), 500
+
+    @app.route('/api/email/templates/reset', methods=['POST'])
+    def reset_email_templates():
+        """Reset email templates to defaults"""
+        try:
+            result = email_service.reset_templates()
+            if result.get('success'):
+                return jsonify(result.get('templates', {}))
+            else:
+                return jsonify({"error": f"Failed to reset templates: {result.get('error')}"}), 500
+                
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error resetting templates: {e}")
+            return jsonify({"error": f"Failed to reset email templates: {str(e)}"}), 500

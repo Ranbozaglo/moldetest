@@ -517,6 +517,42 @@ export const EmailService = {
       }
     });
     return response;
+  },
+
+  // Email template management
+  getTemplates: async () => {
+    const token = getAuthToken();
+    const response = await apiCall('/email/templates', {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
+  },
+
+  saveTemplates: async (templates) => {
+    const token = getAuthToken();
+    const response = await apiCall('/email/templates', {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(templates)
+    });
+    return response;
+  },
+
+  resetTemplates: async () => {
+    const token = getAuthToken();
+    const response = await apiCall('/email/templates/reset', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    return response;
   }
 };
 
