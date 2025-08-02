@@ -488,7 +488,14 @@ ${cleanedExtractedText || 'No lab analysis results available.'}
 
 `;
 
-        const instructions = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string, preferably a numbered list if multiple items).
+        const instructions = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
+
+IMPORTANT FORMATTING REQUIREMENTS:
+- Do NOT use asterisks (*) for formatting or emphasis
+- Do NOT use numbered lists (1. 2. 3.) for recommendations
+- Use plain text without markdown formatting
+- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
+- Use clear, professional language without special characters for emphasis
 
 Based on the comprehensive inspection data above, provide a professional conclusion and specific recommendations. Consider:
 - Types of mold identified and concentration levels
@@ -501,7 +508,7 @@ Based on the comprehensive inspection data above, provide a professional conclus
 Return your response in this exact JSON format:
 {
   "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here (numbered list with specific, actionable items including immediate actions, preventive measures, professional services, timeline, environmental controls, and follow-up testing)..."
+  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Environmental Controls to Implement: [details]'"
 }`;
 
         const analysisPrompt = propertyDetailsSection + clientInfoSection + visibleMoldSection + waterDamageSection + environmentalSection + samplesSection + labAnalysisSection + instructions;
@@ -516,34 +523,59 @@ Return your response in this exact JSON format:
         let conclusion = "";
         let recommendations = "";
 
+        // Helper function to format recommendations text
+        const formatRecommendationsText = (text) => {
+          if (!text) return text;
+          
+          // Remove asterisks and clean up formatting
+          return text
+            .replace(/\*\*/g, '') // Remove bold asterisks
+            .replace(/\*/g, '') // Remove single asterisks
+            .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
+            .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
+            .filter(part => part.trim().length > 0)
+            .map(part => part.trim())
+            .join('\n')
+            .trim();
+        };
+
         if (analysisResult.conclusion && analysisResult.recommendations) {
-          conclusion = analysisResult.conclusion;
-          recommendations = analysisResult.recommendations;
+          conclusion = formatRecommendationsText(analysisResult.conclusion);
+          recommendations = formatRecommendationsText(analysisResult.recommendations);
         } else if (typeof analysisResult.content === 'string') {
           // Try to parse content as JSON only if it looks like JSON
           if (analysisResult.content.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult.content);
-              conclusion = parsedResult.conclusion || analysisResult.content;
-              recommendations = parsedResult.recommendations || "";
-        } catch (parseError) {
-              conclusion = analysisResult.content;
-              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+              conclusion = formatRecommendationsText(parsedResult.conclusion || "");
+              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
+            } catch (parseError) {
+              // JSON parsing failed, try to extract recommendations from the content
+              const contentSplit = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:|"recommendations":\s*"/i);
+              if (contentSplit.length > 1) {
+                conclusion = formatRecommendationsText(contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim());
+                // Extract everything after recommendations keyword, clean up JSON artifacts
+                let recsText = contentSplit[1].replace(/"\s*}?\s*$/, '').trim();
+                recommendations = formatRecommendationsText(recsText);
+              } else {
+                conclusion = formatRecommendationsText(analysisResult.content);
+                recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+              }
             }
           } else {
             // Content is not JSON, try to split by known keywords
             const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
-              recommendations = split[1].trim();
+              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
+              recommendations = formatRecommendationsText(split[1].trim());
             } else {
-              conclusion = analysisResult.content;
+              conclusion = formatRecommendationsText(analysisResult.content);
               recommendations = "";
             }
           }
         } else {
           // Content is not JSON, use as-is
-          conclusion = analysisResult.content;
+          conclusion = formatRecommendationsText(analysisResult.content);
           recommendations = "";
         }
 
@@ -619,7 +651,14 @@ Return your response in this exact JSON format:
       }
 
       // Construct comprehensive prompt with inspection context
-      const comprehensivePrompt = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string, preferably a numbered list if multiple items).
+      const comprehensivePrompt = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
+
+IMPORTANT FORMATTING REQUIREMENTS:
+- Do NOT use asterisks (*) for formatting or emphasis
+- Do NOT use numbered lists (1. 2. 3.) for recommendations
+- Use plain text without markdown formatting
+- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
+- Use clear, professional language without special characters for emphasis
 
 **Property Details:**
 Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
@@ -664,7 +703,7 @@ Based on this comprehensive information, provide a conclusion and specific recom
 Return your response in this exact JSON format:
 {
   "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here (numbered list with specific, actionable items including immediate actions, preventive measures, professional services, timeline, environmental controls, and follow-up testing)..."
+  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Environmental Controls to Implement: [details]'"
 }`;
       
       // Use the InvokeLLM function to analyze the image with comprehensive context
@@ -680,28 +719,53 @@ Return your response in this exact JSON format:
         let conclusion = "";
         let recommendations = "";
 
+        // Helper function to format recommendations text
+        const formatRecommendationsText = (text) => {
+          if (!text) return text;
+          
+          // Remove asterisks and clean up formatting
+          return text
+            .replace(/\*\*/g, '') // Remove bold asterisks
+            .replace(/\*/g, '') // Remove single asterisks
+            .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
+            .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
+            .filter(part => part.trim().length > 0)
+            .map(part => part.trim())
+            .join('\n')
+            .trim();
+        };
+
         if (analysisResult.conclusion && analysisResult.recommendations) {
-          conclusion = analysisResult.conclusion;
-          recommendations = analysisResult.recommendations;
+          conclusion = formatRecommendationsText(analysisResult.conclusion);
+          recommendations = formatRecommendationsText(analysisResult.recommendations);
         } else if (typeof analysisResult.content === 'string') {
           // Try to parse content as JSON only if it looks like JSON
           if (analysisResult.content.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult.content);
-              conclusion = parsedResult.conclusion || analysisResult.content;
-              recommendations = parsedResult.recommendations || "";
+              conclusion = formatRecommendationsText(parsedResult.conclusion || "");
+              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
             } catch (parseError) {
-              conclusion = analysisResult.content;
-              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+              // JSON parsing failed, try to extract recommendations from the content
+              const contentSplit = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:|"recommendations":\s*"/i);
+              if (contentSplit.length > 1) {
+                conclusion = formatRecommendationsText(contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim());
+                // Extract everything after recommendations keyword, clean up JSON artifacts
+                let recsText = contentSplit[1].replace(/"\s*}?\s*$/, '').trim();
+                recommendations = formatRecommendationsText(recsText);
+              } else {
+                conclusion = formatRecommendationsText(analysisResult.content);
+                recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+              }
             }
           } else {
             // Content is not JSON, try to split by known keywords
             const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
-              recommendations = split[1].trim();
+              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
+              recommendations = formatRecommendationsText(split[1].trim());
             } else {
-              conclusion = analysisResult.content;
+              conclusion = formatRecommendationsText(analysisResult.content);
               recommendations = "";
             }
           }
@@ -710,26 +774,26 @@ Return your response in this exact JSON format:
           if (analysisResult.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult);
-              conclusion = parsedResult.conclusion || analysisResult;
-              recommendations = parsedResult.recommendations || "";
+              conclusion = formatRecommendationsText(parsedResult.conclusion || analysisResult);
+              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
             } catch (parseError) {
-              conclusion = analysisResult;
+              conclusion = formatRecommendationsText(analysisResult);
               recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
             }
           } else {
             // Content is not JSON, try to split by known keywords
             const split = analysisResult.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
-              recommendations = split[1].trim();
+              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
+              recommendations = formatRecommendationsText(split[1].trim());
             } else {
-              conclusion = analysisResult;
+              conclusion = formatRecommendationsText(analysisResult);
               recommendations = "";
             }
           }
         } else {
           // Fallback
-          conclusion = analysisResult.toString();
+          conclusion = formatRecommendationsText(analysisResult.toString());
           recommendations = "";
         }
 
@@ -762,6 +826,20 @@ Return your response in this exact JSON format:
   const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
+    // Helper function to format numbered lists (same as in analysis functions)
+    const formatRecommendationsText = (text) => {
+      if (!text) return text;
+      
+      // Split by numbered patterns like "1. " or "2. " etc.
+      return text
+        .replace(/(\d+\.\s)/g, '\n$1') // Add newline before each number
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join('\n')
+        .trim();
+    };
+    
     const disclaimerText = "The Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
     const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
 
@@ -780,7 +858,7 @@ Return your response in this exact JSON format:
         .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
         .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
         .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; }
-        .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
+        .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 0px; margin: 0px 0; }
         .limitations-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
         .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; }
         .client-info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin: 20px 0; }
@@ -1052,7 +1130,24 @@ Return your response in this exact JSON format:
 
             <div class="section">
                 <h2>Conclusion</h2>
-                <p>${inspection.lab_conclusion || inspection.conclusion || 'Pending conclusion.'}</p>
+                <div>
+                  ${
+                    (inspection.lab_conclusion || inspection.conclusion)
+                      ? formatRecommendationsText(inspection.lab_conclusion || inspection.conclusion)
+                          .split('\n')
+                          .filter(line => line.trim().length > 0)
+                          .map(line => {
+                            // Check if line is a section header (words ending with colon)
+                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                            }
+                            // Regular line
+                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                          })
+                          .join('')
+                      : '<p>Pending conclusion.</p>'
+                  }
+                </div>
             </div>
 
             <div class="section">
@@ -1060,12 +1155,12 @@ Return your response in this exact JSON format:
                 <div>
                   ${
                     (inspection.lab_recommendations || inspection.recommendations)
-                      ? (inspection.lab_recommendations || inspection.recommendations)
+                      ? formatRecommendationsText(inspection.lab_recommendations || inspection.recommendations)
                           .split('\n')
                           .filter(line => line.trim().length > 0)
                           .map(line => {
-                            // Check if line is a section header (starts with * and ends with :)
-                            if (line.trim().startsWith('*') && line.trim().endsWith(':*')) {
+                            // Check if line is a section header (words ending with colon)
+                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
                               return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
                             }
                             // Regular line

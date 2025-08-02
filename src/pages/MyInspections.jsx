@@ -743,6 +743,22 @@ export default function MyInspections() {
   // Extract the report generation logic into a separate function for reuse
   const generateReportHtmlContent = async (inspection, samples) => {
     try {
+      // Helper function to format recommendations text (same as in analysis functions)
+      const formatRecommendationsText = (text) => {
+        if (!text) return text;
+        
+        // Remove asterisks and clean up formatting
+        return text
+          .replace(/\*\*/g, '') // Remove bold asterisks
+          .replace(/\*/g, '') // Remove single asterisks
+          .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
+          .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
+          .filter(part => part.trim().length > 0)
+          .map(part => part.trim())
+          .join('\n')
+          .trim();
+      };
+      
       // Get detailed inspection data first
       let detailedInspection = inspection;
       try {
@@ -872,9 +888,41 @@ export default function MyInspections() {
             
             ${detailedInspection.lab_conclusion ? `
             <div class="section">
-                <h2>Laboratory Analysis</h2>
-                <p>${detailedInspection.lab_conclusion}</p>
-                ${detailedInspection.lab_recommendations ? `<p><strong>Recommendations:</strong> ${detailedInspection.lab_recommendations}</p>` : ''}
+                <h2>Laboratory Analysis Conclusion</h2>
+                <div>
+                  ${formatRecommendationsText(detailedInspection.lab_conclusion)
+                    .split('\n')
+                    .filter(line => line.trim().length > 0)
+                    .map(line => {
+                      // Check if line is a section header (words ending with colon)
+                      if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                        return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                      }
+                      // Regular line
+                      return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                    })
+                    .join('')}
+                </div>
+            </div>
+            ` : ''}
+            
+            ${detailedInspection.lab_recommendations ? `
+            <div class="section">
+                <h2>Recommendations</h2>
+                <div>
+                  ${formatRecommendationsText(detailedInspection.lab_recommendations)
+                    .split('\n')
+                    .filter(line => line.trim().length > 0)
+                    .map(line => {
+                      // Check if line is a section header (words ending with colon)
+                      if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                        return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                      }
+                      // Regular line
+                      return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                    })
+                    .join('')}
+                </div>
             </div>
             ` : ''}
         </body>

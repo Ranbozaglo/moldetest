@@ -409,6 +409,22 @@ export default function AdminDashboard() {
   const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
+    // Helper function to format recommendations text (same as in analysis functions)
+    const formatRecommendationsText = (text) => {
+      if (!text) return text;
+      
+      // Remove asterisks and clean up formatting
+      return text
+        .replace(/\*\*/g, '') // Remove bold asterisks
+        .replace(/\*/g, '') // Remove single asterisks
+        .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
+        .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
+        .filter(part => part.trim().length > 0)
+        .map(part => part.trim())
+        .join('\n')
+        .trim();
+    };
+    
     const disclaimerText = "The Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
     const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
 
@@ -795,34 +811,43 @@ export default function AdminDashboard() {
 
             <div class="section">
                 <h2>Conclusion</h2>
-                <p>${inspection.lab_conclusion || inspection.conclusion || 'Pending conclusion.'}</p>
+                <div>
+                  ${
+                    (inspection.lab_conclusion || inspection.conclusion)
+                      ? formatRecommendationsText(inspection.lab_conclusion || inspection.conclusion)
+                          .split('\n')
+                          .filter(line => line.trim().length > 0)
+                          .map(line => {
+                            // Check if line is a section header (words ending with colon)
+                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                            }
+                            // Regular line
+                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                          })
+                          .join('')
+                      : '<p>Pending conclusion.</p>'
+                  }
+                </div>
             </div>
 
             <div class="section">
                 <h2>Recommendations</h2>
                 <div>
-                  ${(inspection.lab_recommendations || inspection.recommendations)
-                    ? (() => {
-                        const recommendations = (inspection.lab_recommendations || inspection.recommendations)
-            .replace(/\\n/g, '')
-            .split(/\n{2,}/)
-            .map(section => {
-              section = section.replace(/\*/g, '').trim();
-              const indexOfColon = section.indexOf(':');
-              if (indexOfColon !== -1) {
-                const title = section.substring(0, indexOfColon).trim();
-                const content = section.substring(indexOfColon + 1).trim();
-                return `
-                  <p style="font-weight: bold; margin: 12px 0 4px;">${title}:</p>
-                  <p style="margin: 4px 0 12px 16px; line-height: 1.6; color: #374151;">${content}</p>
-                  <br>
-                `;
-              }
-              return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${section}</p><br>`;
-            })
-                          .join('');
-                        return recommendations;
-                      })()
+                  ${
+                    (inspection.lab_recommendations || inspection.recommendations)
+                      ? formatRecommendationsText(inspection.lab_recommendations || inspection.recommendations)
+                          .split('\n')
+                          .filter(line => line.trim().length > 0)
+                          .map(line => {
+                            // Check if line is a section header (words ending with colon)
+                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
+                            }
+                            // Regular line
+                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
+                          })
+                          .join('')
                       : '<p>Pending recommendations.</p>'
                   }
                 </div>
