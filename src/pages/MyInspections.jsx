@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
+import { generateReportHtmlContent } from "@/pages/AdminDashboard.jsx";
+import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { 
   FileText, 
   Clock, 
@@ -134,9 +136,7 @@ export default function MyInspections() {
     })();
   }, [navigate, currentUser]);
 
-  const getDisplayNumber = (inspection) => {
-    return inspection?.inspection_number ? `TT #${inspection.inspection_number}` : `TT #${inspection?.id.substring(0, 8)}`;
-  };
+
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -740,201 +740,7 @@ export default function MyInspections() {
     }
   };
 
-  // Extract the report generation logic into a separate function for reuse
-  const generateReportHtmlContent = async (inspection, samples) => {
-    try {
-      // Helper function to format recommendations text (same as in analysis functions)
-      const formatRecommendationsText = (text) => {
-        if (!text) return text;
-        
-        // Remove asterisks and clean up formatting
-        return text
-          .replace(/\*\*/g, '') // Remove bold asterisks
-          .replace(/\*/g, '') // Remove single asterisks
-          .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
-          .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
-          .filter(part => part.trim().length > 0)
-          .map(part => part.trim())
-          .join('\n')
-          .trim();
-      };
-      
-      // Get detailed inspection data first
-      let detailedInspection = inspection;
-      try {
-        detailedInspection = await MoldInspection.getDetailed(inspection.id);
-      } catch (detailError) {
-        console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
-      }
-      
-      // Parse JSON fields if they're strings
-      if (detailedInspection.mold_images && typeof detailedInspection.mold_images === 'string') {
-        try {
-          detailedInspection.mold_images = JSON.parse(detailedInspection.mold_images);
-        } catch (parseError) {
-          detailedInspection.mold_images = [];
-        }
-      }
-      
-      if (detailedInspection.mold_locations && typeof detailedInspection.mold_locations === 'string') {
-        try {
-          detailedInspection.mold_locations = JSON.parse(detailedInspection.mold_locations);
-        } catch (parseError) {
-          detailedInspection.mold_locations = [];
-        }
-      }
-      
-      if (!samples) {
-        samples = await Sample.findMany({ inspection_id: inspection.id });
-      }
-      
-      const displayNum = getDisplayNumber(inspection);
-      
-      // Helper functions
-      const createImageList = (images) => {
-        if (!images || images.length === 0) return '<p>No photos provided.</p>';
-        return images.map(img => `<img src="${img}" alt="Evidence" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
-      };
 
-      const createPriorityBadge = (priority, text) => {
-        const colors = {
-          high: 'background-color: #dc2626; color: white;',
-          medium: 'background-color: #ea580c; color: white;',
-          low: 'background-color: #059669; color: white;'
-        };
-        return `<span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; ${colors[priority]}">${text}</span>`;
-      };
-      
-      // Generate high priority mold section
-      const visibleMoldHtml = detailedInspection.has_visible_mold && detailedInspection.mold_images && detailedInspection.mold_images.length > 0 && detailedInspection.mold_locations && detailedInspection.mold_locations.length > 0
-        ? `<div style="margin-bottom: 20px;">
-            <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              ⚠️ Visible Mold Detected
-            </h3>
-            ${detailedInspection.mold_locations.map((location, i) => `
-              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                  <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
-                  ${createPriorityBadge('high', 'High Priority')}
-                </div>
-                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
-                <div style="text-align: center; margin: 15px 0;">
-                  ${detailedInspection.mold_images[i] ? `<img src="${detailedInspection.mold_images[i]}" alt="Mold Photo" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>`
-        : `<div style="margin-bottom: 20px;">
-            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              ✅ No Visible Mold Detected
-            </h3>
-            <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
-          </div>`;
-      
-      const reportHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Mold Inspection Report - ${displayNum}</title>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .section { margin-bottom: 25px; }
-                .section h2 { color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; }
-                .section h3 { color: #004aac; margin-bottom: 15px; }
-                img { max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; }
-                .priority-high { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
-                .priority-medium { background: #fff7ed; border: 1px solid #fed7aa; color: #ea580c; }
-                .priority-low { background: #f0fdf4; border: 1px solid #bbf7d0; color: #059669; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>DIY Mold Inspection Report</h1>
-                <h2>${displayNum}</h2>
-                <p><strong>Inspection Date:</strong> ${format(new Date(detailedInspection.created_date), "MMMM d, yyyy")}</p>
-                <p><strong>Property:</strong> ${detailedInspection.street_address || 'N/A'}</p>
-            </div>
-            
-            <div class="section">
-                <h2>Client Information</h2>
-                <p><strong>Name:</strong> ${detailedInspection.full_name || 'N/A'}</p>
-                <p><strong>Email:</strong> ${detailedInspection.email || 'N/A'}</p>
-                <p><strong>Property Type:</strong> ${detailedInspection.property_type || 'N/A'}</p>
-            </div>
-            
-            <div class="section">
-                <h2>Inspection Results</h2>
-                ${visibleMoldHtml}
-                <p><strong>Water Damage:</strong> ${detailedInspection.has_water_damage ? 'Yes' : 'No'}</p>
-                <p><strong>Temperature:</strong> ${detailedInspection.temperature || 'N/A'}°F</p>
-                <p><strong>Humidity:</strong> ${detailedInspection.humidity || 'N/A'}%</p>
-            </div>
-            
-            ${samples && samples.length > 0 ? `
-            <div class="section">
-                <h2>Samples Collected</h2>
-                ${samples.map((sample, index) => `
-                    <div style="margin-bottom: 15px;">
-                        <h3>Sample #${index + 1}: ${sample.location || 'Unknown Location'}</h3>
-                        <p>${sample.description || 'No description provided.'}</p>
-                        ${sample.sample_image ? `<img src="${sample.sample_image}" alt="Sample Photo" />` : ''}
-                    </div>
-                `).join('')}
-            </div>
-            ` : ''}
-            
-            ${detailedInspection.lab_conclusion ? `
-            <div class="section">
-                <h2>Laboratory Analysis Conclusion</h2>
-                <div>
-                  ${formatRecommendationsText(detailedInspection.lab_conclusion)
-                    .split('\n')
-                    .filter(line => line.trim().length > 0)
-                    .map(line => {
-                      // Check if line is a section header (words ending with colon)
-                      if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                        return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
-                      }
-                      // Regular line
-                      return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
-                    })
-                    .join('')}
-                </div>
-            </div>
-            ` : ''}
-            
-            ${detailedInspection.lab_recommendations ? `
-            <div class="section">
-                <h2>Recommendations</h2>
-                <div>
-                  ${formatRecommendationsText(detailedInspection.lab_recommendations)
-                    .split('\n')
-                    .filter(line => line.trim().length > 0)
-                    .map(line => {
-                      // Check if line is a section header (words ending with colon)
-                      if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                        return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
-                      }
-                      // Regular line
-                      return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
-                    })
-                    .join('')}
-                </div>
-            </div>
-            ` : ''}
-        </body>
-        </html>
-      `;
-      
-      return reportHtml;
-    } catch (error) {
-      console.error("❌ Error generating report HTML:", error);
-      throw error;
-    }
-  };
 
   if (loading) {
     return (

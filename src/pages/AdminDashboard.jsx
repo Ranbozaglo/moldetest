@@ -14,399 +14,13 @@ import { MoldInspection, Sample, EmailService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
+import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { downloadPDF, downloadHTML, testPDFDownload } from "@/utils/pdfDownload";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, TrendingUp, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 
-export default function AdminDashboard() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [inspections, setInspections] = useState([]);
-  const [selectedInspections, setSelectedInspections] = useState(new Set());
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [downloadStatus, setDownloadStatus] = useState(null);
-  const [emailStatus, setEmailStatus] = useState({});
-  
-  // Cache management
-  const [cacheTimestamp, setCacheTimestamp] = useState(null);
-  const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
-
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
-  const [clientTypeFilter, setClientTypeFilter] = useState("all");
-  const [moldFilter, setMoldFilter] = useState("all");
-  const [waterDamageFilter, setWaterDamageFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("all");
-  const [selectedMonth, setSelectedMonth] = useState("all");
-  const [selectedYear, setSelectedYear] = useState("all");
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [stats, setStats] = useState({
-    total: 0,
-    withMold: 0,
-    withWaterDamage: 0,
-    samples: 0,
-    pending: 0,
-    completed: 0,
-    propertyTypes: {},
-    clientTypes: {},
-    cities: {}
-  });
-  const navigate = useNavigate();
-  const { user: authUser } = useAuth();
-
-  // Loading skeleton component
-  const LoadingSkeleton = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader className="pb-2">
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-
-  // Optimize auth checking - only run when authUser ID changes, not on every property change
-  useEffect(() => {
-    // Debounce auth checks to prevent excessive calls
-    const timeoutId = setTimeout(() => {
-      checkUser();
-    }, 100);
-    
-    return () => clearTimeout(timeoutId);
-  }, [authUser?.id]); // Only depend on user ID, not full user object
-
-  const checkUser = useCallback(async () => {
-    try {
-      // Use the authenticated user from AuthContext instead of calling User.me()
-      if (!authUser) {
-        navigate(createPageUrl("Welcome"));
-        return;
-      }
-      
-      // Check if user is admin
-      if (authUser.role !== 'admin' && !authUser.is_admin) {
-        navigate(createPageUrl("Welcome"));
-        return;
-      }
-      
-      setUser(authUser);
-      smartRefresh();
-    } catch (error) {
-      navigate(createPageUrl("Welcome"));
-    } finally {
-      setLoading(false);
-    }
-  }, [authUser, navigate]);
-
-  const loadInspections = async (forceRefresh = false) => {
-    try {
-      const now = Date.now();
-      
-      // Check if we have cached data and it's still valid
-      if (!forceRefresh && cacheTimestamp && inspections.length > 0) {
-        const cacheAge = now - cacheTimestamp;
-        if (cacheAge < CACHE_DURATION) {
-          console.log("🔍 CACHE: Using cached inspections data (age:", Math.round(cacheAge / 1000), "seconds)");
-          return;
-        }
-      }
-      
-      console.log("🔍 CACHE: Loading fresh inspections data from server");
-      setLoading(true);
-      
-      const allInspections = await MoldInspection.list('-created_at', 50, false); // Use lightweight endpoint for better performance
-      
-      console.log("🔍 DEBUG: Raw inspections data:", allInspections);
-      console.log("🔍 DEBUG: Number of inspections:", allInspections?.length);
-      
-      // Check if allInspections is an array
-      if (!Array.isArray(allInspections)) {
-        console.error("❌ ERROR: allInspections is not an array:", typeof allInspections);
-        setInspections([]);
-        return;
-      }
-      
-      // Debug: Check the first inspection object structure
-      if (allInspections.length > 0) {
-        console.log("🔍 DEBUG: First inspection object:", JSON.stringify(allInspections[0], null, 2));
-        console.log("🔍 DEBUG: First inspection keys:", Object.keys(allInspections[0]));
-      }
-      
-      // For lightweight data, we don't need to parse heavy fields
-      setInspections(allInspections);
-      setSelectedInspections(new Set());
-      setCacheTimestamp(now);
-      setLastUpdateCheck(now);
-      
-      // Load stats after inspections are loaded
-      const dashboardStats = await getDashboardStats(allInspections);
-      setStats(dashboardStats);
-    } catch (error) {
-      console.error("Error loading inspections:", error);
-      console.error("Error details:", error.message);
-      console.error("Error stack:", error.stack);
-      setInspections([]);
-      alert("Failed to load inspections. Please refresh the page.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshStats = async () => {
-    try {
-      const dashboardStats = await getDashboardStats(inspections);
-      setStats(dashboardStats);
-    } catch (error) {
-      console.error("Error refreshing stats:", error);
-    }
-  };
-
-  // Cache invalidation function
-  const invalidateCache = () => {
-    console.log("🔍 CACHE: Invalidating cache due to data changes");
-    setCacheTimestamp(null);
-    setLastUpdateCheck(null);
-  };
-
-  // Smart refresh function that only loads if cache is invalid
-  const smartRefresh = async () => {
-    await loadInspections(false); // Don't force refresh, let cache logic decide
-  };
-  
-  const getDisplayNumber = (inspection) => {
-    const number = inspection.inspection_number || inspection.id;
-    return `TT #${number}`;
-  };
-
-  // Calculate dashboard statistics
-  const getDashboardStats = async (inspectionsList = inspections) => {
-    // Apply month filtering
-    let filteredInspections = inspectionsList;
-    
-    if (selectedMonth !== "all" && selectedYear !== "all") {
-      filteredInspections = inspectionsList.filter(inspection => {
-        const inspectionDate = new Date(inspection.created_date);
-        const inspectionMonth = inspectionDate.getMonth() + 1; // getMonth() returns 0-11
-        const inspectionYear = inspectionDate.getFullYear();
-        
-        return inspectionMonth === parseInt(selectedMonth) && inspectionYear === parseInt(selectedYear);
-      });
-    }
-    
-    const total = filteredInspections.length;
-    const withMold = filteredInspections.filter(i => i.has_visible_mold).length;
-    const withWaterDamage = filteredInspections.filter(i => i.has_water_damage).length;
-    const pending = filteredInspections.filter(i => i.status === 'pending').length;
-    const completed = filteredInspections.filter(i => i.status === 'completed').length;
-
-    // Count actual samples from all inspections
-    let totalSamples = 0;
-    try {
-      for (const inspection of filteredInspections) {
-        const samples = await Sample.findMany({ inspection_id: inspection.id });
-        totalSamples += samples.length;
-      }
-    } catch (error) {
-      console.error("Error fetching samples for stats:", error);
-      // Fallback to counting inspections with is_sample
-      totalSamples = filteredInspections.filter(i => i.is_sample).length;
-    }
-    
-    const propertyTypes = {};
-    const clientTypes = {};
-    const cities = {};
-    
-    filteredInspections.forEach(inspection => {
-      if (inspection.property_type) {
-        propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
-      }
-      if (inspection.client_type) {
-        clientTypes[inspection.client_type] = (clientTypes[inspection.client_type] || 0) + 1;
-      }
-      if (inspection.city) {
-        cities[inspection.city] = (cities[inspection.city] || 0) + 1;
-      }
-    });
-
-    return {
-      total,
-      withMold,
-      withWaterDamage,
-      samples: totalSamples,
-      pending,
-      completed,
-      propertyTypes,
-      clientTypes,
-      cities
-    };
-  };
-
-
-
-
-  // Filter inspections based on all filters
-  const filteredInspections = inspections.filter(inspection => {
-    const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
-    const propertyTypeMatch = propertyTypeFilter === 'all' || inspection.property_type === propertyTypeFilter;
-    const clientTypeMatch = clientTypeFilter === 'all' || inspection.client_type === clientTypeFilter;
-    const moldMatch = moldFilter === 'all' || 
-      (moldFilter === 'yes' && inspection.has_visible_mold) || 
-      (moldFilter === 'no' && !inspection.has_visible_mold);
-    const waterDamageMatch = waterDamageFilter === 'all' || 
-      (waterDamageFilter === 'yes' && inspection.has_water_damage) || 
-      (waterDamageFilter === 'no' && !inspection.has_water_damage);
-
-    const term = searchTerm.toLowerCase();
-    const searchMatch = !term ||
-      (getDisplayNumber(inspection) || '').toLowerCase().includes(term) ||
-      (inspection.full_name || '').toLowerCase().includes(term) ||
-      (inspection.street_address || '').toLowerCase().includes(term) ||
-      (inspection.email || '').toLowerCase().includes(term) ||
-      (inspection.city || '').toLowerCase().includes(term) ||
-      (inspection.state || '').toLowerCase().includes(term);
-
-    return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
-  });
-
-  // Pagination logic
-  const totalPages = Math.ceil(filteredInspections.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentInspections = filteredInspections.slice(startIndex, endIndex);
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, propertyTypeFilter, clientTypeFilter, moldFilter, waterDamageFilter]);
-
-  // Periodic cache refresh every 10 minutes when page is active
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible' && cacheTimestamp) {
-        const cacheAge = Date.now() - cacheTimestamp;
-        if (cacheAge > CACHE_DURATION) {
-          console.log("🔍 CACHE: Auto-refreshing expired cache");
-          smartRefresh();
-        }
-      }
-    }, 60000); // Check every minute
-
-    return () => clearInterval(interval);
-  }, [cacheTimestamp]);
-
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
-
-  const handleItemsPerPageChange = (newItemsPerPage) => {
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page when changing items per page
-  };
-
-  const handleSelectAll = (checked) => {
-    // Select/deselect all currently visible inspections (current page)
-    const idsToSelect = currentInspections.map(insp => insp.id);
-    if (checked) {
-      setSelectedInspections(prev => new Set([...prev, ...idsToSelect]));
-    } else {
-      setSelectedInspections(prev => {
-        const newSet = new Set(prev);
-        idsToSelect.forEach(id => newSet.delete(id));
-        return newSet;
-      });
-    }
-  };
-
-  const handleSelectInspection = (inspectionId, checked) => {
-    if (checked) {
-      setSelectedInspections(prev => new Set([...prev, inspectionId]));
-    } else {
-      setSelectedInspections(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(inspectionId);
-        return newSet;
-      });
-    }
-  };
-
-  const handleDeleteSelected = async (idsToDelete = null) => {
-    const ids = idsToDelete || Array.from(selectedInspections);
-    if (ids.length === 0) return;
-    
-    const confirmMessage = `Are you sure you want to delete ${ids.length} inspection(s)? This action cannot be undone.`;
-    if (!confirm(confirmMessage)) return;
-
-    setIsDeleting(true);
-    try {
-      // Delete inspections one by one with a small delay to avoid rate limiting
-      for (const id of ids) {
-        await MoldInspection.delete(id);
-        // Small delay to prevent rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      // Invalidate cache and reload the inspections list
-      invalidateCache();
-      await smartRefresh();
-      
-      alert(`Successfully deleted ${ids.length} inspection(s).`);
-    } catch (error) {
-      alert("Failed to delete some inspections. Please try again.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const exportToCSV = () => {
-    const headers = [
-      "InspectionNumber", "ID", "CreationDate", "FullName", "Email", "ClientType", "Address",
-      "SquareFootage", "Status", "VisibleMold", "WaterDamage"
-    ];
-
-    const rows = inspections.map((insp, index) => {
-      const displayNum = getDisplayNumber(insp);
-      
-      return [
-        displayNum,
-        insp.id,
-        format(new Date(insp.created_date), "yyyy-MM-dd HH:mm"),
-        `"${insp.full_name}"`,
-        insp.email,
-        insp.client_type,
-        `"${insp.street_address}, ${insp.city}, ${insp.state} ${insp.zip_code}"`,
-        insp.square_footage,
-        insp.status,
-        insp.has_visible_mold,
-        insp.has_water_damage
-      ].join(',');
-    });
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `inspections_export_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-  
-
-  const generateReportHtmlContent = async (inspection, samples) => {
+// Export this function for use in other components
+export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
     // Helper function to format recommendations text (same as in analysis functions)
@@ -861,6 +475,391 @@ export default function AdminDashboard() {
     </html>
     `;
   };
+
+export default function AdminDashboard() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [inspections, setInspections] = useState([]);
+  const [selectedInspections, setSelectedInspections] = useState(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [downloadStatus, setDownloadStatus] = useState(null);
+  const [emailStatus, setEmailStatus] = useState({});
+  
+  // Cache management
+  const [cacheTimestamp, setCacheTimestamp] = useState(null);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState(null);
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
+  const [clientTypeFilter, setClientTypeFilter] = useState("all");
+  const [moldFilter, setMoldFilter] = useState("all");
+  const [waterDamageFilter, setWaterDamageFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedYear, setSelectedYear] = useState("all");
+  const [activeTab, setActiveTab] = useState("overview");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [stats, setStats] = useState({
+    total: 0,
+    withMold: 0,
+    withWaterDamage: 0,
+    samples: 0,
+    pending: 0,
+    completed: 0,
+    propertyTypes: {},
+    clientTypes: {},
+    cities: {}
+  });
+  const navigate = useNavigate();
+  const { user: authUser } = useAuth();
+
+  // Loading skeleton component
+  const LoadingSkeleton = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader className="pb-2">
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-gray-200 rounded w-1/2 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Optimize auth checking - only run when authUser ID changes, not on every property change
+  useEffect(() => {
+    // Debounce auth checks to prevent excessive calls
+    const timeoutId = setTimeout(() => {
+      checkUser();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [authUser?.id]); // Only depend on user ID, not full user object
+
+  const checkUser = useCallback(async () => {
+    try {
+      // Use the authenticated user from AuthContext instead of calling User.me()
+      if (!authUser) {
+        navigate(createPageUrl("Welcome"));
+        return;
+      }
+      
+      // Check if user is admin
+      if (authUser.role !== 'admin' && !authUser.is_admin) {
+        navigate(createPageUrl("Welcome"));
+        return;
+      }
+      
+      setUser(authUser);
+      smartRefresh();
+    } catch (error) {
+      navigate(createPageUrl("Welcome"));
+    } finally {
+      setLoading(false);
+    }
+  }, [authUser, navigate]);
+
+  const loadInspections = async (forceRefresh = false) => {
+    try {
+      const now = Date.now();
+      
+      // Check if we have cached data and it's still valid
+      if (!forceRefresh && cacheTimestamp && inspections.length > 0) {
+        const cacheAge = now - cacheTimestamp;
+        if (cacheAge < CACHE_DURATION) {
+          console.log("🔍 CACHE: Using cached inspections data (age:", Math.round(cacheAge / 1000), "seconds)");
+          return;
+        }
+      }
+      
+      console.log("🔍 CACHE: Loading fresh inspections data from server");
+      setLoading(true);
+      
+      const allInspections = await MoldInspection.list('-created_at', 50, false); // Use lightweight endpoint for better performance
+      
+      console.log("🔍 DEBUG: Raw inspections data:", allInspections);
+      console.log("🔍 DEBUG: Number of inspections:", allInspections?.length);
+      
+      // Check if allInspections is an array
+      if (!Array.isArray(allInspections)) {
+        console.error("❌ ERROR: allInspections is not an array:", typeof allInspections);
+        setInspections([]);
+        return;
+      }
+      
+      // Debug: Check the first inspection object structure
+      if (allInspections.length > 0) {
+        console.log("🔍 DEBUG: First inspection object:", JSON.stringify(allInspections[0], null, 2));
+        console.log("🔍 DEBUG: First inspection keys:", Object.keys(allInspections[0]));
+      }
+      
+      // For lightweight data, we don't need to parse heavy fields
+      setInspections(allInspections);
+      setSelectedInspections(new Set());
+      setCacheTimestamp(now);
+      setLastUpdateCheck(now);
+      
+      // Load stats after inspections are loaded
+      const dashboardStats = await getDashboardStats(allInspections);
+      setStats(dashboardStats);
+    } catch (error) {
+      console.error("Error loading inspections:", error);
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+      setInspections([]);
+      alert("Failed to load inspections. Please refresh the page.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshStats = async () => {
+    try {
+      const dashboardStats = await getDashboardStats(inspections);
+      setStats(dashboardStats);
+    } catch (error) {
+      console.error("Error refreshing stats:", error);
+    }
+  };
+
+  // Cache invalidation function
+  const invalidateCache = () => {
+    console.log("🔍 CACHE: Invalidating cache due to data changes");
+    setCacheTimestamp(null);
+    setLastUpdateCheck(null);
+  };
+
+  // Smart refresh function that only loads if cache is invalid
+  const smartRefresh = async () => {
+    await loadInspections(false); // Don't force refresh, let cache logic decide
+  };
+  
+
+
+  // Calculate dashboard statistics
+  const getDashboardStats = async (inspectionsList = inspections) => {
+    // Apply month filtering
+    let filteredInspections = inspectionsList;
+    
+    if (selectedMonth !== "all" && selectedYear !== "all") {
+      filteredInspections = inspectionsList.filter(inspection => {
+        const inspectionDate = new Date(inspection.created_date);
+        const inspectionMonth = inspectionDate.getMonth() + 1; // getMonth() returns 0-11
+        const inspectionYear = inspectionDate.getFullYear();
+        
+        return inspectionMonth === parseInt(selectedMonth) && inspectionYear === parseInt(selectedYear);
+      });
+    }
+    
+    const total = filteredInspections.length;
+    const withMold = filteredInspections.filter(i => i.has_visible_mold).length;
+    const withWaterDamage = filteredInspections.filter(i => i.has_water_damage).length;
+    const pending = filteredInspections.filter(i => i.status === 'pending').length;
+    const completed = filteredInspections.filter(i => i.status === 'completed').length;
+
+    // Count actual samples from all inspections
+    let totalSamples = 0;
+    try {
+      for (const inspection of filteredInspections) {
+        const samples = await Sample.findMany({ inspection_id: inspection.id });
+        totalSamples += samples.length;
+      }
+    } catch (error) {
+      console.error("Error fetching samples for stats:", error);
+      // Fallback to counting inspections with is_sample
+      totalSamples = filteredInspections.filter(i => i.is_sample).length;
+    }
+    
+    const propertyTypes = {};
+    const clientTypes = {};
+    const cities = {};
+    
+    filteredInspections.forEach(inspection => {
+      if (inspection.property_type) {
+        propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
+      }
+      if (inspection.client_type) {
+        clientTypes[inspection.client_type] = (clientTypes[inspection.client_type] || 0) + 1;
+      }
+      if (inspection.city) {
+        cities[inspection.city] = (cities[inspection.city] || 0) + 1;
+      }
+    });
+
+    return {
+      total,
+      withMold,
+      withWaterDamage,
+      samples: totalSamples,
+      pending,
+      completed,
+      propertyTypes,
+      clientTypes,
+      cities
+    };
+  };
+
+
+
+
+  // Filter inspections based on all filters
+  const filteredInspections = inspections.filter(inspection => {
+    const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
+    const propertyTypeMatch = propertyTypeFilter === 'all' || inspection.property_type === propertyTypeFilter;
+    const clientTypeMatch = clientTypeFilter === 'all' || inspection.client_type === clientTypeFilter;
+    const moldMatch = moldFilter === 'all' || 
+      (moldFilter === 'yes' && inspection.has_visible_mold) || 
+      (moldFilter === 'no' && !inspection.has_visible_mold);
+    const waterDamageMatch = waterDamageFilter === 'all' || 
+      (waterDamageFilter === 'yes' && inspection.has_water_damage) || 
+      (waterDamageFilter === 'no' && !inspection.has_water_damage);
+
+    const term = searchTerm.toLowerCase();
+    const searchMatch = !term ||
+      (getDisplayNumber(inspection) || '').toLowerCase().includes(term) ||
+      (inspection.full_name || '').toLowerCase().includes(term) ||
+      (inspection.street_address || '').toLowerCase().includes(term) ||
+      (inspection.email || '').toLowerCase().includes(term) ||
+      (inspection.city || '').toLowerCase().includes(term) ||
+      (inspection.state || '').toLowerCase().includes(term);
+
+    return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
+  });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredInspections.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentInspections = filteredInspections.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, propertyTypeFilter, clientTypeFilter, moldFilter, waterDamageFilter]);
+
+  // Periodic cache refresh every 10 minutes when page is active
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && cacheTimestamp) {
+        const cacheAge = Date.now() - cacheTimestamp;
+        if (cacheAge > CACHE_DURATION) {
+          console.log("🔍 CACHE: Auto-refreshing expired cache");
+          smartRefresh();
+        }
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [cacheTimestamp]);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  const handleSelectAll = (checked) => {
+    // Select/deselect all currently visible inspections (current page)
+    const idsToSelect = currentInspections.map(insp => insp.id);
+    if (checked) {
+      setSelectedInspections(prev => new Set([...prev, ...idsToSelect]));
+    } else {
+      setSelectedInspections(prev => {
+        const newSet = new Set(prev);
+        idsToSelect.forEach(id => newSet.delete(id));
+        return newSet;
+      });
+    }
+  };
+
+  const handleSelectInspection = (inspectionId, checked) => {
+    if (checked) {
+      setSelectedInspections(prev => new Set([...prev, inspectionId]));
+    } else {
+      setSelectedInspections(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(inspectionId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteSelected = async (idsToDelete = null) => {
+    const ids = idsToDelete || Array.from(selectedInspections);
+    if (ids.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${ids.length} inspection(s)? This action cannot be undone.`;
+    if (!confirm(confirmMessage)) return;
+
+    setIsDeleting(true);
+    try {
+      // Delete inspections one by one with a small delay to avoid rate limiting
+      for (const id of ids) {
+        await MoldInspection.delete(id);
+        // Small delay to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      // Invalidate cache and reload the inspections list
+      invalidateCache();
+      await smartRefresh();
+      
+      alert(`Successfully deleted ${ids.length} inspection(s).`);
+    } catch (error) {
+      alert("Failed to delete some inspections. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    const headers = [
+      "InspectionNumber", "ID", "CreationDate", "FullName", "Email", "ClientType", "Address",
+      "SquareFootage", "Status", "VisibleMold", "WaterDamage"
+    ];
+
+    const rows = inspections.map((insp, index) => {
+      const displayNum = getDisplayNumber(insp);
+      
+      return [
+        displayNum,
+        insp.id,
+        format(new Date(insp.created_date), "yyyy-MM-dd HH:mm"),
+        `"${insp.full_name}"`,
+        insp.email,
+        insp.client_type,
+        `"${insp.street_address}, ${insp.city}, ${insp.state} ${insp.zip_code}"`,
+        insp.square_footage,
+        insp.status,
+        insp.has_visible_mold,
+        insp.has_water_damage
+      ].join(',');
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `inspections_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
 
   const sendLabReceivedEmail = async (inspection) => {
     // Debug: Log the inspection object to see what fields are available
@@ -2196,3 +2195,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+// Function is already exported at declaration above

@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { User } from "@/api/entities";
 import { MoldInspection } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
+import { getDisplayNumber } from "@/utils/inspectionUtils";
 
 export default function ThankYou() {
   const [userInspection, setUserInspection] = useState(null);
@@ -33,9 +34,7 @@ export default function ThankYou() {
     loadUserInspection();
   }, [currentUser]);
 
-  const getDisplayNumber = (inspection) => {
-    return inspection?.inspection_number ? `TT #${inspection.inspection_number}` : `TT #${inspection?.id}`;
-  };
+
 
   if (loading) {
     return (
