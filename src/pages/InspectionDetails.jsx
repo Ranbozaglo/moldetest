@@ -418,10 +418,93 @@ export default function InspectionDetails() {
       console.log("🔍 STEP 3: Generating analysis from cleaned extracted text...");
       
       try {
-        // Construct the full prompt to send to the backend
-        const extractedTextSection = `\nEXTRACTED TEXT FROM LAB REPORTS:\n${cleanedExtractedText}\n`;
-        const instructions = `\nPlease analyze the lab results and provide:\n\n1. **CONCLUSION** (2-3 paragraphs):\n   - Summarize the lab findings and extracted text\n   - Assess the mold levels and types found\n   - Evaluate health and safety implications\n   - Compare to normal/acceptable levels\n   - Consider the property context and client type\n\n2. **RECOMMENDATIONS** (detailed list):\n   - Immediate actions needed (if any)\n   - Preventive measures\n   - Professional services recommended\n   - Timeline for any required actions\n   - Environmental controls to implement\n   - Follow-up testing recommendations\n\nMake the analysis professional, specific, and actionable. Focus on practical guidance for the property owner.\n\nReturn your response in this exact JSON format:\n{\n  \"conclusion\": \"Your detailed conclusion here...\",\n  \"recommendations\": \"Your detailed recommendations here...\"\n}\n`;
-        const analysisPrompt =  extractedTextSection + instructions;
+        // Construct comprehensive prompt with all inspection data
+        const propertyDetailsSection = `**Property Details:**
+Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
+Property Type: ${inspection.property_type || 'Not specified'}
+Square Footage: ${inspection.square_footage || 'Not specified'}
+Year Built: ${inspection.year_built || 'Not specified'}
+
+`;
+        
+        // Parse mold locations for detailed findings
+        let moldLocations = [];
+        try {
+          if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+            moldLocations = JSON.parse(inspection.mold_locations);
+          } else if (Array.isArray(inspection.mold_locations)) {
+            moldLocations = inspection.mold_locations;
+          }
+        } catch (e) {
+          console.error("Error parsing mold_locations:", e);
+        }
+
+        // Parse water damage locations
+        let waterDamageLocations = [];
+        try {
+          if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
+            waterDamageLocations = JSON.parse(inspection.water_damage_locations);
+          } else if (Array.isArray(inspection.water_damage_locations)) {
+            waterDamageLocations = inspection.water_damage_locations;
+          }
+        } catch (e) {
+          console.error("Error parsing water_damage_locations:", e);
+        }
+
+        const clientInfoSection = `**Client Information:**
+Client Type: ${inspection.client_type || 'Not specified'}
+
+`;
+
+        const visibleMoldSection = `**Visible Mold Findings:**
+Visible Mold Present: ${inspection.has_visible_mold ? 'Yes' : 'No'}
+${inspection.has_visible_mold && moldLocations.length > 0 ? 
+  'Visible Mold Details:\n' + moldLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n' 
+  : 'No visible mold was reported during this inspection.\n'}
+`;
+
+        const waterDamageSection = `**Water Damage History:**
+Recent Water Damage: ${inspection.has_water_damage ? 'Yes' : 'No'}
+${inspection.has_water_damage && waterDamageLocations.length > 0 ? 
+  'Water Damage Details:\n' + waterDamageLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n'
+  : 'No recent water damage was reported during this inspection.\n'}
+`;
+
+        const environmentalSection = `**Environmental Conditions:**
+Temperature: ${inspection.temperature || 'Not recorded'}°F
+Humidity: ${inspection.humidity || 'Not recorded'}%
+Data Collection Method: ${inspection.environmental_data_method || 'Not specified'}
+
+`;
+
+        const samplesSection = samples && samples.length > 0 ? 
+          `**Samples Collected:**
+${samples.map((sample, i) => `Sample ${i + 1}: Location: ${sample.location || 'Not specified'}, Description: ${sample.description || 'Not specified'}`).join('\n')}
+
+` : '**Samples Collected:**\nNo samples were collected during this inspection.\n\n';
+
+        const labAnalysisSection = `**Lab Analysis Results:**
+${cleanedExtractedText || 'No lab analysis results available.'}
+
+`;
+
+        const instructions = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string, preferably a numbered list if multiple items).
+
+Based on the comprehensive inspection data above, provide a professional conclusion and specific recommendations. Consider:
+- Types of mold identified and concentration levels
+- Whether levels are elevated or concerning based on industry standards
+- Property context and environmental conditions
+- Health and safety implications
+- Comparison to outdoor levels and normal ranges
+- Presence of toxigenic molds
+
+Return your response in this exact JSON format:
+{
+  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
+  "recommendations": "Your detailed recommendations here (numbered list with specific, actionable items including immediate actions, preventive measures, professional services, timeline, environmental controls, and follow-up testing)..."
+}`;
+
+        const analysisPrompt = propertyDetailsSection + clientInfoSection + visibleMoldSection + waterDamageSection + environmentalSection + samplesSection + labAnalysisSection + instructions;
 
         // Send the constructed prompt as the 'prompt' field to the backend
         const analysisResult = await Core.InvokeLLM(analysisPrompt);
@@ -509,31 +592,163 @@ export default function InspectionDetails() {
     setGeneratingAnalysis(true);
     try {
       console.log("🔍 DEBUG: Generating analysis for image:", imageUrl);
-    console.log("🔍 DEBUG: Inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Inspection ID:", inspectionId);
       
-      // Use the InvokeLLM function to analyze the image
+      // Parse mold locations for detailed findings
+      let moldLocations = [];
+      try {
+        if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
+          moldLocations = JSON.parse(inspection.mold_locations);
+        } else if (Array.isArray(inspection.mold_locations)) {
+          moldLocations = inspection.mold_locations;
+        }
+      } catch (e) {
+        console.error("Error parsing mold_locations:", e);
+      }
+
+      // Parse water damage locations
+      let waterDamageLocations = [];
+      try {
+        if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
+          waterDamageLocations = JSON.parse(inspection.water_damage_locations);
+        } else if (Array.isArray(inspection.water_damage_locations)) {
+          waterDamageLocations = inspection.water_damage_locations;
+        }
+      } catch (e) {
+        console.error("Error parsing water_damage_locations:", e);
+      }
+
+      // Construct comprehensive prompt with inspection context
+      const comprehensivePrompt = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string, preferably a numbered list if multiple items).
+
+**Property Details:**
+Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
+Property Type: ${inspection.property_type || 'Not specified'}
+Square Footage: ${inspection.square_footage || 'Not specified'}
+Year Built: ${inspection.year_built || 'Not specified'}
+
+**Client Information:**
+Client Type: ${inspection.client_type || 'Not specified'}
+
+**Visible Mold Findings:**
+Visible Mold Present: ${inspection.has_visible_mold ? 'Yes' : 'No'}
+${inspection.has_visible_mold && moldLocations.length > 0 ? 
+  'Visible Mold Details:\n' + moldLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n' 
+  : 'No visible mold was reported during this inspection.\n'}
+
+**Water Damage History:**
+Recent Water Damage: ${inspection.has_water_damage ? 'Yes' : 'No'}
+${inspection.has_water_damage && waterDamageLocations.length > 0 ? 
+  'Water Damage Details:\n' + waterDamageLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n'
+  : 'No recent water damage was reported during this inspection.\n'}
+
+**Environmental Conditions:**
+Temperature: ${inspection.temperature || 'Not recorded'}°F
+Humidity: ${inspection.humidity || 'Not recorded'}%
+Data Collection Method: ${inspection.environmental_data_method || 'Not specified'}
+
+**Samples Collected:**
+${samples && samples.length > 0 ? 
+  samples.map((sample, i) => `Sample ${i + 1}: Location: ${sample.location || 'Not specified'}, Description: ${sample.description || 'Not specified'}`).join('\n')
+  : 'No samples were collected during this inspection.'}
+
+**Lab Analysis Results (extracted from image at ${imageUrl}):**
+Please analyze the lab analysis image provided and extract relevant information about:
+- Types of mold identified (e.g., Stachybotrys, Aspergillus/Penicillium, Cladosporium)
+- Concentration levels (e.g., spore counts per cubic meter, colony forming units)
+- Whether levels are elevated or concerning based on industry standards
+- Presence of toxigenic molds
+
+Based on this comprehensive information, provide a conclusion and specific recommendations. Consider all contextual factors including property details, environmental conditions, visible findings, and lab results.
+
+Return your response in this exact JSON format:
+{
+  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
+  "recommendations": "Your detailed recommendations here (numbered list with specific, actionable items including immediate actions, preventive measures, professional services, timeline, environmental controls, and follow-up testing)..."
+}`;
+      
+      // Use the InvokeLLM function to analyze the image with comprehensive context
       const analysisResult = await InvokeLLM({
-        prompt: `Analyze this lab analysis image and provide a professional conclusion and recommendations. Focus on:
-        1. Any visible mold growth or contamination
-        2. The type and severity of any findings
-        3. Specific recommendations for remediation if needed
-        4. Any health concerns that should be addressed
-        
-        Please provide a clear, professional analysis suitable for a mold inspection report.`,
+        prompt: comprehensivePrompt,
         image_url: imageUrl
-      }, [], inspectionId); // Pass inspectionId as the third parameter
+      }, [], inspectionId);
       
       console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
-      if (analysisResult && analysisResult.trim()) {
-        // Update the inspection with the new analysis
+      if (analysisResult) {
+        // Parse the response to extract conclusion and recommendations
+        let conclusion = "";
+        let recommendations = "";
+
+        if (analysisResult.conclusion && analysisResult.recommendations) {
+          conclusion = analysisResult.conclusion;
+          recommendations = analysisResult.recommendations;
+        } else if (typeof analysisResult.content === 'string') {
+          // Try to parse content as JSON only if it looks like JSON
+          if (analysisResult.content.trim().startsWith('{')) {
+            try {
+              const parsedResult = JSON.parse(analysisResult.content);
+              conclusion = parsedResult.conclusion || analysisResult.content;
+              recommendations = parsedResult.recommendations || "";
+            } catch (parseError) {
+              conclusion = analysisResult.content;
+              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+            }
+          } else {
+            // Content is not JSON, try to split by known keywords
+            const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
+            if (split.length > 1) {
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
+              recommendations = split[1].trim();
+            } else {
+              conclusion = analysisResult.content;
+              recommendations = "";
+            }
+          }
+        } else if (typeof analysisResult === 'string') {
+          // Handle case where analysisResult is a string
+          if (analysisResult.trim().startsWith('{')) {
+            try {
+              const parsedResult = JSON.parse(analysisResult);
+              conclusion = parsedResult.conclusion || analysisResult;
+              recommendations = parsedResult.recommendations || "";
+            } catch (parseError) {
+              conclusion = analysisResult;
+              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+            }
+          } else {
+            // Content is not JSON, try to split by known keywords
+            const split = analysisResult.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
+            if (split.length > 1) {
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
+              recommendations = split[1].trim();
+            } else {
+              conclusion = analysisResult;
+              recommendations = "";
+            }
+          }
+        } else {
+          // Fallback
+          conclusion = analysisResult.toString();
+          recommendations = "";
+        }
+
+        // Update the inspection with the separated analysis
         setInspection(prev => ({
           ...prev,
-          lab_conclusion: analysisResult,
-          lab_recommendations: analysisResult
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
         }));
+
+        // Also save to database
+        await MoldInspection.update(inspectionId, {
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
+        });
         
-        console.log("🔍 DEBUG: Updated inspection with analysis");
+        console.log("🔍 DEBUG: Updated inspection with separated conclusion and recommendations");
+        console.log("🔍 DEBUG: Conclusion:", conclusion);
+        console.log("🔍 DEBUG: Recommendations:", recommendations);
       }
     } catch (error) {
       console.error("❌ Error generating analysis:", error);
