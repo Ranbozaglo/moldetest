@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { MoldInspection } from "@/api/entities";
+import { MoldInspection, EmailService } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { User } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
@@ -416,6 +416,23 @@ export default function Inspection() {
           
           // Clear saved inspection data after successful submission
           clearSavedInspectionData();
+          
+          // Send welcome email to user about their new inspection
+          try {
+            const displayNumber = newInspection.inspection_number || `INS-${String(newInspection.id).padStart(4, '0')}`;
+            console.log("🔍 DEBUG: Sending inspection created email for:", {
+              inspectionId: newInspection.id,
+              displayNumber: displayNumber,
+              userEmail: currentUser.email
+            });
+            
+            await EmailService.sendInspectionCreatedEmail(newInspection.id);
+            console.log("✅ Successfully sent inspection creation email");
+          } catch (emailError) {
+            console.error("❌ Failed to send inspection creation email:", emailError);
+            // Don't prevent inspection completion if email fails
+            // The inspection was created successfully, email is just a bonus feature
+          }
       } else {
           // This case handles if creation fails to return a valid object with an ID
           console.error("🔍 DEBUG: Invalid inspection response:", newInspection);

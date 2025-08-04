@@ -123,6 +123,56 @@ def register_email_endpoints(app, supabase):
             print(f"❌ EMAIL DEBUG: Error in send_review_request_email: {e}")
             return jsonify({"error": f"Failed to send review request email: {str(e)}"}), 500
 
+    @app.route('/api/email/send-inspection-created/<int:inspection_id>', methods=['POST'])
+    def send_inspection_created_email(inspection_id):
+        """Send inspection created welcome email"""
+        try:
+            print(f"🔍 EMAIL DEBUG: Starting inspection created email for inspection {inspection_id}")
+            
+            # Fetch inspection data from database using inspection ID (not inspection_number like others)
+            print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
+            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            
+            if not result.data:
+                print(f"❌ EMAIL DEBUG: Inspection with ID {inspection_id} not found in database")
+                # Debug: Let's see what inspections are available
+                try:
+                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
+                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
+                    for insp in all_inspections.data:
+                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
+                except Exception as debug_error:
+                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
+                
+                return jsonify({"error": f"Inspection with ID {inspection_id} not found"}), 404
+            
+            inspection_data = {
+                "email": result.data.get('email'),
+                "full_name": result.data.get('full_name'),
+                "inspection_number": result.data.get('inspection_number', f"INS-{str(inspection_id).zfill(4)}"),
+                "street_address": result.data.get('street_address', ''),
+                "unit_number": result.data.get('unit_number', ''),
+                "city": result.data.get('city', ''),
+                "state": result.data.get('state', ''),
+                "zip_code": result.data.get('zip_code', ''),
+            }
+            
+            print(f"🔍 EMAIL DEBUG: Extracted inspection data: {inspection_data}")
+            
+            # Send email using template
+            email_result = email_service.send_inspection_created_email_with_template(inspection_data)
+            
+            if email_result.get('success'):
+                print(f"✅ EMAIL DEBUG: Inspection created email sent successfully for inspection {inspection_id}")
+                return jsonify(email_result)
+            else:
+                print(f"❌ EMAIL DEBUG: Failed to send inspection created email: {email_result.get('error')}")
+                return jsonify({"error": f"Failed to send inspection created email: {email_result.get('error')}"}), 500
+                
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error in send_inspection_created_email: {e}")
+            return jsonify({"error": f"Failed to send inspection created email: {str(e)}"}), 500
+
     @app.route('/api/email/templates', methods=['GET'])
     def get_email_templates():
         """Get all email templates"""

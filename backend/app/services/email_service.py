@@ -62,6 +62,49 @@ class EmailService:
     <p>Best regards,<br>Total Testing Team</p>
 </body>
 </html>"""
+            },
+            "inspection_created": {
+                "subject": "Welcome to Total Testing - Inspection #{inspection_number} Created",
+                "body": """<html>
+<body>
+    <h2>Welcome to Total Testing!</h2>
+    <p>Dear {full_name},</p>
+    <p>Congratulations! Your mold inspection has been successfully created.</p>
+    
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+        <h3 style="color: #004aac; margin-top: 0;">Your Inspection Details:</h3>
+        <p><strong>Inspection Number:</strong> {inspection_number}</p>
+        <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
+        <p><strong>Status:</strong> Ready for Sample Collection</p>
+    </div>
+    
+    <h3>📋 Next Steps:</h3>
+    <ol>
+        <li><strong>Collect Your Samples:</strong> Follow the sampling guide provided during your inspection setup</li>
+        <li><strong>Send Samples to Lab:</strong> Use the prepaid shipping materials to send your samples</li>
+        <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
+        <li><strong>Receive Results:</strong> Get your detailed report within 3-5 business days</li>
+    </ol>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            View My Inspections
+        </a>
+    </div>
+    
+    <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+    <p>Thank you for choosing Total Testing for your mold inspection needs!</p>
+    
+    <br>
+    <p>Best regards,<br>The Total Testing Team</p>
+    
+    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+    <p style="font-size: 12px; color: #6c757d;">
+        This email was sent to {email} regarding inspection #{inspection_number}. 
+        You received this because you created a new mold inspection with Total Testing.
+    </p>
+</body>
+</html>"""
             }
         }
         
@@ -365,6 +408,48 @@ class EmailService:
             print(f"❌ EMAIL DEBUG: Error sending templated review request email: {e}")
             # Fallback to original method
             return self.send_review_request_email(inspection_data)
+    
+    def send_inspection_created_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send inspection created welcome email using stored template
+        """
+        try:
+            print(f"🔍 EMAIL DEBUG: Sending inspection created email with template")
+            print(f"🔍 EMAIL DEBUG: Inspection data: {inspection_data}")
+            
+            templates = self.get_templates()
+            template = templates.get('inspection_created', self.default_templates['inspection_created'])
+            
+            # Add dashboard URL to inspection data
+            inspection_data_with_url = inspection_data.copy()
+            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            inspection_data_with_url['dashboard_url'] = dashboard_url
+            
+            # Handle missing address fields gracefully
+            inspection_data_with_url['unit_number'] = inspection_data.get('unit_number', '')
+            if inspection_data_with_url['unit_number']:
+                inspection_data_with_url['unit_number'] = f", {inspection_data_with_url['unit_number']}"
+            
+            # Ensure all required fields have defaults
+            inspection_data_with_url.setdefault('street_address', 'Not provided')
+            inspection_data_with_url.setdefault('city', 'Not provided')
+            inspection_data_with_url.setdefault('state', 'Not provided')
+            inspection_data_with_url.setdefault('zip_code', 'Not provided')
+            
+            subject = self.format_template(template['subject'], inspection_data_with_url)
+            body = self.format_template(template['body'], inspection_data_with_url)
+            
+            print(f"🔍 EMAIL DEBUG: Formatted subject: {subject}")
+            print(f"🔍 EMAIL DEBUG: Sending to email: {inspection_data.get('email')}")
+            
+            return self.send_email(inspection_data.get('email'), subject, body)
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error sending templated inspection created email: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to send inspection created email: {str(e)}",
+                "message": "Error in send_inspection_created_email_with_template"
+            }
 
 # Create service instance
 email_service = EmailService()

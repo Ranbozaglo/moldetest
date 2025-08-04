@@ -519,6 +519,18 @@ export const EmailService = {
     return response;
   },
 
+  sendInspectionCreatedEmail: async (inspectionId) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/email/send-inspection-created/${inspectionId}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      }
+    });
+    return response;
+  },
+
   // Email template management
   getTemplates: async () => {
     const token = getAuthToken();
