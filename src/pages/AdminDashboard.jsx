@@ -2444,19 +2444,31 @@ export default function AdminDashboard() {
           <TabsContent value="emails" className="space-y-6">
             <div className="grid gap-6">
               {/* Email Settings Header */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
-                <div className="flex items-center justify-between">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 md:p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-2 rounded-lg">
-                      <Mail className="w-6 h-6 text-blue-600" />
+                    <div className="bg-blue-100 p-2 rounded-lg flex-shrink-0">
+                      <Mail className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Email Template Management</h2>
-                      <p className="text-gray-600 mt-1">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg md:text-2xl font-bold text-gray-900 leading-tight">Email Template Management</h2>
+                      <p className="text-sm md:text-base text-gray-600 mt-1 leading-relaxed">
                         Customize automated emails sent during different stages of the inspection process
                       </p>
                     </div>
                   </div>
+                  {/* Mobile status indicators */}
+                  <div className="flex md:hidden items-center justify-center gap-6 text-xs text-gray-500 bg-white/60 rounded-lg p-3 border">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>Active Templates</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span>Auto-send Enabled</span>
+                    </div>
+                  </div>
+                  {/* Desktop status indicators */}
                   <div className="hidden md:flex items-center gap-4 text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -2471,7 +2483,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Template Statistics */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
@@ -2531,18 +2543,18 @@ export default function AdminDashboard() {
 
               {/* Email Template Manager */}
               <Card className="shadow-lg">
-                <CardHeader className="border-b bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Mail className="w-5 h-5 text-blue-600" />
-                        Template Editor
+                <CardHeader className="border-b bg-gray-50 p-4 md:p-6">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                        <Mail className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0" />
+                        <span className="truncate">Template Editor</span>
                       </CardTitle>
-                      <CardDescription className="mt-1">
+                      <CardDescription className="mt-1 text-sm leading-relaxed">
                         Select and customize email templates with variables and HTML formatting
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 flex-shrink-0">
                       <div className="flex items-center gap-1">
                         <Eye className="w-3 h-3" />
                         <span>Live Preview</span>
@@ -2553,9 +2565,20 @@ export default function AdminDashboard() {
                         <span>Auto-save</span>
                       </div>
                     </div>
+                    {/* Mobile features indicator */}
+                    <div className="flex md:hidden items-center justify-center gap-4 text-xs text-gray-500 bg-blue-50/60 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <Eye className="w-3 h-3" />
+                        <span>Preview</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        <span>Auto-save</span>
+                      </div>
+                    </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-3 md:p-6">
                   <EmailTemplateManager />
                 </CardContent>
               </Card>

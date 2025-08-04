@@ -383,7 +383,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            dashboard_url = os.getenv('https://mold-testing.netlify.app/', 'http://localhost:3000') + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -405,7 +405,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            dashboard_url = os.getenv('https://mold-testing.netlify.app/', 'http://localhost:3000') + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -447,7 +447,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            dashboard_url = os.getenv('https://mold-testing.netlify.app/', 'http://localhost:3000') + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             # Handle missing address fields gracefully
