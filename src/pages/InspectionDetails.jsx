@@ -955,6 +955,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                 <User className="w-5 h-5" />
                 Customer Information
               </CardTitle>
+              <CardDescription>
+                Personal details and property information for this inspection
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -993,7 +996,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               {inspection.background_info && (
                 <div>
                   <Label className="text-slate-600">Background Information</Label>
-                  <p className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg mt-1">
+                  <p className="font-medium">
                     {inspection.background_info}
                   </p>
                 </div>

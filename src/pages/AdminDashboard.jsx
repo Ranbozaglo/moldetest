@@ -425,6 +425,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                     <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
                     <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || 'N/A').toUpperCase()}</div></div>
                     <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage || 'N/A'} SQ FT</div></div>
+                    ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.background_info}</div></div>` : ''}
                 </div>
             
             <div class="section">
