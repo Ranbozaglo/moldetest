@@ -46,10 +46,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     const css = `
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
         .page-break { page-break-after: always; }
-        .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; }
-        .cover-title { font-size: 28px; font-weight: bold; color: #004aac; margin-bottom: 20px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-        .cover-image { max-width: 80%; height: 80%; border-radius: 15px; margin: 20px 0; box-shadow: 0 8px 25px rgba(0,0,0,0.15); border: 3px solid white; }
-        .cover-details { background: rgba(255,255,255,0.9); padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 100%; }
+        .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 30px 20px; }
+        .cover-title { font-size: 32px; font-weight: bold; color: #004aac; margin-top: 20px; margin-bottom: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+        .cover-image { max-width: 90%; max-height: 400px; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
+        .cover-details { background: rgba(255,255,255,0.95); padding: 25px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); max-width: 90%; width: 100%; }
         .cover-detail-item { margin: 10px 0; font-size: 16px; }
         .cover-detail-label { font-weight: bold; color: #004aac; }
         .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; }
@@ -70,8 +70,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         
         /* Mobile-specific improvements */
         @media (max-width: 768px) {
-            .cover-title { font-size: 24px; }
-            .cover-details { padding: 15px; }
+            .cover-title { font-size: 26px; margin-top: 15px; margin-bottom: 25px; }
+            .cover-page { padding: 25px 15px; }
+            .cover-image { max-width: 95%; max-height: 300px; margin: 25px 0; }
+            .cover-details { padding: 20px; max-width: 95%; }
             .cover-detail-item { font-size: 14px; }
             .report-container { padding: 15px; }
             .section h2 { font-size: 18px; }
@@ -84,10 +86,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         }
         
         @media (min-width: 769px) {
-            .cover-title { font-size: 48px; }
-            .cover-page { padding: 40px; }
-            .cover-image { max-width: 450px; }
-            .cover-details { padding: 30px; max-width: 500px; }
+            .cover-title { font-size: 52px; margin-top: 30px; margin-bottom: 40px; }
+            .cover-page { padding: 50px; }
+            .cover-image { max-width: 95%; max-height: 500px; margin: 40px 0; }
+            .cover-details { padding: 35px; max-width: 85%; }
             .cover-detail-item { font-size: 18px; }
             .report-container { max-width: 800px; padding: 40px; }
             .section h2 { font-size: 22px; }
@@ -98,6 +100,25 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             .client-info-item { padding: 10px; }
             .client-info-label { font-size: 14px; }
             .client-info-value { font-size: 16px; }
+        }
+        
+        /* Print-specific styles to hide browser headers/footers */
+        @media print {
+          @page {
+            margin: 0.3in 1in 0.3in 1in;
+            size: A4;
+          }
+          
+          body {
+            margin: 0 !important;
+            padding: 20px !important;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+          }
+          
+          html {
+            background: white !important;
+          }
         }
     `;
 
@@ -376,8 +397,9 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Mold Inspection Report</title>
+        <title></title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="robots" content="noindex">
         <style>${css}</style>
     </head>
     <body>
@@ -419,10 +441,14 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 ${samplesHtml}
             </div>
 
+            <div class="page-break"></div>
+            
             <div class="section">
                 <h2>Lab Analysis</h2>
                 ${labAnalysisHtml}
             </div>
+
+            <div class="page-break"></div>
 
             <div class="section">
                 <h2>Conclusion</h2>
@@ -1993,10 +2019,9 @@ export default function AdminDashboard() {
                                       // Generate comprehensive report HTML
                                       const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
                                       
-                                      // Open in new window
-                                      const newWindow = window.open('', '_blank');
-                                      newWindow.document.write(reportHtml);
-                                      newWindow.document.close();
+                                      // Open in new window using data URL to avoid about:blank
+                                      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(reportHtml)}`;
+                                      const newWindow = window.open(dataUrl, '_blank');
                                     } catch (error) {
                                       console.error("❌ Error viewing report:", error);
                                       alert("Failed to generate report. Please try again.");

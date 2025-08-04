@@ -56,12 +56,39 @@ export const downloadPDF = async (
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Mold Inspection Report - ${displayNum}</title>
+        <meta name="robots" content="noindex">
+        <title></title>
         <style>
           @media print {
             @page {
-              margin: 1in;
+              margin: 0.3in 1in 0.3in 1in;
               size: A4;
+            }
+            
+            /* Aggressive approach to hide browser headers/footers */
+            @page :first {
+              margin-top: 0.3in;
+            }
+            
+            @page :left {
+              margin-left: 1in;
+            }
+            
+            @page :right {
+              margin-right: 1in;
+            }
+            
+            /* Hide browser default headers and footers */
+            body {
+              margin: 0 !important;
+              padding: 20px !important;
+              -webkit-print-color-adjust: exact;
+              color-adjust: exact;
+            }
+            
+            /* Additional CSS to prevent browser-generated content */
+            html {
+              background: white !important;
             }
           }
           
@@ -100,18 +127,19 @@ export const downloadPDF = async (
             min-height: 100vh; 
             display: flex; 
             flex-direction: column; 
-            justify-content: center; 
+            justify-content: flex-start; 
             align-items: center; 
             text-align: center; 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            padding: 40px 20px; 
+            padding: 50px 20px; 
             position: relative;
             color: white;
           }
           
           .cover-title { 
-            font-size: 28px; 
+            font-size: 32px; 
             font-weight: 700; 
+            margin-top: 20px;
             margin-bottom: 30px; 
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
           }
@@ -125,10 +153,11 @@ export const downloadPDF = async (
           
           .cover-details { 
             background: rgba(255,255,255,0.95); 
-            padding: 30px; 
+            padding: 35px; 
             border-radius: 20px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
-            max-width: 500px; 
+            box-shadow: 0 12px 35px rgba(0,0,0,0.2); 
+            max-width: 85%; 
+            width: 100%;
             color: #2c3e50;
           }
           
@@ -410,8 +439,9 @@ export const downloadPDF = async (
     try {
       console.log("🔍 DEBUG: Attempting to open print window...");
       
-      // First, try to open the window with a specific URL to avoid popup blockers
-      printWindow = window.open('about:blank', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+      // Create a data URL to avoid about:blank appearing in print
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(completeHtml)}`;
+      printWindow = window.open(dataUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
       
       console.log("🔍 DEBUG: Print window result:", printWindow);
       
@@ -419,13 +449,7 @@ export const downloadPDF = async (
         throw new Error("Popup blocked by browser. Please allow popups for this site.");
       }
       
-      console.log("🔍 DEBUG: Writing content to print window...");
-      
-      // Write the content to the new window
-      printWindow.document.write(completeHtml);
-      printWindow.document.close();
-      
-      console.log("🔍 DEBUG: Content written to print window, setting up onload...");
+      console.log("🔍 DEBUG: Data URL window opened, setting up print...");
       
       // Wait for content to load and then print
       printWindow.onload = () => {
@@ -602,85 +626,3 @@ export const downloadHTML = async (
     setTimeout(() => setStatus(null), 5000);
   }
 };
-
-/**
- * Test function to debug PDF download issues
- * @param {Function} setStatus - Function to update status
- */
-export const testPDFDownload = async (setStatus) => {
-  setStatus({ type: 'info', message: 'Testing PDF download functionality...' });
-  
-  try {
-    console.log("🔍 DEBUG: Testing PDF download...");
-    
-    // Simple test HTML
-    const testHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Test PDF</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          h1 { color: #333; }
-        </style>
-      </head>
-      <body>
-        <h1>Test PDF Download</h1>
-        <p>This is a test to see if PDF download works.</p>
-        <p>If you can see this, the print dialog should open.</p>
-      </body>
-      </html>
-    `;
-    
-    console.log("🔍 DEBUG: Opening test window...");
-    const testWindow = window.open('about:blank', '_blank', 'width=600,height=400');
-    
-    if (!testWindow) {
-      throw new Error("Popup blocked by browser");
-    }
-    
-    console.log("🔍 DEBUG: Writing test content...");
-    testWindow.document.write(testHtml);
-    testWindow.document.close();
-    
-         testWindow.onload = () => {
-       console.log("🔍 DEBUG: Test window loaded, printing...");
-       // Add a small delay to ensure content is fully rendered
-       setTimeout(() => {
-         testWindow.print();
-         // Don't close immediately - let user interact with print dialog
-         setTimeout(() => {
-           if (testWindow && !testWindow.closed) {
-             testWindow.close();
-           }
-         }, 1000);
-       }, 500);
-       setStatus({ type: 'success', message: 'Test PDF download successful! Check your print dialog.' });
-       setTimeout(() => setStatus(null), 3000);
-     };
-    
-         // Fallback
-     setTimeout(() => {
-       if (testWindow && !testWindow.closed) {
-         console.log("🔍 DEBUG: Fallback test print...");
-         // Add a small delay to ensure content is fully rendered
-         setTimeout(() => {
-           testWindow.print();
-           // Don't close immediately - let user interact with print dialog
-           setTimeout(() => {
-             if (testWindow && !testWindow.closed) {
-               testWindow.close();
-             }
-           }, 1000);
-         }, 500);
-         setStatus({ type: 'success', message: 'Test PDF download successful! Check your print dialog.' });
-         setTimeout(() => setStatus(null), 3000);
-       }
-     }, 1000);
-    
-  } catch (error) {
-    console.error("❌ Test PDF download failed:", error);
-    setStatus({ type: 'error', message: `Test failed: ${error.message}` });
-    setTimeout(() => setStatus(null), 5000);
-  }
-}; 
