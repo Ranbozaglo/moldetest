@@ -441,7 +441,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             </div>
 
             <div class="page-break"></div>
-            
+
             <div class="section">
                 <h2>Lab Analysis</h2>
                 ${labAnalysisHtml}
@@ -466,7 +466,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                           .join('')
                       : '<p>Pending conclusion.</p>'
                   }
-                </div>
+            </div>
 
                 <h2>Recommendations</h2>
                 <div>
@@ -957,7 +957,7 @@ export default function AdminDashboard() {
         
         console.log(`🔍 DEBUG: Attempting to delete inspection ${id}...`);
         try {
-          await MoldInspection.delete(id);
+        await MoldInspection.delete(id);
           deletionResults.successful.push(id);
           console.log(`✅ Successfully deleted inspection ${id}`);
           
@@ -973,8 +973,8 @@ export default function AdminDashboard() {
             setSelectedInspections(newSet);
           }
           
-          // Small delay to prevent rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Small delay to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
         } catch (deleteError) {
           console.error(`❌ Failed to delete inspection ${id}:`, deleteError);
           
@@ -2549,10 +2549,10 @@ export default function AdminDashboard() {
                       <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                         <Mail className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0" />
                         <span className="truncate">Template Editor</span>
-                      </CardTitle>
+                  </CardTitle>
                       <CardDescription className="mt-1 text-sm leading-relaxed">
                         Select and customize email templates with variables and HTML formatting
-                      </CardDescription>
+                  </CardDescription>
                     </div>
                     <div className="hidden md:flex items-center gap-2 text-xs text-gray-500 flex-shrink-0">
                       <div className="flex items-center gap-1">
