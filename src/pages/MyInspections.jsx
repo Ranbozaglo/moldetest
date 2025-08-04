@@ -558,7 +558,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
-                  <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
               </div>
               <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
           </div>
@@ -572,12 +572,12 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               <div class="section">
                   <h2>Client Information</h2>
                   <div class="client-info-grid">
-                      <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${inspection.full_name}</div></div>
-                      <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${inspection.email}</div></div>
-                      <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${inspection.client_type}</div></div>
-                      <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div></div>
-                      <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${inspection.property_type}</div></div>
-                      <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage} sq ft</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(inspection.full_name || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(inspection.email || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${(inspection.client_type || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage} SQ FT</div></div>
                   </div>
               </div>
               

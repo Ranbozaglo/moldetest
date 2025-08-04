@@ -409,7 +409,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
            <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
-                <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
+                <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
             </div>
         </div>
         <div class="report-container">
@@ -419,12 +419,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             </div>
                 <h2>Client Information</h2>
                 <div class="client-info-grid">
-                    <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${inspection.full_name || 'N/A'}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${inspection.email || 'N/A'}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${inspection.client_type || 'N/A'}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${inspection.property_type || 'N/A'}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage || 'N/A'} sq ft</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(inspection.full_name || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(inspection.email || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${(inspection.client_type || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage || 'N/A'} SQ FT</div></div>
                 </div>
             
             <div class="section">
