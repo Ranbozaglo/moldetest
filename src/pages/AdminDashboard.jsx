@@ -826,28 +826,195 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteSelected = async (idsToDelete = null) => {
-    const ids = idsToDelete || Array.from(selectedInspections);
-    if (ids.length === 0) return;
+    let ids = [];
+    
+    try {
+      if (idsToDelete) {
+        // Handle different types of idsToDelete parameter
+        if (Array.isArray(idsToDelete)) {
+          ids = idsToDelete;
+        } else if (typeof idsToDelete === 'string' || typeof idsToDelete === 'number') {
+          // Single ID passed as string or number
+          ids = [idsToDelete];
+        } else if (typeof idsToDelete === 'object') {
+          // Handle object parameters (events, objects with id, etc.)
+          if (idsToDelete && (idsToDelete.preventDefault || idsToDelete.target || idsToDelete.currentTarget)) {
+            console.log(`🔍 DEBUG: Detected React event object, using selectedInspections instead`);
+            // It's an event object, treat as if no parameter was passed
+            idsToDelete = null;
+          } else if (idsToDelete && typeof idsToDelete.id !== 'undefined') {
+            // Object with id property, extract the id
+            console.log(`🔍 DEBUG: Extracting ID from object:`, idsToDelete.id);
+            ids = [idsToDelete.id];
+          } else if (idsToDelete === null) {
+            // Explicitly null, treat as no parameter
+            idsToDelete = null;
+          } else {
+            console.warn(`⚠️ Unknown object type passed to handleDeleteSelected:`, {
+              type: typeof idsToDelete,
+              constructor: idsToDelete?.constructor?.name,
+              keys: Object.keys(idsToDelete || {}),
+              value: idsToDelete
+            });
+            // Treat as if no parameter was passed
+            idsToDelete = null;
+          }
+        } else {
+          throw new Error(`Invalid idsToDelete parameter: ${typeof idsToDelete}`);
+        }
+      }
+      
+      // Handle case where idsToDelete was reset to null (event object case)
+      if (idsToDelete === null) {
+        // Use selectedInspections
+        if (selectedInspections && typeof selectedInspections.size === 'number') {
+          // It's a Set
+          ids = Array.from(selectedInspections);
+        } else if (Array.isArray(selectedInspections)) {
+          // It's already an array
+          ids = selectedInspections;
+        } else {
+          // Fallback: selectedInspections is corrupted or undefined, reset it
+          console.warn(`⚠️ selectedInspections is corrupted (${typeof selectedInspections}), resetting to empty Set`);
+          setSelectedInspections(new Set());
+          ids = [];
+        }
+      }
+      
+      console.log(`🔍 DEBUG: Processed IDs for deletion:`, { 
+        original: idsToDelete, 
+        originalType: typeof idsToDelete,
+        selectedInspections: selectedInspections, 
+        selectedInspectionsType: typeof selectedInspections,
+        selectedInspectionsSize: selectedInspections?.size,
+        final: ids,
+        finalType: typeof ids,
+        isArray: Array.isArray(ids),
+        length: ids?.length
+      });
+      
+    } catch (error) {
+      console.error(`❌ Error processing deletion IDs:`, error);
+      alert(`Error preparing deletion: ${error.message}`);
+      return;
+    }
+    
+    if (!Array.isArray(ids) || ids.length === 0) {
+      console.log(`🔍 DEBUG: No valid IDs to delete`);
+      return;
+    }
     
     const confirmMessage = `Are you sure you want to delete ${ids.length} inspection(s)? This action cannot be undone.`;
     if (!confirm(confirmMessage)) return;
 
     setIsDeleting(true);
+    
+    const deletionResults = {
+      successful: [],
+      failed: []
+    };
+
     try {
-      // Delete inspections one by one with a small delay to avoid rate limiting
-      for (const id of ids) {
-        await MoldInspection.delete(id);
-        // Small delay to prevent rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+      console.log(`🔍 DEBUG: Starting bulk deletion of ${ids.length} inspections:`, ids);
+      
+      // Final safety check before iteration
+      if (!Array.isArray(ids)) {
+        throw new Error(`IDs is not an array at iteration time: ${typeof ids}`);
       }
       
-      // Invalidate cache and reload the inspections list
-      invalidateCache();
-      await smartRefresh();
+      // Delete inspections one by one with detailed error tracking
+      for (const id of ids) {
+        // Validate the ID before attempting deletion
+        if (!id || id === 'undefined' || id === 'null') {
+          console.error(`❌ Invalid inspection ID: ${id}`);
+          deletionResults.failed.push({ id, error: 'Invalid inspection ID' });
+          continue;
+        }
+        
+        console.log(`🔍 DEBUG: Attempting to delete inspection ${id}...`);
+        try {
+          await MoldInspection.delete(id);
+          deletionResults.successful.push(id);
+          console.log(`✅ Successfully deleted inspection ${id}`);
+          
+          // Immediately remove from UI state to provide instant feedback
+          setInspections(prevInspections => 
+            prevInspections.filter(inspection => inspection.id !== id)
+          );
+          
+          // Remove from selected inspections immediately if successful
+          if (selectedInspections.has(id)) {
+            const newSet = new Set(selectedInspections);
+            newSet.delete(id);
+            setSelectedInspections(newSet);
+          }
+          
+          // Small delay to prevent rate limiting
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (deleteError) {
+          console.error(`❌ Failed to delete inspection ${id}:`, deleteError);
+          
+          // Get more detailed error information
+          let errorMessage = 'Unknown error';
+          if (deleteError.message) {
+            errorMessage = deleteError.message;
+          } else if (deleteError.response?.data?.message) {
+            errorMessage = deleteError.response.data.message;
+          } else if (deleteError.response?.statusText) {
+            errorMessage = `HTTP ${deleteError.response.status}: ${deleteError.response.statusText}`;
+          }
+          
+          deletionResults.failed.push({ id, error: errorMessage });
+          
+          // Continue with next deletion after a brief pause
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
       
-      alert(`Successfully deleted ${ids.length} inspection(s).`);
+      // Force refresh the UI to show updated list
+      console.log(`🔄 REFRESH: Force refreshing UI after deletion...`);
+      invalidateCache();
+      
+      // Small delay to ensure backend has processed all deletions
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Force refresh to ensure UI is completely up to date
+      await loadInspections(true);
+      
+      // Final cleanup: ensure all successfully deleted inspections are removed from selection
+      if (deletionResults.successful.length > 0) {
+        setSelectedInspections(prev => {
+          const newSet = new Set(prev);
+          deletionResults.successful.forEach(id => newSet.delete(id));
+          return newSet;
+        });
+      }
+      
+      // Provide detailed feedback based on results
+      console.log(`🔍 DEBUG: Deletion completed. Successful: ${deletionResults.successful.length}, Failed: ${deletionResults.failed.length}`);
+      console.log(`🔄 REFRESH: UI refresh completed after deletion`);
+      
+      if (deletionResults.failed.length === 0) {
+        // All deletions successful
+        alert(`Successfully deleted ${deletionResults.successful.length} inspection(s). The list has been refreshed.`);
+      } else if (deletionResults.successful.length === 0) {
+        // All deletions failed
+        console.log(`❌ All deletions failed. Errors:`, deletionResults.failed);
+        alert(`Failed to delete any inspections. Please check the console for details or contact support.`);
+      } else {
+        // Mixed results
+        console.log(`⚠️ Mixed deletion results:`, { successful: deletionResults.successful, failed: deletionResults.failed });
+        alert(
+          `Partially completed:\n` +
+          `✅ Successfully deleted: ${deletionResults.successful.length} inspection(s)\n` +
+          `❌ Failed to delete: ${deletionResults.failed.length} inspection(s)\n\n` +
+          `The list has been refreshed. Check the console for detailed error information. Please try again for the failed inspections.`
+        );
+      }
+      
     } catch (error) {
-      alert("Failed to delete some inspections. Please try again.");
+      console.error("❌ Unexpected error during bulk deletion:", error);
+      alert("An unexpected error occurred during deletion. Please try again.");
     } finally {
       setIsDeleting(false);
     }
@@ -1647,7 +1814,7 @@ export default function AdminDashboard() {
 
                     {selectedInspections.size > 0 && (
                       <Button
-                        onClick={handleDeleteSelected}
+                        onClick={() => handleDeleteSelected()}
                         variant="destructive"
                         size="sm"
                         disabled={isDeleting}

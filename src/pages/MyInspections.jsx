@@ -943,10 +943,12 @@ export default function MyInspections() {
         <div className="mt-12 bg-amber-50 rounded-xl p-6 border border-amber-200">
           <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
           <ul className="text-amber-800 text-sm space-y-2">
-            <li>• <strong>Sample Collection:</strong> Follow the step-by-step guide provided in your email</li>
-            <li>• <strong>Shipping:</strong> Use the prepaid shipping label to send samples to our lab</li>
-            <li>• <strong>Results:</strong> Lab analysis typically takes 3-5 business days</li>
-            <li>• <strong>Questions:</strong> Contact our support team for assistance</li>
+            <li>• <strong>Sample Collection:</strong> Follow the step-by-step guide provided in your email to ensure accurate results. Use a new swab for each sample location and place it in a Ziploc bag</li>
+            <li>• <strong>Sample Labeling & Documentation:</strong> Clearly label each sample bag (e.g., “Living Room Vent”) and write the same name on your COC (Chain of Custody) form. Every sample must match what's listed on the form.</li>
+            <li>• <strong>COC Form:</strong> Complete the Chain of Custody with your contact info, sample names, collection date, and signature. This ensures proper lab processing.</li>
+            <li>• <strong>Bagging Samples:</strong> Place all samples and the signed COC form in an envelope and seal it securely</li>
+            <li>• <strong>Shipping Samples:</strong> Use the prepaid FedEx label and drop the envelope off at any FedEx location. Ship within 24 hours of collecting your samples, if possible.</li>
+            <li>• <strong>Results Timeline:</strong> Once your samples arrive at the lab, expect results within 2-3 business days, delivered to your portal.</li>
           </ul>
         </div>
       </motion.div>
