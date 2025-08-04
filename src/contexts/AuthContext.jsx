@@ -125,14 +125,8 @@ export const AuthProvider = ({ children }) => {
             localStorage.setItem('mth_user', JSON.stringify(userData));
           }
           
-          // Update admin role for specific emails if needed
-          const adminEmails = ['rotemiluz53@gmail.com', 'totaltesting.info@gmail.com'];
-          if (adminEmails.includes(userData.email) && userData.role !== 'admin') {
-            console.log('🔍 AUTH DEBUG: Updating admin role for:', userData.email);
-            userData.role = 'admin';
-            userData.is_admin = true;
-            localStorage.setItem('mth_user', JSON.stringify(userData));
-          }
+          // Admin role is now determined only by Supabase database values
+          console.log('🔍 AUTH DEBUG: Using admin role from database only');
           
           console.log('🔍 AUTH DEBUG: User session restored successfully');
         } catch (error) {
@@ -218,11 +212,8 @@ export const AuthProvider = ({ children }) => {
       }
       
       // Create user object with token from Flask backend
-      // Check for admin role from multiple sources
-      const isAdminUser = response.user.is_admin || 
-                         response.user.role === 'admin' || 
-                         email === 'rotemiluz53@gmail.com' ||
-                         email === 'totaltesting.info@gmail.com';
+      // Admin role is determined only by Supabase database values
+      const isAdminUser = response.user.is_admin || response.user.role === 'admin';
       
       const userRole = isAdminUser ? 'admin' : (response.user.role || 'user');
       
@@ -252,29 +243,7 @@ export const AuthProvider = ({ children }) => {
         environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
       });
       
-      // Special handling for admin user login issue (development only)
-      const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      if (isDevelopment && (email === 'rotemiluz53@gmail.com' || email === 'totaltesting.info@gmail.com') && error.message.includes('Invalid credentials')) {
-        console.log(`${logPrefix} Admin user login issue detected in development, creating fallback session`);
-        
-        // Create a fallback admin user session (development only)
-        const fallbackUser = {
-          id: 'admin-fallback',
-          email: email,
-          name: email === 'totaltesting.info@gmail.com' ? 'Total Testing Admin' : 'Admin User',
-          is_admin: true,
-          role: 'admin',
-          access_token: 'fallback-admin-token',
-          createdAt: new Date().toISOString(),
-          lastValidated: new Date().toISOString()
-        };
-        
-        setUser(fallbackUser);
-        localStorage.setItem('mth_user', JSON.stringify(fallbackUser));
-        
-        console.log(`${logPrefix} Fallback admin session created (development only)`);
-        return { success: true, user: fallbackUser };
-      }
+      // No hardcoded admin fallbacks - use Supabase database only
       
       return { success: false, error: error.message || 'Sign in failed' };
     }
@@ -285,13 +254,13 @@ export const AuthProvider = ({ children }) => {
       // Call backend API for registration
       const response = await User.register(email, password);
       
-      // Create user object
+      // Create user object with role from Supabase database only
       const user = {
         id: response.user_id,
         email: email,
         name: name || email.split('@')[0],
-        is_admin: email.includes('rotemiluz53@gmail.com'),
-        role: email.includes('rotemiluz53@gmail.com') ? 'admin' : 'user',
+        is_admin: response.is_admin || false,
+        role: response.role || 'user',
         createdAt: new Date().toISOString()
       };
       

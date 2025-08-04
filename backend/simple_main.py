@@ -421,28 +421,8 @@ def init_db():
         print(f"⚠️ User_profiles table setup: {e}")
         print("📝 Please create the user_profiles table in the public schema")
     
-    # Insert admin user if not exists (in public schema)
-    admin_email = "rotemiluz53@gmail.com"
-    admin_password = "admin123"  # In production, use proper password hashing
-    admin_hash = hashlib.sha256(admin_password.encode()).hexdigest()
-    
-    try:
-        # Check if admin user exists in user_profiles table
-        result = supabase.table('user_profiles').select('*').eq('email', admin_email).execute()
-        if not result.data:
-            # Insert admin user in user_profiles table
-            supabase.table('user_profiles').insert({
-                'id': str(uuid.uuid4()),  # Generate UUID for admin
-                'email': admin_email,
-                'full_name': 'Admin User',
-                'role': 'admin'
-            }).execute()
-            print("✅ Admin user created in user_profiles table")
-        else:
-            print("✅ Admin user already exists in user_profiles table")
-    except Exception as e:
-        print(f"⚠️ Admin user setup: {e}")
-        print("📝 Please check if the user_profiles table exists in public schema")
+    # Admin users are now managed only through Supabase database
+    print("✅ Admin users are managed through Supabase database only")
 
 def check_supabase_storage():
     """Check Supabase storage configuration and permissions for anon key"""
@@ -740,8 +720,17 @@ def get_inspections():
         if limit > 50:
             limit = 50
         
-        # Check if user is admin
-        is_admin = email == 'rotemiluz53@gmail.com'
+        # Check if user is admin from database
+        is_admin = False
+        if email:
+            try:
+                user_result = supabase.table('user_profiles').select('role, is_admin').eq('email', email).execute()
+                if user_result.data:
+                    user_data = user_result.data[0]
+                    is_admin = user_data.get('role') == 'admin' or user_data.get('is_admin', False)
+            except Exception as e:
+                print(f"⚠️ Error checking user admin status: {e}")
+                is_admin = False
         
         print(f"🔍 DEBUG: Fetching inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}, detailed={detailed}")
         
@@ -1887,7 +1876,7 @@ if __name__ == '__main__':
     print("   - POST /api/email/send-report-ready/<inspection_id>")
     print("   - POST /api/email/send-review-request/<inspection_id>")
     print("   - POST /api/upload")
-    print("\n💡 Default admin user: rotemiluz53@gmail.com / admin123")
+    print("\n💡 Admin users are managed through Supabase database only")
     print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision & OpenAI READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")
     
 port = int(os.environ.get("PORT", 5000))  # לוקח את הפורט של Render אם קיים

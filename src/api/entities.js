@@ -574,8 +574,11 @@ if (typeof window !== 'undefined') {
     // Test backend connectivity
     testHealth: () => checkBackendHealth(),
     
-    // Test login endpoint
-    testLogin: async (email = 'rotemiluz53@gmail.com', password = 'admin123') => {
+    // Test login endpoint - no default credentials
+    testLogin: async (email, password) => {
+      if (!email || !password) {
+        throw new Error('Email and password are required for login test');
+      }
       console.log('🔍 PROD DEBUG: Testing login endpoint...');
       try {
         const result = await User.login(email, password);
