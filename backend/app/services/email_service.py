@@ -425,8 +425,13 @@ class EmailService:
             templates = self.get_templates()
             template = templates.get('review_request', self.default_templates['review_request'])
             
-            subject = self.format_template(template['subject'], inspection_data)
-            body = self.format_template(template['body'], inspection_data)
+            # Add dashboard URL to inspection data (for future template use)
+            inspection_data_with_url = inspection_data.copy()
+            dashboard_url = os.getenv('FRONTEND_URL', 'https://mold-testing.netlify.app') + '/MyInspections'
+            inspection_data_with_url['dashboard_url'] = dashboard_url
+            
+            subject = self.format_template(template['subject'], inspection_data_with_url)
+            body = self.format_template(template['body'], inspection_data_with_url)
             
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
