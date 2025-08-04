@@ -15,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
-import { downloadPDF, downloadHTML, testPDFDownload } from "@/utils/pdfDownload";
+import { downloadPDF, downloadHTML } from "@/utils/pdfDownload";
 import EmailTemplateManager from "@/components/EmailTemplateManager";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
