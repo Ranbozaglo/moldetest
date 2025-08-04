@@ -439,8 +439,7 @@ export const downloadPDF = async (
     try {
       console.log("🔍 DEBUG: Attempting to open print window...");
       
-      // Create a data URL to avoid about:blank appearing in print
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(completeHtml)}`;
+      // First, try to open the window with a specific URL to avoid popup blockers
       printWindow = window.open(dataUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
       
       console.log("🔍 DEBUG: Print window result:", printWindow);
