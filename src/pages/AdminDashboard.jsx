@@ -471,21 +471,21 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 <h2>Recommendations</h2>
                 <div>
                   ${
-                                `Immediate Actions
+                                `<strong>Immediate Actions</strong>
 1. Fix Moisture & Humidity Issues
 Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
 
 2. Avoid Impacted Areas
 Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
 
-Next Steps
+<strong>Next Steps</strong>
 1. Consult a Mold Professional
 To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
 
 2. Re-Testing
 After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
 
-Prevention Tips
+<strong>Prevention Tips</strong>
 • Act Quickly on Leaks
 Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
 

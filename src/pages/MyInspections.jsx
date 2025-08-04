@@ -443,21 +443,21 @@ export default function MyInspections() {
           console.log("🔍 DEBUG: Using standard template recommendations for report");
           
           // Standard template recommendations
-          const standardRecommendations = `Immediate Actions
+          const standardRecommendations = `<strong>Immediate Actions</strong>
 1. Fix Moisture & Humidity Issues
 Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
 
 2. Avoid Impacted Areas
 Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
 
-Next Steps
+<strong>Next Steps</strong>
 1. Consult a Mold Professional
 To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
 
 2. Re-Testing
 After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
 
-Prevention Tips
+<strong>Prevention Tips</strong>
 • Act Quickly on Leaks
 Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
 
@@ -480,9 +480,11 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               .map((line, index) => {
                   const trimmedLine = line.trim();
                   // Check if line is a main header (no numbers but followed by content)
-                  if ((trimmedLine === 'Immediate Actions' || trimmedLine === 'Next Steps' || trimmedLine === 'Prevention Tips')) {
+                  if ((trimmedLine === '<strong>Immediate Actions</strong>' || trimmedLine === '<strong>Next Steps</strong>' || trimmedLine === '<strong>Prevention Tips</strong>')) {
                       const extraSpacing = index > 0 ? '<div style="height: 15px;"></div>' : '';
-                      return `${extraSpacing}<h4 style="margin: 10px 0 8px 0; font-weight: bold; color: #1e40af; font-size: 16px;">${trimmedLine}</h4>`;
+                      // Extract the text from between strong tags for display
+                      const headerText = trimmedLine.replace(/<\/?strong>/g, '');
+                      return `${extraSpacing}<h4 style="margin: 10px 0 8px 0; font-weight: bold; color: #1e40af; font-size: 16px;">${headerText}</h4>`;
                   }
                   // Check if line starts with number (1. 2.)
                   if (/^\d+\./.test(trimmedLine)) {
