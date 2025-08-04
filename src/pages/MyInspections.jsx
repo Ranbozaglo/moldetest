@@ -238,13 +238,13 @@ export default function MyInspections() {
       const css = `
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
           .page-break { page-break-after: always; }
-          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 30px 20px; }
+          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 30px 20px; }
           .cover-title { font-size: 32px; font-weight: bold; color: #004aac; margin-top: 20px; margin-bottom: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-          .cover-image { max-width: 90%; max-height: 400px; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
+          .cover-image { max-width: 100%; max-height: 600px; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
           .cover-details { background: rgba(255,255,255,0.95); padding: 25px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); max-width: 90%; width: 100%; }
           .cover-detail-item { margin: 10px 0; font-size: 16px; }
           .cover-detail-label { font-weight: bold; color: #004aac; }
-          .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; }
+          .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; } 
           .section { margin-bottom: 25px; }
           .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
           .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
@@ -283,7 +283,7 @@ export default function MyInspections() {
           @media (max-width: 768px) {
               .cover-title { font-size: 26px; margin-top: 15px; margin-bottom: 25px; }
               .cover-page { padding: 25px 15px; }
-              .cover-image { max-width: 95%; max-height: 300px; margin: 25px 0; }
+              .cover-image { max-width: 100%; max-height: 450px; margin: 25px 0; }
               .cover-details { padding: 20px; max-width: 95%; }
               .cover-detail-item { font-size: 14px; }
               .report-container { padding: 15px; }
@@ -299,7 +299,7 @@ export default function MyInspections() {
           @media (min-width: 769px) {
               .cover-title { font-size: 52px; margin-top: 30px; margin-bottom: 40px; }
               .cover-page { padding: 50px; }
-              .cover-image { max-width: 95%; max-height: 500px; margin: 40px 0; }
+              .cover-image { max-width: 100%; max-height: 700px; margin: 40px 0; }
               .cover-details { padding: 35px; max-width: 85%; }
               .cover-detail-item { font-size: 18px; }
               .report-container { max-width: 800px; padding: 40px; }
@@ -438,98 +438,72 @@ export default function MyInspections() {
           </div>`;
       }
       
-      // Use AI-generated recommendations if available, otherwise generate based on findings
+      // Always use standard template for recommendations
       const getRecommendationsHtml = () => {
-          // First, check if we have AI-generated recommendations from lab analysis
-          if (detailedInspection.recommendations && detailedInspection.recommendations.trim().length > 0) {
-              console.log("🔍 DEBUG: Using AI-generated recommendations for report:", detailedInspection.recommendations);
-              // Format the AI recommendations as HTML, preserving line breaks and ensuring proper spacing
-              const lines = detailedInspection.recommendations.split('\n');
-              const formattedRecommendations = lines
-                  .filter(line => line.trim().length > 0)
-                  .map((line, index) => {
-                      const trimmedLine = line.trim();
-                      // Check if this line is a bolded section header (contains **)
-                      const isBoldedSection = trimmedLine.includes('**') && trimmedLine.includes('**');
-                      
-                      if (isBoldedSection) {
-                          // Add extra spacing before bolded sections (except the first one)
-                          const extraSpacing = index > 0 ? '<div style="height: 20px;"></div>' : '';
-                          return `${extraSpacing}<p style="margin: 8px 0; line-height: 1.5; color: #374151; font-weight: bold;">${trimmedLine}</p>`;
-                      } else {
-                          return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${trimmedLine}</p>`;
-                      }
-                  })
-                  .join('');
-              
-              return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
-                <h4 style="color: #059669; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                  🤖 AI-Generated Recommendations (Based on Lab Analysis)
-                </h4>
-                ${formattedRecommendations}
-              </div>`;
-          }
+          console.log("🔍 DEBUG: Using standard template recommendations for report");
           
-          // Fallback to generic recommendations if no AI recommendations available
-          console.log("🔍 DEBUG: No AI recommendations found, using generic recommendations for report");
-          const recommendations = [];
+          // Standard template recommendations
+          const standardRecommendations = `Immediate Actions
+1. Fix Moisture & Humidity Issues
+Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
+
+2. Avoid Impacted Areas
+Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
+
+Next Steps
+1. Consult a Mold Professional
+To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
+
+2. Re-Testing
+After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
+
+Prevention Tips
+• Act Quickly on Leaks
+Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
+
+• Monitor Humidity
+Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
+
+• Look for Early Signs
+Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
+
+• Promote Airflow
+Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
+
+• Inspect After Water Events
+After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`;
+
+          // Format the standard recommendations as HTML
+          const lines = standardRecommendations.split('\n');
+          const formattedRecommendations = lines
+              .filter(line => line.trim().length > 0)
+              .map((line, index) => {
+                  const trimmedLine = line.trim();
+                  // Check if line is a main header (no numbers but followed by content)
+                  if ((trimmedLine === 'Immediate Actions' || trimmedLine === 'Next Steps' || trimmedLine === 'Prevention Tips')) {
+                      const extraSpacing = index > 0 ? '<div style="height: 15px;"></div>' : '';
+                      return `${extraSpacing}<h4 style="margin: 10px 0 8px 0; font-weight: bold; color: #1e40af; font-size: 16px;">${trimmedLine}</h4>`;
+                  }
+                  // Check if line starts with number (1. 2.)
+                  if (/^\d+\./.test(trimmedLine)) {
+                      return `<h5 style="margin: 12px 0 6px 0; font-weight: bold; color: #374151; font-size: 14px;">${trimmedLine}</h5>`;
+                  }
+                  // Check if line starts with bullet point
+                  if (trimmedLine.startsWith('•')) {
+                      return `<p style="margin: 6px 0 6px 20px; line-height: 1.5; color: #374151;"><strong>${trimmedLine.substring(1).trim().split(' ')[0]}</strong> ${trimmedLine.substring(1).trim().split(' ').slice(1).join(' ')}</p>`;
+                  }
+                  // Regular paragraph
+                  return `<p style="margin: 6px 0; line-height: 1.5; color: #374151;">${trimmedLine}</p>`;
+              })
+              .join('');
           
-          if (detailedInspection.has_visible_mold) {
-              recommendations.push({
-                  priority: 'high',
-                  icon: '🔴',
-                  title: 'Immediate Action Required',
-                  description: 'Visible mold detected. Consider professional mold assessment and remediation.'
-              });
-          }
-          
-          if (detailedInspection.has_water_damage) {
-              recommendations.push({
-                  priority: 'medium',
-                  icon: '🟠',
-                  title: 'Water Damage',
-                  description: 'Address water damage promptly to prevent mold growth.'
-              });
-          }
-          
-          if (detailedInspection.humidity && parseFloat(detailedInspection.humidity) > 60) {
-              recommendations.push({
-                  priority: 'medium',
-                  icon: '🟡',
-                  title: 'High Humidity',
-                  description: 'Consider dehumidification and HVAC system maintenance.'
-              });
-          }
-          
-          if (recommendations.length === 0) {
-              recommendations.push({
-                  priority: 'low',
-                  icon: '🟢',
-                  title: 'Good Conditions',
-                  description: 'No immediate concerns detected. Continue regular monitoring.'
-              });
-          }
-          
-          const recommendationsHtml = recommendations.map(rec => `
-            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
-              <div style="width: 8px; height: 8px; border-radius: 50%; background-color: ${rec.priority === 'high' ? '#dc2626' : rec.priority === 'medium' ? '#ea580c' : '#059669'}; margin-top: 6px; flex-shrink: 0;"></div>
-              <div>
-                <p style="font-weight: bold; color: #374151; margin: 0 0 4px 0; font-size: 14px;">
-                  ${rec.icon} ${rec.title}
-                </p>
-                <p style="color: #6b7280; margin: 0; font-size: 13px; line-height: 1.4;">
-                  ${rec.description}
-                </p>
-              </div>
-            </div>
-          `).join('');
-          
-          return `<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 15px;">
-            <h4 style="color: #059669; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-              📋 General Recommendations
+          return `<div style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px;">
+            <h4 style="color: #1e40af; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+              📋 Standard Recommendations
             </h4>
-            ${recommendationsHtml}
+            ${formattedRecommendations}
           </div>`;
+        // Standard template already returned above, no need for fallback logic
       };
       
       const recommendationsHtml = getRecommendationsHtml();
@@ -586,7 +560,6 @@ export default function MyInspections() {
               </div>
               <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
           </div>
-          <div class="page-break"></div>
 
           <div class="report-container">
               <div class="disclaimer-box">
@@ -636,6 +609,8 @@ export default function MyInspections() {
                   <h2>Recommendations</h2>
                   ${recommendationsSection}
               </div>
+
+              <div class="page-break"></div>
 
               <div class="limitations-section">
                   <h3 class="limitations-title">Limitations of DIY Total Testing</h3>
@@ -721,11 +696,88 @@ export default function MyInspections() {
       console.log("🔍 DEBUG: Retrieved samples for view report:", samples);
       
       // Generate the same HTML content as the download function
+      console.log("🔍 DEBUG: About to generate report HTML content...");
       const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
+      console.log("🔍 DEBUG: Successfully generated HTML content, length:", reportHtml.length);
       
-      // Open in new window using data URL to avoid about:blank
-      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(reportHtml)}`;
-      const newWindow = window.open(dataUrl, '_blank');
+      // Create blob URL for better browser compatibility and reliability
+      const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      console.log("🔍 DEBUG: Created blob URL, attempting to open window...");
+      
+      // Try opening with blob URL first (most reliable)
+      let reportWindow = window.open(blobUrl, '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes,toolbar=yes,menubar=yes');
+      
+      if (!reportWindow || reportWindow.closed) {
+        console.log("🔍 DEBUG: Blob URL blocked, trying about:blank approach...");
+        
+        // Fallback 1: Try about:blank
+        reportWindow = window.open('about:blank', '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes,toolbar=yes');
+        
+        if (!reportWindow || reportWindow.closed) {
+          // Fallback 2: Create temporary download link
+          console.log("🔍 DEBUG: All popup methods blocked, creating download link...");
+          
+          const downloadLink = document.createElement('a');
+          downloadLink.href = blobUrl;
+          downloadLink.download = `Mold_Inspection_Report_${inspection.inspection_number || inspection.id}.html`;
+          downloadLink.style.display = 'none';
+          document.body.appendChild(downloadLink);
+          
+          // Inform user and provide download option
+          const userChoice = confirm(
+            'Popup blocker detected! Would you like to:\n\n' +
+            'OK = Download the report as HTML file\n' +
+            'Cancel = Try opening in same tab (will navigate away)'
+          );
+          
+          if (userChoice) {
+            // Download the file
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(blobUrl);
+            alert('Report downloaded! Open the HTML file in your browser to view.');
+          } else {
+            // Open in same tab
+            document.body.removeChild(downloadLink);
+            window.location.href = blobUrl;
+          }
+          return;
+        }
+        
+        // Write content to about:blank window
+        console.log("🔍 DEBUG: Writing HTML content to window...");
+        try {
+          reportWindow.document.write(reportHtml);
+          reportWindow.document.close();
+          
+          // Clean up blob URL after a delay
+          setTimeout(() => {
+            URL.revokeObjectURL(blobUrl);
+          }, 5000);
+          
+          console.log("🔍 DEBUG: Report successfully written to window");
+        } catch (writeError) {
+          console.error("❌ Error writing to window:", writeError);
+          reportWindow.close();
+          throw new Error("Failed to write content to window. Please try again.");
+        }
+      } else {
+        console.log("🔍 DEBUG: Blob URL window opened successfully");
+        
+        // Clean up blob URL after window loads
+        reportWindow.addEventListener('load', () => {
+          setTimeout(() => {
+            URL.revokeObjectURL(blobUrl);
+          }, 2000);
+        });
+        
+        // Fallback cleanup in case load event doesn't fire
+        setTimeout(() => {
+          URL.revokeObjectURL(blobUrl);
+        }, 10000);
+      }
     } catch (error) {
       console.error("❌ Error viewing report:", error);
       alert("Failed to generate report view. Please try again.");

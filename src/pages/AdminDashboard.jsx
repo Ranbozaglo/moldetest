@@ -46,9 +46,9 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     const css = `
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
         .page-break { page-break-after: always; }
-        .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 30px 20px; }
+        .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 30px 20px; }
         .cover-title { font-size: 32px; font-weight: bold; color: #004aac; margin-top: 20px; margin-bottom: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-        .cover-image { max-width: 90%; max-height: 400px; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
+        .cover-image { max-width: 100%; max-height: 100%; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
         .cover-details { background: rgba(255,255,255,0.95); padding: 25px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); max-width: 90%; width: 100%; }
         .cover-detail-item { margin: 10px 0; font-size: 16px; }
         .cover-detail-label { font-weight: bold; color: #004aac; }
@@ -72,7 +72,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         @media (max-width: 768px) {
             .cover-title { font-size: 26px; margin-top: 15px; margin-bottom: 25px; }
             .cover-page { padding: 25px 15px; }
-            .cover-image { max-width: 95%; max-height: 300px; margin: 25px 0; }
+            .cover-image { max-width: 100%; max-height: 450px; margin: 25px 0; }
             .cover-details { padding: 20px; max-width: 95%; }
             .cover-detail-item { font-size: 14px; }
             .report-container { padding: 15px; }
@@ -88,7 +88,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         @media (min-width: 769px) {
             .cover-title { font-size: 52px; margin-top: 30px; margin-bottom: 40px; }
             .cover-page { padding: 50px; }
-            .cover-image { max-width: 95%; max-height: 500px; margin: 40px 0; }
+            .cover-image { max-width: 100%; max-height: 700px; margin: 40px 0; }
             .cover-details { padding: 35px; max-width: 85%; }
             .cover-detail-item { font-size: 18px; }
             .report-container { max-width: 800px; padding: 40px; }
@@ -382,7 +382,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             <div style="text-align: center; margin: 20px 0;">
               ${inspection.lab_analysis_images.map((imageUrl, index) => `
                 <div style="margin-bottom: 20px;">
-                  <img src="${imageUrl}" alt="Lab Analysis Results ${index + 1}" style="max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                  <img src="${imageUrl}" alt="Lab Analysis Results ${index + 1}" style="max-width: 100%; height: 100%; border: 2px solid #ddd; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
                   <p style="color: #666; font-size: 14px; margin-top: 10px; font-style: italic;">Laboratory mold analysis report ${inspection.lab_analysis_images.length > 1 ? `- Image ${index + 1}` : ''}</p>
                 </div>
               `).join('')}
@@ -412,8 +412,6 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${inspection.street_address}${inspection.unit_number ? ', ' + inspection.unit_number : ''}, ${inspection.city}, ${inspection.state} ${inspection.zip_code}</div>
             </div>
         </div>
-        <div class="page-break"></div>
-
         <div class="report-container">
             <div class="disclaimer-box">
                 <h3 class="disclaimer-title">Disclaimer</h3>
@@ -433,10 +431,11 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 <h2>Findings</h2>
                 ${visibleMoldHtml}
                 ${waterDamageHtml}
-                ${environmentalHtml}
             </div>
             
             <div class="section">
+                ${environmentalHtml}
+
                 <h2>Samples Collected</h2>
                 ${samplesHtml}
             </div>
@@ -447,8 +446,6 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 <h2>Lab Analysis</h2>
                 ${labAnalysisHtml}
             </div>
-
-            <div class="page-break"></div>
 
             <div class="section">
                 <h2>Conclusion</h2>
@@ -470,14 +467,39 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       : '<p>Pending conclusion.</p>'
                   }
                 </div>
-            </div>
 
-            <div class="section">
                 <h2>Recommendations</h2>
                 <div>
                   ${
-                    (inspection.lab_recommendations || inspection.recommendations)
-                      ? formatRecommendationsText(inspection.lab_recommendations || inspection.recommendations)
+                                `Immediate Actions
+1. Fix Moisture & Humidity Issues
+Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
+
+2. Avoid Impacted Areas
+Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
+
+Next Steps
+1. Consult a Mold Professional
+To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
+
+2. Re-Testing
+After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
+
+Prevention Tips
+• Act Quickly on Leaks
+Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
+
+• Monitor Humidity
+Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
+
+• Look for Early Signs
+Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
+
+• Promote Airflow
+Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
+
+• Inspect After Water Events
+After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`
                           .split('\n')
                           .filter(line => line.trim().length > 0)
                           .map(line => {
@@ -489,10 +511,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                             return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
                           })
                           .join('')
-                      : '<p>Pending recommendations.</p>'
                   }
                 </div>
             </div>
+            
+            <div class="page-break"></div>
+            
             <div class="limitations-section">
                 <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
                 <p class="limitations-text">${limitationsText}</p>
@@ -2185,10 +2209,86 @@ export default function AdminDashboard() {
                                       
                                       // Generate comprehensive report HTML
                                       const reportHtml = await generateReportHtmlContent(detailedInspection, samples);
+                                      console.log("🔍 DEBUG: Successfully generated HTML content, length:", reportHtml.length);
                                       
-                                      // Open in new window using data URL to avoid about:blank
-                                      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(reportHtml)}`;
-                                      const newWindow = window.open(dataUrl, '_blank');
+                                      // Create blob URL for better browser compatibility and reliability
+                                      const blob = new Blob([reportHtml], { type: 'text/html;charset=utf-8' });
+                                      const blobUrl = URL.createObjectURL(blob);
+                                      
+                                      console.log("🔍 DEBUG: Created blob URL, attempting to open window...");
+                                      
+                                      // Try opening with blob URL first (most reliable)
+                                      let reportWindow = window.open(blobUrl, '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes,toolbar=yes,menubar=yes');
+                                      
+                                      if (!reportWindow || reportWindow.closed) {
+                                        console.log("🔍 DEBUG: Blob URL blocked, trying about:blank approach...");
+                                        
+                                        // Fallback 1: Try about:blank
+                                        reportWindow = window.open('about:blank', '_blank', 'width=1200,height=900,scrollbars=yes,resizable=yes,toolbar=yes');
+                                        
+                                        if (!reportWindow || reportWindow.closed) {
+                                          // Fallback 2: Create temporary download link
+                                          console.log("🔍 DEBUG: All popup methods blocked, creating download link...");
+                                          
+                                          const downloadLink = document.createElement('a');
+                                          downloadLink.href = blobUrl;
+                                          downloadLink.download = `Mold_Inspection_Report_${inspection.inspection_number || inspection.id}.html`;
+                                          downloadLink.style.display = 'none';
+                                          document.body.appendChild(downloadLink);
+                                          
+                                          // Inform user and provide download option
+                                          const userChoice = confirm(
+                                            'Popup blocker detected! Would you like to:\n\n' +
+                                            'OK = Download the report as HTML file\n' +
+                                            'Cancel = Try opening in same tab (will navigate away)'
+                                          );
+                                          
+                                          if (userChoice) {
+                                            // Download the file
+                                            downloadLink.click();
+                                            document.body.removeChild(downloadLink);
+                                            URL.revokeObjectURL(blobUrl);
+                                            alert('Report downloaded! Open the HTML file in your browser to view.');
+                                          } else {
+                                            // Open in same tab
+                                            document.body.removeChild(downloadLink);
+                                            window.location.href = blobUrl;
+                                          }
+                                          return;
+                                        }
+                                        
+                                        // Write content to about:blank window
+                                        console.log("🔍 DEBUG: Writing HTML content to window...");
+                                        try {
+                                          reportWindow.document.write(reportHtml);
+                                          reportWindow.document.close();
+                                          
+                                          // Clean up blob URL after a delay
+                                          setTimeout(() => {
+                                            URL.revokeObjectURL(blobUrl);
+                                          }, 5000);
+                                          
+                                          console.log("🔍 DEBUG: Report successfully written to window");
+                                        } catch (writeError) {
+                                          console.error("❌ Error writing to window:", writeError);
+                                          reportWindow.close();
+                                          throw new Error("Failed to write content to window. Please try again.");
+                                        }
+                                      } else {
+                                        console.log("🔍 DEBUG: Blob URL window opened successfully");
+                                        
+                                        // Clean up blob URL after window loads
+                                        reportWindow.addEventListener('load', () => {
+                                          setTimeout(() => {
+                                            URL.revokeObjectURL(blobUrl);
+                                          }, 2000);
+                                        });
+                                        
+                                        // Fallback cleanup in case load event doesn't fire
+                                        setTimeout(() => {
+                                          URL.revokeObjectURL(blobUrl);
+                                        }, 10000);
+                                      }
                                     } catch (error) {
                                       console.error("❌ Error viewing report:", error);
                                       alert("Failed to generate report. Please try again.");
@@ -2343,17 +2443,119 @@ export default function AdminDashboard() {
           {/* Email Settings Tab */}
           <TabsContent value="emails" className="space-y-6">
             <div className="grid gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mail className="w-5 h-5" />
-                    Email Settings
-                  </CardTitle>
-                  <CardDescription>
-                    Edit email settings for different stages of the inspection process
-                  </CardDescription>
+              {/* Email Settings Header */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <Mail className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Email Template Management</h2>
+                      <p className="text-gray-600 mt-1">
+                        Customize automated emails sent during different stages of the inspection process
+                      </p>
+                    </div>
+                  </div>
+                  <div className="hidden md:flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>Active Templates</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span>Auto-send Enabled</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Template Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-500 p-2 rounded-lg">
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-blue-700">Inspection Created</p>
+                        <p className="text-xs text-blue-600">Welcome emails</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-purple-500 p-2 rounded-lg">
+                        <FlaskConical className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-purple-700">Lab Received</p>
+                        <p className="text-xs text-purple-600">Processing updates</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-green-500 p-2 rounded-lg">
+                        <FileText className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-700">Report Ready</p>
+                        <p className="text-xs text-green-600">Results available</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-orange-500 p-2 rounded-lg">
+                        <Star className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-orange-700">Review Request</p>
+                        <p className="text-xs text-orange-600">Feedback collection</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Email Template Manager */}
+              <Card className="shadow-lg">
+                <CardHeader className="border-b bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Mail className="w-5 h-5 text-blue-600" />
+                        Template Editor
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        Select and customize email templates with variables and HTML formatting
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Eye className="w-3 h-3" />
+                        <span>Live Preview</span>
+                      </div>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <Zap className="w-3 h-3" />
+                        <span>Auto-save</span>
+                      </div>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6">
                   <EmailTemplateManager />
                 </CardContent>
               </Card>

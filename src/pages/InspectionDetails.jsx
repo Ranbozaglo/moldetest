@@ -114,8 +114,8 @@ export default function InspectionDetails() {
     }
   }, [inspection?.lab_conclusion, inspection?.lab_recommendations]);
 
-  useEffect(() => {
-    (async () => {
+  useEffect(() => {(
+    async () => {
       try {
           // Skip Supabase session check - using Flask backend authentication
         const checkUserAndLoadData = async () => {
@@ -520,65 +520,75 @@ Return your response in this exact JSON format:
         console.log("✅ OCR ANALYSIS: Received analysis from backend!");
         console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
-        // Parse the response to extract conclusion and recommendations
+        // Parse the response to extract conclusion and use standard template for recommendations
         let conclusion = "";
-        let recommendations = "";
+        let recommendations = `Immediate Actions
+1. Fix Moisture & Humidity Issues
+Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
 
-        // Helper function to format recommendations text
-        const formatRecommendationsText = (text) => {
-          if (!text) return text;
-          
-          // Remove asterisks and clean up formatting
-          return text
-            .replace(/\*\*/g, '') // Remove bold asterisks
-            .replace(/\*/g, '') // Remove single asterisks
-            .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
-            .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
-            .filter(part => part.trim().length > 0)
-            .map(part => part.trim())
-            .join('\n')
-            .trim();
-        };
+2. Avoid Impacted Areas
+Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
 
-        if (analysisResult.conclusion && analysisResult.recommendations) {
-          conclusion = formatRecommendationsText(analysisResult.conclusion);
-          recommendations = formatRecommendationsText(analysisResult.recommendations);
+Next Steps
+1. Consult a Mold Professional
+To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
+
+2. Re-Testing
+After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
+
+Prevention Tips
+• Act Quickly on Leaks
+Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
+
+• Monitor Humidity
+Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
+
+• Look for Early Signs
+Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
+
+• Promote Airflow
+Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
+
+• Inspect After Water Events
+After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`;
+
+        // Parse AI conclusion but use standard recommendations
+        if (analysisResult.conclusion) {
+          conclusion = analysisResult.conclusion;
         } else if (typeof analysisResult.content === 'string') {
-          // Try to parse content as JSON only if it looks like JSON
           if (analysisResult.content.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult.content);
-              conclusion = formatRecommendationsText(parsedResult.conclusion || "");
-              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
-        } catch (parseError) {
-              // JSON parsing failed, try to extract recommendations from the content
+              conclusion = parsedResult.conclusion || "Lab analysis completed successfully.";
+            } catch (parseError) {
+              // Extract conclusion from content
               const contentSplit = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:|"recommendations":\s*"/i);
               if (contentSplit.length > 1) {
-                conclusion = formatRecommendationsText(contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim());
-                // Extract everything after recommendations keyword, clean up JSON artifacts
-                let recsText = contentSplit[1].replace(/"\s*}?\s*$/, '').trim();
-                recommendations = formatRecommendationsText(recsText);
+                conclusion = contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim();
               } else {
-                conclusion = formatRecommendationsText(analysisResult.content);
-              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+                conclusion = analysisResult.content;
               }
             }
           } else {
-            // Content is not JSON, try to split by known keywords
+            // Extract conclusion from non-JSON content
             const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
-              recommendations = formatRecommendationsText(split[1].trim());
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
             } else {
-              conclusion = formatRecommendationsText(analysisResult.content);
-              recommendations = "";
+              conclusion = analysisResult.content;
             }
           }
         } else {
-          // Content is not JSON, use as-is
-          conclusion = formatRecommendationsText(analysisResult.content);
-          recommendations = "";
+          conclusion = "Lab analysis completed successfully.";
         }
+
+        // Clean up conclusion formatting
+        conclusion = conclusion
+          .replace(/\*\*/g, '') // Remove bold asterisks
+          .replace(/\*/g, '') // Remove single asterisks
+          .replace(/^\s*["']*/, '') // Remove leading quotes
+          .replace(/["']*\s*$/, '') // Remove trailing quotes
+          .trim();
 
         // Update local state immediately so the textareas show the response
         setInspection(prev => ({
@@ -716,89 +726,94 @@ Return your response in this exact JSON format:
       console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
       if (analysisResult) {
-        // Parse the response to extract conclusion and recommendations
+        // Parse AI conclusion but use standard recommendations template
         let conclusion = "";
-        let recommendations = "";
+        let recommendations = `Immediate Actions
+1. Fix Moisture & Humidity Issues
+Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
 
-        // Helper function to format recommendations text
-        const formatRecommendationsText = (text) => {
-          if (!text) return text;
-          
-          // Remove asterisks and clean up formatting
-          return text
-            .replace(/\*\*/g, '') // Remove bold asterisks
-            .replace(/\*/g, '') // Remove single asterisks
-            .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
-            .split(/([A-Z][^:]*:)/) // Split by section headers (words ending with colon)
-            .filter(part => part.trim().length > 0)
-            .map(part => part.trim())
-            .join('\n')
-            .trim();
-        };
+2. Avoid Impacted Areas
+Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
 
-        if (analysisResult.conclusion && analysisResult.recommendations) {
-          conclusion = formatRecommendationsText(analysisResult.conclusion);
-          recommendations = formatRecommendationsText(analysisResult.recommendations);
+Next Steps
+1. Consult a Mold Professional
+To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
+
+2. Re-Testing
+After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
+
+Prevention Tips
+• Act Quickly on Leaks
+Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
+
+• Monitor Humidity
+Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
+
+• Look for Early Signs
+Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
+
+• Promote Airflow
+Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
+
+• Inspect After Water Events
+After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`;
+
+        // Parse AI conclusion but use standard recommendations
+        if (analysisResult.conclusion) {
+          conclusion = analysisResult.conclusion;
         } else if (typeof analysisResult.content === 'string') {
-          // Try to parse content as JSON only if it looks like JSON
           if (analysisResult.content.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult.content);
-              conclusion = formatRecommendationsText(parsedResult.conclusion || "");
-              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
+              conclusion = parsedResult.conclusion || "Lab analysis completed successfully.";
             } catch (parseError) {
-              // JSON parsing failed, try to extract recommendations from the content
+              // Extract conclusion from content
               const contentSplit = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:|"recommendations":\s*"/i);
               if (contentSplit.length > 1) {
-                conclusion = formatRecommendationsText(contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim());
-                // Extract everything after recommendations keyword, clean up JSON artifacts
-                let recsText = contentSplit[1].replace(/"\s*}?\s*$/, '').trim();
-                recommendations = formatRecommendationsText(recsText);
+                conclusion = contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim();
               } else {
-                conclusion = formatRecommendationsText(analysisResult.content);
-                recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+                conclusion = analysisResult.content;
               }
             }
           } else {
-            // Content is not JSON, try to split by known keywords
+            // Extract conclusion from non-JSON content
             const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
-              recommendations = formatRecommendationsText(split[1].trim());
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
             } else {
-              conclusion = formatRecommendationsText(analysisResult.content);
-              recommendations = "";
+              conclusion = analysisResult.content;
             }
           }
         } else if (typeof analysisResult === 'string') {
-          // Handle case where analysisResult is a string
           if (analysisResult.trim().startsWith('{')) {
             try {
               const parsedResult = JSON.parse(analysisResult);
-              conclusion = formatRecommendationsText(parsedResult.conclusion || analysisResult);
-              recommendations = formatRecommendationsText(parsedResult.recommendations || "");
+              conclusion = parsedResult.conclusion || analysisResult;
             } catch (parseError) {
-              conclusion = formatRecommendationsText(analysisResult);
-              recommendations = "Please review the lab analysis results and consult with a professional for specific recommendations.";
+              conclusion = analysisResult;
             }
           } else {
-            // Content is not JSON, try to split by known keywords
+            // Extract conclusion from non-JSON content
             const split = analysisResult.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
             if (split.length > 1) {
-              conclusion = formatRecommendationsText(split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim());
-              recommendations = formatRecommendationsText(split[1].trim());
+              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
             } else {
-              conclusion = formatRecommendationsText(analysisResult);
-              recommendations = "";
+              conclusion = analysisResult;
             }
           }
         } else {
-          // Fallback
-          conclusion = formatRecommendationsText(analysisResult.toString());
-          recommendations = "";
+          conclusion = "Lab analysis completed successfully.";
         }
 
-        // Update the inspection with the separated analysis
+        // Clean up conclusion formatting
+        conclusion = conclusion
+          .replace(/\*\*/g, '') // Remove bold asterisks
+          .replace(/\*/g, '') // Remove single asterisks
+          .replace(/^\s*["']*/, '') // Remove leading quotes
+          .replace(/["']*\s*$/, '') // Remove trailing quotes
+          .trim();
+
+        // Update the inspection with the standard template
         setInspection(prev => ({
           ...prev,
           lab_conclusion: conclusion,
@@ -1478,7 +1493,7 @@ Return your response in this exact JSON format:
                               console.log("✅ User confirmed, starting simple analysis...");
                               setGeneratingAnalysis(true);
                               
-                                                             try {
+                           try {
                                  // Simple implementation - just update with mock data for now
                                  console.log("📝 Updating with mock analysis...");
                                  
@@ -1669,4 +1684,4 @@ Return your response in this exact JSON format:
       </div>
     </div>
   );
-}
+};

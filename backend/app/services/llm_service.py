@@ -77,7 +77,7 @@ class LLMService:
         
         Mold Details: {inspection_data.get('visible_mold_details', [])}
         Water Damage Details: {inspection_data.get('water_damage_details', [])}
-        
+        Pending recommendations
         Please provide a concise, professional summary suitable for a mold inspection report.
         """
         

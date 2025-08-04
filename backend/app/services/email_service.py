@@ -23,14 +23,20 @@ class EmailService:
                 "subject": "Total Testing - Lab Samples Received (Inspection #{inspection_number})",
                 "body": """<html>
 <body>
-    <h2>Total Testing - Lab Samples Received</h2>
-    <p>Dear {full_name},</p>
-    <p>We have received your mold testing samples for inspection #{inspection_number}.</p>
-    <p>Our laboratory is now processing your samples and will provide results within 3-5 business days.</p>
-    <p>We will notify you as soon as your report is ready.</p>
-    <p>Thank you for choosing Total Testing.</p>
+    <p>Hi {full_name},</p>
+    
+    <p>Just a quick update, your mold test samples have been received by our lab and are now being processed.</p>
+    
+    <p>Our team is reviewing the findings and preparing your personalized report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
+    
+    <p>You can track the status of your report here: <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold;">Track My Report</a></p>
+    
+    <p>We'll notify you the moment your report is ready.</p>
+    
+    <p>Thank you for trusting Total Testing with your health and home!</p>
+    
     <br>
-    <p>Best regards,<br>Total Testing Team</p>
+    <p>Warm regards,<br>Total Testing</p>
 </body>
 </html>"""
             },
@@ -38,14 +44,23 @@ class EmailService:
                 "subject": "Total Testing - Report Ready (Inspection #{inspection_number})",
                 "body": """<html>
 <body>
-    <h2>Total Testing - Report Ready</h2>
-    <p>Dear {full_name},</p>
-    <p>Your Total Testing report for inspection #{inspection_number} is now ready.</p>
-    <p>You can download your report from your account dashboard.</p>
-    <p>If you have any questions about your results, please don't hesitate to contact us.</p>
-    <p>Thank you for choosing Total Testing.</p>
+    <p>Hi {full_name},</p>
+    
+    <p>Your lab results and mold inspection report are now ready to view in your secure portal.</p>
+    
+    <p><strong>This report includes:</strong></p>
+    <ul style="margin-left: 20px; line-height: 1.6;">
+        <li>Inspection finding</li>
+        <li>Lab-verified analysis of your samples</li>
+        <li>Mold types identified and spore levels</li>
+        <li>Professional interpretation and next steps (if needed)</li>
+    </ul>
+    
+    <p>🔗 View your report now by visiting your portal:</p>
+    <p>👉 <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold; background-color: #f0f8ff; padding: 8px 16px; border-radius: 5px; display: inline-block;">Access Your Report</a></p>
+    
     <br>
-    <p>Best regards,<br>Total Testing Team</p>
+    <p>Thanks again for choosing Total Testing!</p>
 </body>
 </html>"""
             },

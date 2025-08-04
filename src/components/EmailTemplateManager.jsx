@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Save, RefreshCw, Eye, Mail, CheckCircle, AlertTriangle, FlaskConical } from "lucide-react";
+import { Save, RefreshCw, Eye, Mail, CheckCircle, AlertTriangle, FlaskConical, FileText, Zap } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 import { EmailService } from "@/api/entities";
 
@@ -18,14 +18,20 @@ const EmailTemplateManager = () => {
       subject: "Total Testing - Lab Samples Received (Inspection #{inspection_number})",
       body: `<html>
 <body>
-    <h2>Total Testing - Lab Samples Received</h2>
-    <p>Dear {full_name},</p>
-    <p>We have received your mold testing samples for inspection #{inspection_number}.</p>
-    <p>Our laboratory is now processing your samples and will provide results within 3-5 business days.</p>
-    <p>We will notify you as soon as your report is ready.</p>
-    <p>Thank you for choosing Total Testing.</p>
+    <p>Hi {full_name},</p>
+    
+    <p>Just a quick update, your mold test samples have been received by our lab and are now being processed.</p>
+    
+    <p>Our team is reviewing the findings and preparing your personalized report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
+    
+    <p>You can track the status of your report here: <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold;">Track My Report</a></p>
+    
+    <p>We'll notify you the moment your report is ready.</p>
+    
+    <p>Thank you for trusting Total Testing with your health and home!</p>
+    
     <br>
-    <p>Best regards,<br>Total Testing Team</p>
+    <p>Warm regards,<br>Total Testing</p>
 </body>
 </html>`
     },
@@ -33,14 +39,23 @@ const EmailTemplateManager = () => {
       subject: "Total Testing - Report Ready (Inspection #{inspection_number})",
       body: `<html>
 <body>
-    <h2>Total Testing - Report Ready</h2>
-    <p>Dear {full_name},</p>
-    <p>Your Total Testing report for inspection #{inspection_number} is now ready.</p>
-    <p>You can download your report from your account dashboard.</p>
-    <p>If you have any questions about your results, please don't hesitate to contact us.</p>
-    <p>Thank you for choosing Total Testing.</p>
+    <p>Hi {full_name},</p>
+    
+    <p>Your lab results and mold inspection report are now ready to view in your secure portal.</p>
+    
+    <p><strong>This report includes:</strong></p>
+    <ul style="margin-left: 20px; line-height: 1.6;">
+        <li>Inspection finding</li>
+        <li>Lab-verified analysis of your samples</li>
+        <li>Mold types identified and spore levels</li>
+        <li>Professional interpretation and next steps (if needed)</li>
+    </ul>
+    
+    <p>🔗 View your report now by visiting your portal:</p>
+    <p>👉 <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold; background-color: #f0f8ff; padding: 8px 16px; border-radius: 5px; display: inline-block;">Access Your Report</a></p>
+    
     <br>
-    <p>Best regards,<br>Total Testing Team</p>
+    <p>Thanks again for choosing Total Testing!</p>
 </body>
 </html>`
     },
@@ -55,6 +70,43 @@ const EmailTemplateManager = () => {
     <p>Thank you for choosing Total Testing.</p>
     <br>
     <p>Best regards,<br>Total Testing Team</p>
+</body>
+</html>`
+    },
+    inspection_created: {
+      subject: "Welcome to Total Testing - Inspection #{inspection_number} Created",
+      body: `<html>
+<body>
+    <h2>Welcome to Total Testing!</h2>
+    <p>Dear {full_name},</p>
+    <p>Congratulations! Your mold inspection has been successfully created.</p>
+    
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+        <h3 style="color: #004aac; margin-top: 0;">Your Inspection Details:</h3>
+        <p><strong>Inspection Number:</strong> {inspection_number}</p>
+        <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
+        <p><strong>Status:</strong> Ready for Sample Collection</p>
+    </div>
+    
+    <h3>📋 Next Steps:</h3>
+    <ol>
+        <li><strong>Collect Your Samples:</strong> Follow the sampling guide provided during your inspection setup</li>
+        <li><strong>Send Samples to Lab:</strong> Use the prepaid shipping materials to send your samples</li>
+        <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
+        <li><strong>Receive Results:</strong> Get your detailed report within 3-5 business days</li>
+    </ol>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            View My Inspections
+        </a>
+    </div>
+    
+    <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+    <p>Thank you for choosing Total Testing for your mold inspection needs!</p>
+    
+    <br>
+    <p>Best regards,<br>The Total Testing Team</p>
 </body>
 </html>`
     }
@@ -83,6 +135,12 @@ const EmailTemplateManager = () => {
       description: "Sent to request customer feedback and reviews after completion",
       icon: <Mail className="w-4 h-4" />,
       color: "bg-purple-500"
+    },
+    inspection_created: {
+      title: "Inspection Created",
+      description: "Sent when a new inspection is successfully created",
+      icon: <CheckCircle className="w-4 h-4" />,
+      color: "bg-indigo-500"
     }
   };
 
@@ -91,11 +149,13 @@ const EmailTemplateManager = () => {
     { name: '{inspection_number}', description: 'Inspection number' },
     { name: '{email}', description: 'Customer email address' },
     { name: '{street_address}', description: 'Property street address' },
+    { name: '{unit_number}', description: 'Property unit number' },
     { name: '{city}', description: 'Property city' },
     { name: '{state}', description: 'Property state' },
     { name: '{zip_code}', description: 'Property zip code' },
     { name: '{property_type}', description: 'Type of property' },
-    { name: '{client_type}', description: 'Type of client' }
+    { name: '{client_type}', description: 'Type of client' },
+    { name: '{dashboard_url}', description: 'Link to customer dashboard' }
   ];
 
   // Load templates from backend on mount
@@ -206,60 +266,78 @@ const EmailTemplateManager = () => {
     <div className="space-y-6">
       {/* Template Selection */}
       <Tabs value={activeTemplate} onValueChange={setActiveTemplate} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 gap-1 bg-gray-100 p-1 rounded-lg">
           {Object.entries(templateInfo).map(([key, info]) => (
             <TabsTrigger
               key={key}
               value={key}
-              className="flex items-center gap-2 data-[state=active]:bg-white"
+              className="flex flex-col md:flex-row items-center gap-2 p-3 data-[state=active]:bg-white data-[state=active]:border data-[state=active]:border-blue-200 data-[state=active]:shadow-sm rounded-md transition-all duration-200 hover:bg-gray-50"
             >
-              <div className={`w-2 h-2 rounded-full ${info.color}`} />
-              {info.icon}
-              {info.title}
+              <div className={`w-3 h-3 rounded-full ${info.color} shadow-sm`} />
+              <div className="flex items-center gap-1">
+                {info.icon}
+                <span className="text-xs md:text-sm font-medium truncate">{info.title}</span>
+              </div>
             </TabsTrigger>
           ))}
         </TabsList>
 
         {Object.entries(templateInfo).map(([key, info]) => (
-          <TabsContent key={key} value={key} className="space-y-6">
-            <Alert>
-              <info.icon.type className="w-4 h-4" />
-              <AlertDescription>
-                <strong>{info.title}:</strong> {info.description}
-              </AlertDescription>
-            </Alert>
+          <TabsContent key={key} value={key} className="space-y-6 mt-6">
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${info.color}`}>
+                  {React.cloneElement(info.icon, { className: "w-4 h-4 text-white" })}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{info.title} Template</h3>
+                  <p className="text-sm text-gray-600">{info.description}</p>
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Editor */}
               <div className="lg:col-span-2 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                <Card className="shadow-md">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                    <CardTitle className="flex items-center gap-2 text-blue-800">
                       <Mail className="w-4 h-4" />
-                      Edit Template
+                      Edit Template Content
                     </CardTitle>
+                    <CardDescription className="text-blue-600">
+                      Customize the subject line and HTML body content
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div>
-                      <Label htmlFor="subject">Email Subject</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="subject" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        Email Subject Line
+                      </Label>
                       <Input
                         id="subject"
                         value={templates[key]?.subject || ''}
                         onChange={(e) => handleSubjectChange(e.target.value)}
-                        placeholder="Enter email subject..."
-                        className="mt-1"
+                        placeholder="Enter email subject line with variables..."
+                        className="mt-1 bg-gray-50 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                       />
+                      <p className="text-xs text-gray-500">Use variables like {'{inspection_number}'} for dynamic content</p>
                     </div>
 
-                    <div>
-                      <Label htmlFor="body">Email Body (HTML)</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="body" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Email Body Content (HTML)
+                      </Label>
                       <Textarea
                         id="body"
                         value={templates[key]?.body || ''}
                         onChange={(e) => handleBodyChange(e.target.value)}
-                        placeholder="Enter email body HTML..."
-                        className="mt-1 min-h-[400px] font-mono text-sm"
+                        placeholder="Enter HTML email body content..."
+                        className="mt-1 min-h-[400px] font-mono text-sm bg-gray-50 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                       />
+                      <p className="text-xs text-gray-500">Full HTML content including styling and variables</p>
                     </div>
 
                     <div className="flex gap-2">
@@ -308,11 +386,14 @@ const EmailTemplateManager = () => {
 
               {/* Variables Helper */}
               <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Available Variables</CardTitle>
-                    <CardDescription className="text-xs">
-                      Click to insert into template
+                <Card className="shadow-md border-purple-200">
+                  <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 border-b">
+                    <CardTitle className="text-sm flex items-center gap-2 text-purple-800">
+                      <Zap className="w-4 h-4" />
+                      Available Variables
+                    </CardTitle>
+                    <CardDescription className="text-xs text-purple-600">
+                      Click any variable to insert into your template
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -320,13 +401,13 @@ const EmailTemplateManager = () => {
                       {availableVariables.map((variable) => (
                         <div
                           key={variable.name}
-                          className="p-2 border rounded-md hover:bg-slate-50 cursor-pointer transition-colors"
+                          className="p-3 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 cursor-pointer transition-all duration-200 group"
                           onClick={() => insertVariable(variable.name)}
                         >
-                          <div className="font-mono text-sm text-blue-600">
+                          <div className="font-mono text-sm text-purple-700 group-hover:text-purple-800 font-medium">
                             {variable.name}
                           </div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-gray-500 mt-1 group-hover:text-purple-600">
                             {variable.description}
                           </div>
                         </div>
@@ -335,27 +416,41 @@ const EmailTemplateManager = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Preview</CardTitle>
-                    <CardDescription className="text-xs">
-                      How the email will appear
+                <Card className="shadow-md border-green-200">
+                  <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
+                    <CardTitle className="text-sm flex items-center gap-2 text-green-800">
+                      <Eye className="w-4 h-4" />
+                      Live Preview
+                    </CardTitle>
+                    <CardDescription className="text-xs text-green-600">
+                      Real-time preview of your email template
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="border rounded-md p-3 bg-slate-50 max-h-60 overflow-y-auto">
-                      <div className="text-xs font-mono">
-                        <div className="font-semibold mb-2">Subject:</div>
-                        <div className="mb-4 p-2 bg-white rounded border">
-                          {templates[key]?.subject || ''}
+                    <div className="border border-gray-200 rounded-lg p-4 bg-white max-h-80 overflow-y-auto">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                            <Mail className="w-3 h-3" />
+                            Subject Line:
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-md border text-sm font-medium">
+                            {templates[key]?.subject || 'No subject defined'}
+                          </div>
                         </div>
-                        <div className="font-semibold mb-2">Body:</div>
-                        <div 
-                          className="p-2 bg-white rounded border text-xs"
-                          dangerouslySetInnerHTML={{ 
-                            __html: templates[key]?.body?.replace(/\{(\w+)\}/g, '<span class="bg-yellow-200 px-1 rounded">{$1}</span>') || '' 
-                          }}
-                        />
+                        <Separator />
+                        <div>
+                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                            <FileText className="w-3 h-3" />
+                            Email Body:
+                          </div>
+                          <div 
+                            className="p-3 bg-gray-50 rounded-md border text-xs leading-relaxed"
+                            dangerouslySetInnerHTML={{ 
+                              __html: templates[key]?.body?.replace(/\{(\w+)\}/g, '<span class="bg-yellow-200 px-1.5 py-0.5 rounded text-yellow-800 font-medium">{$1}</span>') || 'No content defined'
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </CardContent>
