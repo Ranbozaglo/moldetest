@@ -209,10 +209,7 @@ const EmailTemplateManager = () => {
       await EmailService.saveTemplates(templates);
       
       setSaveStatus('success');
-      toast({
-        title: "Templates Saved",
-        description: "Email templates have been successfully updated.",
-      });
+  
     } catch (error) {
       console.error('Failed to save email templates:', error);
       setSaveStatus('error');
