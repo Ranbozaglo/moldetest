@@ -381,8 +381,13 @@ class EmailService:
             templates = self.get_templates()
             template = templates.get('lab_received', self.default_templates['lab_received'])
             
-            subject = self.format_template(template['subject'], inspection_data)
-            body = self.format_template(template['body'], inspection_data)
+            # Add dashboard URL to inspection data
+            inspection_data_with_url = inspection_data.copy()
+            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            inspection_data_with_url['dashboard_url'] = dashboard_url
+            
+            subject = self.format_template(template['subject'], inspection_data_with_url)
+            body = self.format_template(template['body'], inspection_data_with_url)
             
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
@@ -398,8 +403,13 @@ class EmailService:
             templates = self.get_templates()
             template = templates.get('report_ready', self.default_templates['report_ready'])
             
-            subject = self.format_template(template['subject'], inspection_data)
-            body = self.format_template(template['body'], inspection_data)
+            # Add dashboard URL to inspection data
+            inspection_data_with_url = inspection_data.copy()
+            dashboard_url = os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/MyInspections'
+            inspection_data_with_url['dashboard_url'] = dashboard_url
+            
+            subject = self.format_template(template['subject'], inspection_data_with_url)
+            body = self.format_template(template['body'], inspection_data_with_url)
             
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
