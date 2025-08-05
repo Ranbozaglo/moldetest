@@ -44,7 +44,7 @@ CORS(app, origins=[
     "https://mold-testing.netlify.app",
     "http://localhost:5173",
     "http://localhost:3000",
-    "total-testing-diy.com"
+    "https://total-testing-diy.com"
 ], supports_credentials=True)
 
 # JWT Configuration
