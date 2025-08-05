@@ -887,6 +887,7 @@ def create_inspection():
             'property_type': data.get('property_type'),
             'client_type': data.get('client_type'),
             'square_footage': data.get('square_footage'),
+            'background_info': data.get('background_info'),
             'has_visible_mold': data.get('has_visible_mold'),
             'has_water_damage': data.get('has_water_damage'),
             'status': data.get('status', 'pending'),
@@ -1004,6 +1005,8 @@ def update_inspection(inspection_id):
             update_data['has_water_damage'] = data['has_water_damage']
         if 'is_sample' in data:
             update_data['is_sample'] = data['is_sample']
+        if 'background_info' in data:
+            update_data['background_info'] = data['background_info']
         
         # Handle image fields using correct database column names
         if 'lab_analysis_images' in data:

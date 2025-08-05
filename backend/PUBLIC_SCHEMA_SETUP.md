@@ -14,6 +14,7 @@ CREATE TABLE public.inspection (
   full_name text null,
   street_address text null,
   square_footage integer null,
+  background_info text null,
   has_visible_mold boolean null,
   mold_locations text null,
   mold_images text[] null,
