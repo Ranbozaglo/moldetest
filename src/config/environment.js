@@ -32,7 +32,7 @@ const getApiUrls = () => {
 export const ENVIRONMENT_CONFIG = {
   // Production settings
   PRODUCTION: {
-    FRONTEND_URL: 'https://total-testing.com/',
+    FRONTEND_URL: 'total-testing-diy.com/',
     ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://opjgytjlebfnhjzarvyy.supabase.co',
     SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -65,7 +65,7 @@ export const getCurrentEnvironment = () => {
   }
   
   const hostname = window.location.hostname;
-  const isProduction = hostname === 'mold-testing.netlify.app' || import.meta.env.PROD;
+  const isProduction = hostname === 'total-testing-diy.com' || import.meta.env.PROD;
   const isDevelopment = hostname === 'localhost' || hostname === '127.0.0.1' || import.meta.env.DEV;
   
   return {

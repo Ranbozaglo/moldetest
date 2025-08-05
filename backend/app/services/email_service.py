@@ -427,7 +427,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data (for future template use)
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'https://total-testing.com/') + '/MyInspections'
+            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -452,7 +452,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'https://total-testing.com/') + '/MyInspections'
+            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             # Handle missing address fields gracefully

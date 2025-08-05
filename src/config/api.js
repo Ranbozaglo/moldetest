@@ -17,7 +17,7 @@ export const API_CONFIG = {
   ENVIRONMENT: envConfig.environment,
   
   // Production URL for the frontend
-  PRODUCTION_URL: 'https://total-testing.com/',
+  PRODUCTION_URL: 'total-testing-diy.com',
   
   // API endpoints matching Flask backend and actual database schema
   ENDPOINTS: {
