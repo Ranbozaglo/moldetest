@@ -32,7 +32,7 @@ const getApiUrls = () => {
 export const ENVIRONMENT_CONFIG = {
   // Production settings
   PRODUCTION: {
-    FRONTEND_URL: 'https://mold-testing.netlify.app',
+    FRONTEND_URL: 'https://total-testing.com/',
     ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://opjgytjlebfnhjzarvyy.supabase.co',
     SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
