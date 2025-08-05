@@ -867,17 +867,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Inspections</h1>
             <p className="text-slate-600 mt-2 text-sm sm:text-base">Welcome back, {user.name || user.email}</p>
           </div>
-          
-          <Button 
-            onClick={() => window.open('https://buy.stripe.com/YOUR_STRIPE_PAYMENT_LINK', '_blank')}
-            size="lg"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 w-full sm:w-auto"
-          >
-            <Plus className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
-            Start New Testing
-          </Button>
         </div>
-
+          
         {/* Inspections List */}
         {inspections.length === 0 ? (
           <div className="text-center py-12">
@@ -886,13 +877,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No Inspections Yet</h3>
             <p className="text-slate-600 mb-6">You haven't submitted any mold inspections yet.</p>
-            <Button 
-              onClick={() => window.open('https://buy.stripe.com/YOUR_STRIPE_PAYMENT_LINK', '_blank')}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Start Your First Testing
-            </Button>
+
           </div>
         ) : (
           <div className="space-y-6">
@@ -925,7 +910,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                           <p className="text-sm text-slate-600">{inspection.client_status_detail || 
                              (inspection.status === 'completed' ? 'Inspection completed - samples documented' :
                               inspection.status === 'report_ready' ? 'Your detailed report is ready for download' :
-                              'Inspection submitted - Awaiting drop-off')}
+                              'Inspection submitted - awaiting sample collection')}
                           </p>
                         </div>
 
@@ -1007,6 +992,18 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
           </ul>
         </div>
       </motion.div>
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mt-8">
+<Button 
+              onClick={() => window.open('https://buy.stripe.com/6oU28r2Wb2KF9Tv3xEabK01', '_blank')}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              Start New Testing
+            </Button>
+          </div>
     </div>
+    
+    
   );
 }
