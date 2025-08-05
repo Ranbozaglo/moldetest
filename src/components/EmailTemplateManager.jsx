@@ -377,6 +377,45 @@ const EmailTemplateManager = () => {
                         </div>
                       )}
                     </div>
+
+                    {/* Live Preview - moved below text area */}
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <div className="mb-4">
+                        <h4 className="text-sm font-semibold text-green-800 flex items-center gap-2 mb-2">
+                          <Eye className="w-4 h-4 flex-shrink-0" />
+                          <span>Live Preview</span>
+                        </h4>
+                        <p className="text-xs text-green-600">
+                          Real-time preview of your email template
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 rounded-lg p-3 md:p-4 bg-white max-h-60 md:max-h-80 overflow-y-auto">
+                        <div className="space-y-3 md:space-y-4">
+                          <div>
+                            <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <Mail className="w-3 h-3 flex-shrink-0" />
+                              <span>Subject Line:</span>
+                            </div>
+                            <div className="p-2 md:p-3 bg-gray-50 rounded-md border text-xs md:text-sm font-medium break-words">
+                              {templates[key]?.subject || 'No subject defined'}
+                            </div>
+                          </div>
+                          <Separator />
+                          <div>
+                            <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                              <FileText className="w-3 h-3 flex-shrink-0" />
+                              <span>Email Body:</span>
+                            </div>
+                            <div 
+                              className="p-2 md:p-3 bg-gray-50 rounded-md border text-xs leading-relaxed overflow-auto"
+                              dangerouslySetInnerHTML={{ 
+                                __html: templates[key]?.body?.replace(/\{(\w+)\}/g, '<span class="bg-yellow-200 px-1.5 py-0.5 rounded text-yellow-800 font-medium whitespace-nowrap">{$1}</span>') || 'No content defined'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -409,46 +448,6 @@ const EmailTemplateManager = () => {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-md border-green-200">
-                  <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b p-3 md:p-6">
-                    <CardTitle className="text-xs md:text-sm flex items-center gap-2 text-green-800">
-                      <Eye className="w-3 h-3 md:w-4 md:h-4 flex-shrink-0" />
-                      <span>Live Preview</span>
-                    </CardTitle>
-                    <CardDescription className="text-xs text-green-600">
-                      Real-time preview of your email template
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-3 md:p-6">
-                    <div className="border border-gray-200 rounded-lg p-3 md:p-4 bg-white max-h-60 md:max-h-80 overflow-y-auto">
-                      <div className="space-y-3 md:space-y-4">
-                        <div>
-                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                            <Mail className="w-3 h-3 flex-shrink-0" />
-                            <span>Subject Line:</span>
-                          </div>
-                          <div className="p-2 md:p-3 bg-gray-50 rounded-md border text-xs md:text-sm font-medium break-words">
-                            {templates[key]?.subject || 'No subject defined'}
-                          </div>
-                        </div>
-                        <Separator />
-                        <div>
-                          <div className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                            <FileText className="w-3 h-3 flex-shrink-0" />
-                            <span>Email Body:</span>
-                          </div>
-                          <div 
-                            className="p-2 md:p-3 bg-gray-50 rounded-md border text-xs leading-relaxed overflow-auto"
-                            dangerouslySetInnerHTML={{ 
-                              __html: templates[key]?.body?.replace(/\{(\w+)\}/g, '<span class="bg-yellow-200 px-1.5 py-0.5 rounded text-yellow-800 font-medium whitespace-nowrap">{$1}</span>') || 'No content defined'
-                            }}
-                          />
-                        </div>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
