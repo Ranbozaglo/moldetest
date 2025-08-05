@@ -551,7 +551,7 @@ export default function AdminDashboard() {
   const [dateFilter, setDateFilter] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("inspections");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
