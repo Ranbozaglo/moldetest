@@ -984,7 +984,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
           <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
           <ul className="text-amber-800 text-sm space-y-2">
             <li>• <strong>Sample Collection:</strong> Use a new swab for each sample location and place it in a Ziploc bag</li>
-            <li>• <strong>Sample Labeling & Documentation:</strong> Clearly label each sample bag (e.g., “Living Room Vent”) and write the same name on your COC (Chain of Custody) form. Every sample must match what's listed on the form.</li>
+            <li>• <strong>Sample Labeling & Documentation:</strong> Clearly label each sample bag (e.g., “Living Room Vent”) and write the same name on your COC (Chain of Custody) form.</li>
             <li>• <strong>COC Form:</strong> Complete the Chain of Custody with your contact info, sample names, collection date, and signature. This ensures proper lab processing.</li>
             <li>• <strong>Bagging Samples:</strong> Place all samples and the signed COC form in an envelope and seal it securely</li>
             <li>• <strong>Shipping Samples:</strong> Use the prepaid FedEx label and drop the envelope off at any FedEx location. Ship within 24 hours of collecting your samples, if possible.</li>
