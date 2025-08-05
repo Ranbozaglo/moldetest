@@ -85,7 +85,12 @@ const EmailTemplateManager = () => {
         <h3 style="color: #004aac; margin-top: 0;">Your Inspection Details:</h3>
         <p><strong>Inspection Number:</strong> {inspection_number}</p>
         <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
-        <p><strong>Status:</strong> Ready for Sample Collection</p>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            View My Inspections
+        </a>
     </div>
     
     <h3>📋 Next Steps:</h3>
@@ -95,13 +100,7 @@ const EmailTemplateManager = () => {
         <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
         <li><strong>Receive Results:</strong> Get your detailed report within 3-5 business days</li>
     </ol>
-    
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            View My Inspections
-        </a>
-    </div>
-    
+        
     <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
     <p>Thank you for choosing Total Testing for your mold inspection needs!</p>
     

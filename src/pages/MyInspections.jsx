@@ -925,7 +925,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                           <p className="text-sm text-slate-600">{inspection.client_status_detail || 
                              (inspection.status === 'completed' ? 'Inspection completed - samples documented' :
                               inspection.status === 'report_ready' ? 'Your detailed report is ready for download' :
-                              'Inspection submitted - awaiting sample collection')}
+                              'Inspection submitted - Awaiting drop-off')}
                           </p>
                         </div>
 
