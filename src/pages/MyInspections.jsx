@@ -597,7 +597,6 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               <div class="page-break"></div>
               
               <div class="section">
-                  <h2>Lab Analysis</h2>
                   ${labAnalysisHtml}
               </div>
 
