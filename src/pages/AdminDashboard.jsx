@@ -444,7 +444,6 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             <div class="page-break"></div>
 
             <div class="section">
-                <h2>Lab Analysis</h2>
                 ${labAnalysisHtml}
             </div>
 
