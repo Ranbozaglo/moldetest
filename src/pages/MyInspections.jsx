@@ -864,7 +864,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Inspections</h1>
-            <p className="text-slate-600 mt-2 text-sm sm:text-base">Welcome back, {user.name || user.email}</p>
+            <p className="text-slate-600 mt-2 text-sm sm:text-base">Welcome back, {user?.full_name || user?.first_name || user?.email || 'User'}</p>
           </div>
         </div>
           
