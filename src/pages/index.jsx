@@ -10,6 +10,8 @@ import ThankYou from "./ThankYou";
 import MyInspections from "./MyInspections";
 import SignIn from "./SignIn";
 import SignUp from "./SignUp";
+import ForgotPassword from "./ForgotPassword";
+import ResetPassword from "./ResetPassword";
 
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext";
@@ -91,6 +93,8 @@ const PAGES = {
     MyInspections: MyInspections,
     SignIn: SignIn,
     SignUp: SignUp,
+    ForgotPassword: ForgotPassword,
+    ResetPassword: ResetPassword,
 }
 
 /**
@@ -153,6 +157,8 @@ function PagesContent() {
                 <Route path="/Welcome" element={<PublicRoute><Welcome /></PublicRoute>} />
                 <Route path="/SignIn" element={<SignIn />} />
                 <Route path="/SignUp" element={<SignUp />} />
+                <Route path="/ForgotPassword" element={<ForgotPassword />} />
+                <Route path="/ResetPassword" element={<ResetPassword />} />
                 
                 {/* Protected Routes - Regular Users Only */}
                 <Route path="/Inspection" element={

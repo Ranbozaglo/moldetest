@@ -160,6 +160,15 @@ export default function SignIn() {
                 </div>
               </div>
               
+              <div className="flex justify-end">
+                <Link
+                  to={createPageUrl('ForgotPassword')}
+                  className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Forgot your password?
+                </Link>
+              </div>
+              
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-lg transition-all duration-200"

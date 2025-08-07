@@ -19,6 +19,48 @@ class EmailService:
         
         # Default templates
         self.default_templates = {
+            "password_reset": {
+                "subject": "Total Testing - Password Reset Request",
+                "body": """<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #004aac; margin: 0;">Total Testing</h1>
+            <p style="color: #666; margin: 5px 0 0 0;">DIY Mold Testing</p>
+        </div>
+        
+        <h2 style="color: #004aac;">Password Reset Request</h2>
+        
+        <p>Hi {full_name},</p>
+        
+        <p>We received a request to reset your password for your Total Testing account. If you made this request, click the button below to reset your password:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{reset_link}" style="background-color: #004aac; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset My Password</a>
+        </div>
+        
+        <p>This link will expire in 24 hours for security reasons.</p>
+        
+        <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+        
+        <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
+        <p style="word-break: break-all; color: #004aac;">{reset_link}</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        
+        <p style="color: #666; font-size: 14px;">
+            If you have any questions or concerns, please contact our support team.<br>
+            This is an automated message, please do not reply to this email.
+        </p>
+        
+        <p style="color: #666; font-size: 14px;">
+            Best regards,<br>
+            The Total Testing Team
+        </p>
+    </div>
+</body>
+</html>"""
+            },
             "lab_received": {
                 "subject": "Total Testing - Lab Samples Received (Inspection #{inspection_number})",
                 "body": """<html>
@@ -480,6 +522,58 @@ class EmailService:
                 "error": f"Failed to send inspection created email: {str(e)}",
                 "message": "Error in send_inspection_created_email_with_template"
             }
+    
+    def send_password_reset_email(self, reset_data: Dict[str, Any]) -> bool:
+        """
+        Send password reset email with template
+        
+        Args:
+            reset_data: Dictionary containing:
+                - email: User's email address
+                - full_name: User's full name (optional)
+                - reset_link: Password reset link
+                - token: Reset token (for logging)
+        
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            print(f"🔧 EMAIL DEBUG: Sending password reset email to {reset_data.get('email')}")
+            
+            # Get template
+            template = self.get_template("password_reset")
+            if not template:
+                print("❌ EMAIL DEBUG: Password reset template not found")
+                return False
+            
+            # Prepare template variables
+            template_vars = {
+                'full_name': reset_data.get('full_name', 'User'),
+                'reset_link': reset_data.get('reset_link', ''),
+                'email': reset_data.get('email', '')
+            }
+            
+            # Format subject and body
+            subject = template['subject'].format(**template_vars)
+            body = template['body'].format(**template_vars)
+            
+            # Send email
+            result = self.send_email(
+                to_email=reset_data['email'],
+                subject=subject,
+                body=body
+            )
+            
+            if result.get('success'):
+                print(f"✅ EMAIL DEBUG: Password reset email sent successfully to {reset_data.get('email')}")
+                return True
+            else:
+                print(f"❌ EMAIL DEBUG: Failed to send password reset email: {result.get('error')}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ EMAIL DEBUG: Error sending password reset email: {e}")
+            return False
 
 # Create service instance
 email_service = EmailService()

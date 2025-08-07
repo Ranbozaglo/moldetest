@@ -38,6 +38,7 @@ except ImportError as e:
 
 # Import email endpoints
 from email_endpoints import register_email_endpoints
+from password_reset_endpoints import register_password_reset_endpoints
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -1819,6 +1820,9 @@ if __name__ == '__main__':
     
     # Register email endpoints
     register_email_endpoints(app, supabase)
+    
+    # Register password reset endpoints
+    register_password_reset_endpoints(app, supabase)
     
     # Show detailed OCR status after initialization
     print(f"\n🔬 OCR INTEGRATION FINAL STATUS:")
