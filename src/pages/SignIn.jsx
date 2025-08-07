@@ -58,47 +58,18 @@ export default function SignIn() {
             window.location.href = '/AdminDashboard';
           }
         } else {
-          // Check if user has existing inspections
+          // Redirect all non-admin users to Inspection page
+          console.log('🔍 DEBUG: Redirecting user to Inspection page');
+          console.log('🔍 PROD DEBUG: SignIn - Redirecting user to Inspection');
+          console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
           try {
-            console.log('🔍 DEBUG: Checking for existing inspections for user:', result.user.email);
-            const existingInspections = await MoldInspection.list("-created_at", 10, false);
-            
-            if (existingInspections && existingInspections.length > 0) {
-              console.log('🔍 DEBUG: User has existing inspections, redirecting to MyInspections');
-              console.log('🔍 PROD DEBUG: SignIn - Redirecting user with existing inspections to MyInspections');
-              console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
-              try {
-                navigate('/MyInspections', { replace: true });
-                console.log('🔍 PROD DEBUG: SignIn - Navigate to MyInspections called successfully');
-              } catch (navError) {
-                console.error('🔍 PROD DEBUG: SignIn - Navigation error to MyInspections:', navError);
-                // Fallback navigation
-                console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
-                window.location.href = '/MyInspections';
-              }
-            } else {
-              console.log('🔍 DEBUG: User has no existing inspections, redirecting to Inspection');
-              console.log('🔍 PROD DEBUG: SignIn - Redirecting new user to Inspection');
-              console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
-              try {
-                navigate('/Inspection', { replace: true });
-                console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
-              } catch (navError) {
-                console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
-                // Fallback navigation
-                console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
-                window.location.href = '/Inspection';
-              }
-            }
-          } catch (inspectionError) {
-            console.error('🔍 DEBUG: Error checking existing inspections:', inspectionError);
-            // If we can't check inspections, default to Inspection page
-            console.log('🔍 PROD DEBUG: SignIn - Error checking inspections, defaulting to Inspection');
-            try {
-              navigate('/Inspection', { replace: true });
-            } catch (navError) {
-              window.location.href = '/Inspection';
-            }
+            navigate('/Inspection', { replace: true });
+            console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
+          } catch (navError) {
+            console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
+            // Fallback navigation
+            console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
+            window.location.href = '/Inspection';
           }
         }
       } else {
