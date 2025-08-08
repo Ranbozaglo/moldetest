@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Simple Flask Backend for Mold Testing Houston with Supabase
-"""
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
@@ -38,7 +33,7 @@ except ImportError as e:
 
 # Import email endpoints
 from email_endpoints import register_email_endpoints
-from password_reset_endpoints import register_password_reset_endpoints
+
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -1801,6 +1796,152 @@ def upload_file():
         print(f"❌ Error in file upload: {e}")
         return jsonify({"error": f"Upload failed: {str(e)}"}), 500
 
+# === PASSWORD RESET ENDPOINTS ===
+@app.route('/api/auth/request-password-reset', methods=['POST'])
+def request_password_reset():
+    """Request password reset - sends reset email to user"""
+    try:
+        data = request.get_json()
+        if not data or 'email' not in data:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        email = data['email'].strip().lower()
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+            
+        # Find user in user_profiles table
+        user_query = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        
+        if not user_query.data:
+            # Return success even if user doesn't exist (security best practice)
+            return jsonify({
+                'success': True,
+                'message': 'If an account with that email exists, you will receive a password reset link.'
+            }), 200
+            
+        user_data = user_query.data[0]
+        user_id = str(user_data['id'])  # Ensure UUID is handled as string
+        
+        # Generate secure token
+        import uuid
+        import secrets
+        reset_token = str(uuid.uuid4())
+        
+        # Insert token into password_reset_tokens table
+        token_data = {
+            'user_id': user_id,
+            'token': reset_token,
+            'used': False
+        }
+        
+        token_result = supabase.table('password_reset_tokens').insert(token_data).execute()
+        
+        if not token_result.data:
+            return jsonify({'error': 'Failed to create reset token'}), 500
+            
+        # Send reset email
+        reset_link = f"https://mold-testing.netlify.app/ResetPassword?token={reset_token}"
+        
+        reset_data = {
+            'email': email,
+            'full_name': user_data.get('full_name', 'User'),
+            'reset_link': reset_link,
+            'token': reset_token
+        }
+        
+        # Import and use email service
+        from app.services.email_service import email_service
+        email_sent = email_service.send_password_reset_email(reset_data)
+        
+        if not email_sent:
+            return jsonify({'error': 'Failed to send reset email'}), 500
+            
+        return jsonify({
+            'success': True,
+            'message': 'If an account with that email exists, you will receive a password reset link.'
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Password reset request error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/auth/confirm-password-reset', methods=['POST'])
+def confirm_password_reset():
+    """Confirm password reset - validates token and updates password"""
+    try:
+        print(f"🔧 DEBUG: Password reset confirmation request received")
+        data = request.get_json()
+        print(f"🔧 DEBUG: Request data keys: {list(data.keys()) if data else 'None'}")
+        
+        if not data or 'token' not in data or 'password' not in data:
+            print(f"❌ DEBUG: Missing required fields - data: {data}")
+            return jsonify({'error': 'Token and password are required'}), 400
+            
+        token = data['token']
+        new_password = data['password']
+        
+        if not token or not new_password:
+            return jsonify({'error': 'Token and password are required'}), 400
+            
+        if len(new_password) < 8:
+            return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+            
+        # Find and validate token
+        print(f"🔧 DEBUG: Looking for token: {token}")
+        token_query = supabase.table('password_reset_tokens').select('*').eq('token', token).eq('used', False).execute()
+        
+        print(f"🔧 DEBUG: Token query result: {len(token_query.data) if token_query.data else 0} tokens found")
+        
+        if not token_query.data:
+            print(f"❌ DEBUG: Token not found or already used")
+            return jsonify({'error': 'Invalid or expired reset token'}), 400
+            
+        token_data = token_query.data[0]
+        user_id = token_data['user_id']
+        print(f"🔧 DEBUG: Found valid token for user: {user_id}")
+        
+        # Check if token is expired (24 hours)
+        from datetime import datetime, timedelta
+        import dateutil.parser
+        
+        created_at = dateutil.parser.parse(token_data['created_at'])
+        if datetime.now(created_at.tzinfo) > created_at + timedelta(hours=24):
+            return jsonify({'error': 'Reset token has expired'}), 400
+            
+        # Hash new password using the same method as the rest of the app
+        password_hash = generate_password_hash(new_password)
+        
+        # Update user password
+        print(f"🔧 DEBUG: Updating password for user ID: {user_id}")
+        user_update = supabase.table('user_profiles').update({
+            'password_hash': password_hash
+        }).eq('id', user_id).execute()
+        
+        print(f"🔧 DEBUG: Update result: {user_update.data}")
+        print(f"✅ DEBUG: Password updated successfully for user: {user_id}")
+        
+        # Note: Supabase update operations may return empty data even on success
+        # If no exception was thrown, we assume the update succeeded
+            
+        # Mark token as used
+        print(f"🔧 DEBUG: Marking token as used: {token_data['id']}")
+        token_update = supabase.table('password_reset_tokens').update({
+            'used': True
+        }).eq('id', token_data['id']).execute()
+        print(f"🔧 DEBUG: Token marked as used: {token_update.data}")
+        
+        print(f"✅ DEBUG: Password reset completed successfully for user: {user_id}")
+        return jsonify({
+            'success': True,
+            'message': 'Password has been reset successfully. You can now sign in with your new password.'
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Password reset confirmation error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Internal server error'}), 500
+
 # --- PATCH: Dynamic Google Vision credentials from env ---
 CRED_FILENAME = 'gcloud-key.json'
 cred_path = os.path.join(os.path.dirname(__file__), CRED_FILENAME)
@@ -1820,9 +1961,6 @@ if __name__ == '__main__':
     
     # Register email endpoints
     register_email_endpoints(app, supabase)
-    
-    # Register password reset endpoints
-    register_password_reset_endpoints(app, supabase)
     
     # Show detailed OCR status after initialization
     print(f"\n🔬 OCR INTEGRATION FINAL STATUS:")

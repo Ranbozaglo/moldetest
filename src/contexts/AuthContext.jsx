@@ -1,17 +1,34 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User } from '@/api/entities';
 
-const AuthContext = createContext();
+// Create context with default value to prevent undefined context errors
+const AuthContext = createContext({
+  user: null,
+  loading: true,
+  signIn: () => Promise.resolve({ success: false, error: 'AuthProvider not initialized' }),
+  signUp: () => Promise.resolve({ success: false, error: 'AuthProvider not initialized' }),
+  signOut: () => {},
+  refreshSession: () => Promise.resolve(false),
+  debugAuthState: () => ({})
+});
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
+  
+  // Add debugging to help identify when this error occurs
+  if (context === undefined) {
+    console.error('🔍 AUTH ERROR: useAuth called outside of AuthProvider');
+    console.error('🔍 AUTH ERROR: Current location:', window.location.href);
+    console.error('🔍 AUTH ERROR: Stack trace:', new Error().stack);
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  
   return context;
 };
 
 export const AuthProvider = ({ children }) => {
+  console.log('🔍 AUTH DEBUG: AuthProvider initializing...');
+  
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef(null);

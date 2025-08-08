@@ -540,8 +540,10 @@ class EmailService:
         try:
             print(f"🔧 EMAIL DEBUG: Sending password reset email to {reset_data.get('email')}")
             
-            # Get template
-            template = self.get_template("password_reset")
+            # Get templates and find password reset template
+            templates = self.get_templates()
+            template = templates.get('password_reset', self.default_templates.get('password_reset'))
+            
             if not template:
                 print("❌ EMAIL DEBUG: Password reset template not found")
                 return False
@@ -574,6 +576,7 @@ class EmailService:
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending password reset email: {e}")
             return False
+
 
 # Create service instance
 email_service = EmailService()

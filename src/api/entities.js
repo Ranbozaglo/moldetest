@@ -624,3 +624,56 @@ if (typeof window !== 'undefined') {
   console.log('🔍 PROD DEBUG: Try: debugBackend.testHealth(), debugBackend.testLogin(), debugBackend.checkEnv(), debugBackend.checkAuth()');
 }
 
+// Password Reset API Functions
+export class PasswordResetService {
+  /**
+   * Request password reset - sends reset email to user
+   * @param {string} email - User's email address
+   * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+   */
+  static async requestPasswordReset(email) {
+    try {
+      const response = await apiCall('/auth/request-password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      
+      return {
+        success: true,
+        message: response.message || 'If an account with that email exists, you will receive a password reset link.'
+      };
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to send reset email. Please try again.'
+      };
+    }
+  }
+
+  /**
+   * Confirm password reset - validates token and updates password
+   * @param {string} token - Reset token from email
+   * @param {string} password - New password
+   * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+   */
+  static async confirmPasswordReset(token, password) {
+    try {
+      const response = await apiCall('/auth/confirm-password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ token, password })
+      });
+      
+      return {
+        success: true,
+        message: response.message || 'Password has been reset successfully. You can now sign in with your new password.'
+      };
+    } catch (error) {
+      console.error('Password reset confirmation error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to reset password. Please try again.'
+      };
+    }
+  }
+}
