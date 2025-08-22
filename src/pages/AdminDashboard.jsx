@@ -550,6 +550,10 @@ export default function AdminDashboard() {
   const [selectedYear, setSelectedYear] = useState("all");
   const [activeTab, setActiveTab] = useState("inspections");
   
+  // Sorting state
+  const [sortField, setSortField] = useState("created_at");
+  const [sortDirection, setSortDirection] = useState("desc");
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -829,16 +833,26 @@ export default function AdminDashboard() {
     return statusMatch && inspectionTypeMatch && searchMatch;
   });
 
+  // Sort filtered inspections
+  const sortedInspections = [...filteredInspections].sort((a, b) => {
+    if (sortField === 'created_at') {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+    }
+    return 0; // Default sorting (by created_at desc)
+  });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredInspections.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedInspections.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentInspections = filteredInspections.slice(startIndex, endIndex);
+  const currentInspections = sortedInspections.slice(startIndex, endIndex);
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, inspectionTypeFilter]);
+  }, [searchTerm, statusFilter, inspectionTypeFilter, sortField, sortDirection]);
 
   // Periodic cache refresh every 10 minutes when page is active
   useEffect(() => {
@@ -862,6 +876,18 @@ export default function AdminDashboard() {
   const handleItemsPerPageChange = (newItemsPerPage) => {
     setItemsPerPage(newItemsPerPage);
     setCurrentPage(1); // Reset to first page when changing items per page
+  };
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new field with default desc direction
+      setSortField(field);
+      setSortDirection('desc');
+    }
+    setCurrentPage(1); // Reset to first page when sorting changes
   };
 
   const handleSelectAll = (checked) => {
@@ -1837,7 +1863,7 @@ export default function AdminDashboard() {
 
                 <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
                   <div className="text-sm text-slate-600">
-                    Showing {filteredInspections.length} of {inspections.length + asbestosInspections.length} inspections
+                    Showing {sortedInspections.length} of {inspections.length + asbestosInspections.length} inspections
                   </div>
                   <Button
                     variant="outline"
@@ -1846,6 +1872,8 @@ export default function AdminDashboard() {
                       setSearchTerm("");
                       setStatusFilter("all");
                       setInspectionTypeFilter("all");
+                      setSortField("created_at");
+                      setSortDirection("desc");
                     }}
                     className="flex items-center gap-2"
                   >
@@ -1865,7 +1893,7 @@ export default function AdminDashboard() {
                       <Database className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-slate-800">All Inspections ({filteredInspections.length} of {inspections.length + asbestosInspections.length})</CardTitle>
+                      <CardTitle className="text-slate-800">All Inspections ({sortedInspections.length} of {inspections.length + asbestosInspections.length})</CardTitle>
                                               <p className="text-sm text-slate-600 mt-1">
                           Manage and monitor all mold and asbestos inspection records
                         </p>
@@ -1916,6 +1944,15 @@ export default function AdminDashboard() {
                       className="mr-2"
                     />
                     <span className="text-sm font-medium text-slate-700">Select All</span>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-slate-500">Sorted by Created Date</span>
+                      <button
+                        onClick={() => handleSort('created_at')}
+                        className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors duration-200"
+                      >
+                        {sortDirection === 'asc' ? 'Oldest First ↑' : 'Newest First ↓'}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-4 p-4">
                     {currentInspections.map((inspection, index) => (
@@ -2067,7 +2104,20 @@ export default function AdminDashboard() {
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Property</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Type Inspection</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Status</TableHead>
-                        <TableHead className="bg-slate-100 font-slate-700">Created</TableHead>
+                        <TableHead 
+                          className="bg-slate-100 font-slate-700 cursor-pointer hover:bg-slate-200 transition-colors duration-200 select-none"
+                          onClick={() => handleSort('created_at')}
+                        >
+                          <div className="flex items-center gap-1">
+                            Created
+                            <span className="text-slate-400 text-xs">↕</span>
+                            {sortField === 'created_at' && (
+                              <span className="text-slate-500">
+                                {sortDirection === 'asc' ? '↑' : '↓'}
+                              </span>
+                            )}
+                          </div>
+                        </TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2420,10 +2470,10 @@ export default function AdminDashboard() {
                       
                       <div className="text-xs sm:text-sm text-slate-600">
                         <span className="hidden sm:inline">Showing </span>
-                        <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, filteredInspections.length)}</span>
+                        <span className="font-medium">{startIndex + 1}-{Math.min(endIndex, sortedInspections.length)}</span>
                         <span className="hidden sm:inline"> of </span>
                         <span className="sm:hidden"> / </span>
-                        <span className="font-medium">{filteredInspections.length}</span>
+                        <span className="font-medium">{sortedInspections.length}</span>
                         <span className="hidden sm:inline"> inspections</span>
                       </div>
                     </div>
