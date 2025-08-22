@@ -931,7 +931,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
           <div>
             <h1 className="text-3xl font-bold text-slate-900">{getDisplayNumber(inspection)}</h1>
             <p className="text-slate-600 mt-2">
-              Submitted {format(new Date(inspection.created_date), "MMMM d, yyyy 'at' h:mm a")}
+                              Submitted {format(new Date(inspection.created_at), "MMMM d, yyyy 'at' h:mm a")}
             </p>
           </div>
           

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger , DropdownMenuLabel , DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoldInspection, Sample, EmailService } from "@/api/entities";
+import { MoldInspection, Sample, EmailService, AsbestosInspection } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
@@ -408,7 +408,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
 <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="TT Logo" class="cover-image" />    
            <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
-                <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
+                <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
             </div>
         </div>
@@ -531,6 +531,7 @@ export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [inspections, setInspections] = useState([]);
+  const [asbestosInspections, setAsbestosInspections] = useState([]);
   const [selectedInspections, setSelectedInspections] = useState(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [downloadStatus, setDownloadStatus] = useState(null);
@@ -543,10 +544,7 @@ export default function AdminDashboard() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [propertyTypeFilter, setPropertyTypeFilter] = useState("all");
-  const [clientTypeFilter, setClientTypeFilter] = useState("all");
-  const [moldFilter, setMoldFilter] = useState("all");
-  const [waterDamageFilter, setWaterDamageFilter] = useState("all");
+  const [inspectionTypeFilter, setInspectionTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("all");
   const [selectedYear, setSelectedYear] = useState("all");
@@ -562,8 +560,6 @@ export default function AdminDashboard() {
     samples: 0,
     pending: 0,
     completed: 0,
-    propertyTypes: {},
-    clientTypes: {},
     cities: {}
   });
   const navigate = useNavigate();
@@ -655,8 +651,14 @@ export default function AdminDashboard() {
         console.log("🔍 DEBUG: First inspection keys:", Object.keys(allInspections[0]));
       }
       
+      // Add inspectionType property to each mold inspection
+      const moldInspectionsWithType = allInspections.map(inspection => ({
+        ...inspection,
+        inspectionType: 'mold'
+      }));
+      
       // For lightweight data, we don't need to parse heavy fields
-      setInspections(allInspections);
+      setInspections(moldInspectionsWithType);
       setSelectedInspections(new Set());
       setCacheTimestamp(now);
       setLastUpdateCheck(now);
@@ -672,6 +674,37 @@ export default function AdminDashboard() {
       alert("Failed to load inspections. Please refresh the page.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAsbestosInspections = async (forceRefresh = false) => {
+    try {
+      console.log("🔍 DEBUG: Loading asbestos inspections data from server");
+      
+      const allAsbestosInspections = await AsbestosInspection.list('-created_at', 100, false);
+      
+      console.log("🔍 DEBUG: Raw asbestos inspections data:", allAsbestosInspections);
+      console.log("🔍 DEBUG: Number of asbestos inspections:", allAsbestosInspections?.length);
+      
+      // Check if allAsbestosInspections is an array
+      if (!Array.isArray(allAsbestosInspections)) {
+        console.error("❌ ERROR: allAsbestosInspections is not an array:", typeof allAsbestosInspections);
+        setAsbestosInspections([]);
+        return;
+      }
+      
+      // Add inspectionType property to each asbestos inspection
+      const asbestosInspectionsWithType = allAsbestosInspections.map(inspection => ({
+        ...inspection,
+        inspectionType: 'asbestos'
+      }));
+      
+      setAsbestosInspections(asbestosInspectionsWithType);
+    } catch (error) {
+      console.error("Error loading asbestos inspections:", error);
+      console.error("Error details:", error.message);
+      console.error("Error stack:", error.stack);
+      setAsbestosInspections([]);
     }
   };
 
@@ -693,19 +726,41 @@ export default function AdminDashboard() {
 
   // Smart refresh function that only loads if cache is invalid
   const smartRefresh = async () => {
-    await loadInspections(false); // Don't force refresh, let cache logic decide
+    await Promise.all([
+      loadInspections(false), // Don't force refresh, let cache logic decide
+      loadAsbestosInspections(false)
+    ]);
+  };
+
+  // Function to get inspection type based on inspection data
+  const getInspectionType = (inspection) => {
+    // If the inspection already has an inspectionType property, use it
+    if (inspection.inspectionType) {
+      return inspection.inspectionType;
+    }
+    
+    // Fallback to app_id if available
+    if (inspection.app_id) {
+      return inspection.app_id;
+    }
+    
+    // Default to 'mold' for backward compatibility
+    return 'mold';
   };
   
 
 
   // Calculate dashboard statistics
   const getDashboardStats = async (inspectionsList = inspections) => {
+    // Combine mold and asbestos inspections for stats
+    const allInspectionsForStats = [...inspectionsList, ...asbestosInspections];
+    
     // Apply month filtering
-    let filteredInspections = inspectionsList;
+    let filteredInspections = allInspectionsForStats;
     
     if (selectedMonth !== "all" && selectedYear !== "all") {
-      filteredInspections = inspectionsList.filter(inspection => {
-        const inspectionDate = new Date(inspection.created_date);
+      filteredInspections = allInspectionsForStats.filter(inspection => {
+        const inspectionDate = new Date(inspection.created_at);
         const inspectionMonth = inspectionDate.getMonth() + 1; // getMonth() returns 0-11
         const inspectionYear = inspectionDate.getFullYear();
         
@@ -714,8 +769,8 @@ export default function AdminDashboard() {
     }
     
     const total = filteredInspections.length;
-    const withMold = filteredInspections.filter(i => i.has_visible_mold).length;
-    const withWaterDamage = filteredInspections.filter(i => i.has_water_damage).length;
+    const withMold = filteredInspections.filter(i => getInspectionType(i) === 'mold' && i.has_visible_mold).length;
+    const withWaterDamage = filteredInspections.filter(i => getInspectionType(i) === 'mold' && i.has_water_damage).length;
     const pending = filteredInspections.filter(i => i.status === 'pending').length;
     const completed = filteredInspections.filter(i => i.status === 'completed').length;
 
@@ -732,17 +787,9 @@ export default function AdminDashboard() {
       totalSamples = filteredInspections.filter(i => i.is_sample).length;
     }
     
-    const propertyTypes = {};
-    const clientTypes = {};
     const cities = {};
     
     filteredInspections.forEach(inspection => {
-      if (inspection.property_type) {
-        propertyTypes[inspection.property_type] = (propertyTypes[inspection.property_type] || 0) + 1;
-      }
-      if (inspection.client_type) {
-        clientTypes[inspection.client_type] = (clientTypes[inspection.client_type] || 0) + 1;
-      }
       if (inspection.city) {
         cities[inspection.city] = (cities[inspection.city] || 0) + 1;
       }
@@ -755,8 +802,6 @@ export default function AdminDashboard() {
       samples: totalSamples,
       pending,
       completed,
-      propertyTypes,
-      clientTypes,
       cities
     };
   };
@@ -765,16 +810,12 @@ export default function AdminDashboard() {
 
 
   // Filter inspections based on all filters
-  const filteredInspections = inspections.filter(inspection => {
+  // Combine mold and asbestos inspections for filtering
+  const allInspections = [...inspections, ...asbestosInspections];
+  
+  const filteredInspections = allInspections.filter(inspection => {
     const statusMatch = statusFilter === 'all' || inspection.status === statusFilter;
-    const propertyTypeMatch = propertyTypeFilter === 'all' || inspection.property_type === propertyTypeFilter;
-    const clientTypeMatch = clientTypeFilter === 'all' || inspection.client_type === clientTypeFilter;
-    const moldMatch = moldFilter === 'all' || 
-      (moldFilter === 'yes' && inspection.has_visible_mold) || 
-      (moldFilter === 'no' && !inspection.has_visible_mold);
-    const waterDamageMatch = waterDamageFilter === 'all' || 
-      (waterDamageFilter === 'yes' && inspection.has_water_damage) || 
-      (waterDamageFilter === 'no' && !inspection.has_water_damage);
+    const inspectionTypeMatch = inspectionTypeFilter === 'all' || getInspectionType(inspection) === inspectionTypeFilter;
 
     const term = searchTerm.toLowerCase();
     const searchMatch = !term ||
@@ -785,7 +826,7 @@ export default function AdminDashboard() {
       (inspection.city || '').toLowerCase().includes(term) ||
       (inspection.state || '').toLowerCase().includes(term);
 
-    return statusMatch && propertyTypeMatch && clientTypeMatch && moldMatch && waterDamageMatch && searchMatch;
+    return statusMatch && inspectionTypeMatch && searchMatch;
   });
 
   // Pagination logic
@@ -797,7 +838,7 @@ export default function AdminDashboard() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, propertyTypeFilter, clientTypeFilter, moldFilter, waterDamageFilter]);
+  }, [searchTerm, statusFilter, inspectionTypeFilter]);
 
   // Periodic cache refresh every 10 minutes when page is active
   useEffect(() => {
@@ -1056,7 +1097,7 @@ export default function AdminDashboard() {
       return [
         displayNum,
         insp.id,
-        format(new Date(insp.created_date), "yyyy-MM-dd HH:mm"),
+        format(new Date(insp.created_at), "yyyy-MM-dd HH:mm"),
         `"${insp.full_name}"`,
         insp.email,
         insp.client_type,
@@ -1747,7 +1788,7 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-slate-700">Search</label>
                     <div className="relative">
@@ -1777,18 +1818,26 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
 
-
-
-
-
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">Type Inspection</label>
+                    <Select value={inspectionTypeFilter} onValueChange={setInspectionTypeFilter}>
+                      <SelectTrigger className="h-10 bg-white border-slate-300 focus:border-blue-500 focus:ring-blue-500">
+                        <SelectValue placeholder="Filter by type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="mold">Mold</SelectItem>
+                        <SelectItem value="asbestos">Asbestos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                 </div>
 
                 <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
                   <div className="text-sm text-slate-600">
-                    Showing {filteredInspections.length} of {inspections.length} inspections
+                    Showing {filteredInspections.length} of {inspections.length + asbestosInspections.length} inspections
                   </div>
                   <Button
                     variant="outline"
@@ -1796,10 +1845,7 @@ export default function AdminDashboard() {
                     onClick={() => {
                       setSearchTerm("");
                       setStatusFilter("all");
-                      setPropertyTypeFilter("all");
-                      setClientTypeFilter("all");
-                      setMoldFilter("all");
-                      setWaterDamageFilter("all");
+                      setInspectionTypeFilter("all");
                     }}
                     className="flex items-center gap-2"
                   >
@@ -1819,10 +1865,10 @@ export default function AdminDashboard() {
                       <Database className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-slate-800">All Inspections ({filteredInspections.length})</CardTitle>
-                      <p className="text-sm text-slate-600 mt-1">
-                        Manage and monitor all mold inspection records
-                      </p>
+                      <CardTitle className="text-slate-800">All Inspections ({filteredInspections.length} of {inspections.length + asbestosInspections.length})</CardTitle>
+                                              <p className="text-sm text-slate-600 mt-1">
+                          Manage and monitor all mold and asbestos inspection records
+                        </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -1889,7 +1935,7 @@ export default function AdminDashboard() {
                                 <span className="text-blue-600 font-semibold text-sm">{getDisplayNumber(inspection)}</span>
                               </div>
                               <div className="text-xs text-slate-500 mt-1">
-                                {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
+                                {inspection.created_at ? format(new Date(inspection.created_at), "MMM dd, yyyy") : 'N/A'}
                               </div>
                             </div>
                           </div>
@@ -1933,6 +1979,18 @@ export default function AdminDashboard() {
                             <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs">
                               {inspection.client_type?.replace('_', ' ') || 'N/A'}
                             </span>
+                            <Badge 
+                              variant="outline"
+                                         className={`px-2 py-1 text-xs font-medium ${
+             getInspectionType(inspection) === 'mold' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+             getInspectionType(inspection) === 'asbestos' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+             'bg-slate-100 text-slate-700 border-slate-200'
+           }`}
+         >
+           {getInspectionType(inspection) === 'mold' ? 'Mold' :
+            getInspectionType(inspection) === 'asbestos' ? 'Asbestos' :
+            'Unknown'}
+                            </Badge>
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -2007,8 +2065,9 @@ export default function AdminDashboard() {
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Inspection #</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Client</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Property</TableHead>
+                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Type Inspection</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Status</TableHead>
-                        <TableHead className="bg-slate-100 font-semibold text-slate-700">Created</TableHead>
+                        <TableHead className="bg-slate-100 font-slate-700">Created</TableHead>
                         <TableHead className="bg-slate-100 font-semibold text-slate-700">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2060,6 +2119,22 @@ export default function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
+                            <div className="flex items-center justify-center">
+                              <Badge 
+                                variant="outline"
+                                               className={`px-2 py-1 text-xs font-medium ${
+                 getInspectionType(inspection) === 'mold' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                 getInspectionType(inspection) === 'asbestos' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                 'bg-slate-50 text-slate-700 border-slate-200'
+               }`}
+             >
+               {getInspectionType(inspection) === 'mold' ? 'Mold' :
+                getInspectionType(inspection) === 'asbestos' ? 'Asbestos' :
+                'Unknown'}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               <Badge 
                                 variant={getStatusDisplay(inspection.status).variant}
@@ -2103,7 +2178,7 @@ export default function AdminDashboard() {
                           <TableCell>
                             <div className="text-sm text-slate-600 flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              {inspection.created_date ? format(new Date(inspection.created_date), "MMM dd, yyyy") : 'N/A'}
+                              {inspection.created_at ? format(new Date(inspection.created_at), "MMM dd, yyyy") : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>

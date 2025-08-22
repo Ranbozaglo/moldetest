@@ -557,7 +557,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                 <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
-                  <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_date), "MMMM d, yyyy")}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
               </div>
               <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
@@ -916,7 +916,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         {/* Inspection Summary */}
                         <div className="text-sm text-slate-600">
                           <p><strong>Property:</strong> {inspection.street_address}{inspection.unit_number ? `, ${inspection.unit_number}` : ''}, {inspection.city}</p>
-                          <p><strong>Submission Date:</strong> {format(new Date(inspection.created_date), "MMMM d, yyyy")}</p>
+                          <p><strong>Submission Date:</strong> {format(new Date(inspection.created_at), "MMMM d, yyyy")}</p>
                         </div>
 
                         {/* Action Buttons */}

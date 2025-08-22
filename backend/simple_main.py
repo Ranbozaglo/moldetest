@@ -738,17 +738,15 @@ def get_inspections():
         else:
             # For list view, select only essential lightweight fields
             query = supabase.table('inspection').select(
-                'id,created_at,created_date,updated_date,created_by_id,'
+                'id,created_at,updated_date,created_by_id,'
                 'full_name,email,client_type,street_address,city,state,zip_code,'
                 'property_type,square_footage,has_visible_mold,has_water_damage,'
-                'status,is_sample,inspection_number'
+                'status,is_sample,inspection_number,app_id'
             )
         
         # Apply sorting - handle different sort fields
         if sort_by:
-            if sort_by == '-created_date':
-                query = query.order('created_date', desc=True)
-            elif sort_by == '-created_at':
+            if sort_by == '-created_at':
                 query = query.order('created_at', desc=True)
             elif sort_by.startswith('-'):
                 # Handle other descending sorts
@@ -777,9 +775,9 @@ def get_inspections():
                 "id": inspection['id'],
                 "inspection_number": inspection.get('inspection_number') or inspection.get('id'),
                 "created_at": inspection['created_at'],
-                "created_date": inspection.get('created_date'),
                 "updated_date": inspection.get('updated_date'),
                 "created_by_id": inspection.get('created_by_id'),
+                "app_id": inspection.get('app_id', 'mold'),
                 
                 # Client information
                 "full_name": inspection.get('full_name'),
@@ -801,7 +799,7 @@ def get_inspections():
                 # Legacy fields for compatibility
                 "user_id": inspection.get('created_by_id'),
                 "property_address": inspection.get('street_address', ''),
-                "inspection_date": inspection.get('created_date'),
+                "inspection_date": inspection.get('created_at'),
                 "summary": f"Inspection for {inspection.get('full_name', 'Unknown')}",
                 "user_email": inspection.get('email'),
             }
@@ -890,7 +888,6 @@ def create_inspection():
             'created_by_id': data.get('created_by'),
             'email': data.get('email'),
             'is_sample': data.get('is_sample', False),
-          'created_date': data.get('created_date'),
             'app_id': 'mold'  # Default app_id for all inspections
         }
         
@@ -1150,6 +1147,102 @@ def get_samples():
     except Exception as e:
         print(f"🔍 DEBUG: Get samples error: {e}")
         return jsonify({"error": "Failed to fetch samples"}), 500
+
+@app.route('/api/asbestos-inspections', methods=['GET'])
+def get_asbestos_inspections():
+    """Get all asbestos inspections"""
+    try:
+        # Get query parameters
+        sort_by = request.args.get('sort', '-created_at')
+        limit = int(request.args.get('limit', 50))  # Default to 50, max 100
+        email = request.args.get('email')
+        
+        # Limit the maximum number of inspections to prevent performance issues
+        if limit > 100:
+            limit = 100
+        
+        # Check if user is admin from database
+        is_admin = False
+        if email:
+            try:
+                user_result = supabase.table('user_profiles').select('role, is_admin').eq('email', email).execute()
+                if user_result.data:
+                    user_data = user_result.data[0]
+                    is_admin = user_data.get('role') == 'admin' or user_data.get('is_admin', False)
+            except Exception as e:
+                print(f"⚠️ Error checking user admin status: {e}")
+                is_admin = False
+        
+        print(f"🔍 DEBUG: Fetching asbestos inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
+        
+        # Build the query - select only essential fields for list view
+        query = supabase.table('asbestosinspection').select(
+            'id,created_at,updated_date,created_by_id,'
+            'full_name,email,client_type,street_address,city,state,zip_code,'
+            'property_type,square_footage,status,app_id'
+        )
+        
+        # Apply sorting - handle different sort fields
+        if sort_by:
+            if sort_by == '-created_at':
+                query = query.order('created_at', desc=True)
+            elif sort_by.startswith('-'):
+                # Handle other descending sorts
+                field = sort_by[1:]
+                query = query.order(field, desc=True)
+            else:
+                query = query.order(sort_by)
+        
+        # Apply limit
+        query = query.limit(limit)
+
+        print(f"🔍 DEBUG: Executing asbestos inspection query...")
+        result = query.execute()
+        inspections = result.data
+        print(f"🔍 DEBUG: Found {len(inspections)} asbestos inspections")
+        
+        # Filter by email if provided (for non-admin users)
+        if email and not is_admin:
+            inspections = [i for i in inspections if i.get('email') == email]
+
+        # Convert to expected format
+        result_list = []
+        for inspection in inspections:
+            inspection_data = {
+                # Basic identification
+                "id": inspection['id'],
+                "created_at": inspection['created_at'],
+                "updated_date": inspection.get('updated_date'),
+                "created_by_id": inspection.get('created_by_id'),
+                "app_id": inspection.get('app_id', 'asbestos'),
+                
+                # Client information
+                "full_name": inspection.get('full_name'),
+                "email": inspection.get('email'),
+                "client_type": inspection.get('client_type'),
+                
+                # Property information
+                "street_address": inspection.get('street_address'),
+                "city": inspection.get('city'),
+                "state": inspection.get('state'),
+                "zip_code": inspection.get('zip_code'),
+                "property_type": inspection.get('property_type'),
+                "square_footage": inspection.get('square_footage'),
+                
+                # Status and metadata
+                "status": inspection.get('status', 'pending'),
+            }
+            
+            result_list.append(inspection_data)
+        
+        print(f"🔍 DEBUG: Returning {len(result_list)} asbestos inspections")
+        return jsonify(result_list)
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Get asbestos inspections error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch asbestos inspections: {str(e)}"}), 500
 
 @app.route('/api/samples', methods=['POST'])
 def create_sample():
@@ -2015,6 +2108,7 @@ if __name__ == '__main__':
     print("   - DELETE /api/inspection/<int:inspection_id>/lab-image/<int:image_index>")
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
+    print("   - GET  /api/asbestos-inspections")
     print("   - POST /api/llm/summarize")
     print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
     print("   - POST /api/validate-lab-image (OCR validation before database save)")

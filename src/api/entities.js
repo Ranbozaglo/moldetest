@@ -343,6 +343,49 @@ export const MoldInspection = {
   }
 };
 
+// Asbestos Inspection entity
+export const AsbestosInspection = {
+  list: async (sortBy = '-created_at', limit = 50) => {
+    const token = getAuthToken();
+    const user = localStorage.getItem('mth_user');
+    let email = '';
+    let isAdmin = false;
+    
+    if (user) {
+      const userData = JSON.parse(user);
+      email = userData.email;
+      isAdmin = userData.role === 'admin' || userData.is_admin;
+    }
+    
+    // Use higher limit for admin users
+    if (isAdmin) {
+      sortBy = sortBy || '-created_at';
+      limit = limit === 50 ? 100 : limit; // Limit to 100 for performance
+    }
+    
+    const queryParams = new URLSearchParams();
+    if (sortBy) {
+      queryParams.append('sort', sortBy);
+    }
+    if (limit) {
+      queryParams.append('limit', limit.toString());
+    }
+    
+    // Only send email filter for non-admin users
+    // Admin users get ALL inspections without email filtering
+    if (email && !isAdmin) {
+      queryParams.append('email', email);
+    }
+    
+    const response = await apiCall(`/asbestos-inspections?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
+  }
+};
+
 // Sample entity
 export const Sample = {
   create: async (data) => {

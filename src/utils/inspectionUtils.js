@@ -15,7 +15,7 @@ export function getDisplayNumber(inspection) {
   
   // Fallback to ID
   if (inspection.id) {
-    return `TT #${inspection.id.substring(0, 8)}`;
+    return `TT #${String(inspection.id).substring(0, 8)}`;
   }
   
   return 'TT #N/A';

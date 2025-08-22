@@ -19,7 +19,7 @@ export default function ThankYou() {
       try {
         if (currentUser && currentUser.email) {
           // Find the most recent inspection by this user
-          const inspections = await MoldInspection.filter({ email: currentUser.email }, '-created_date', 1);
+          const inspections = await MoldInspection.filter({ email: currentUser.email }, '-created_at', 1);
           if (inspections && inspections.length > 0) {
             setUserInspection(inspections[0]);
           }

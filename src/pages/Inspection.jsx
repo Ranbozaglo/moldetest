@@ -292,7 +292,7 @@ export default function Inspection() {
         // Don't manually assign inspection_number - let the database trigger handle it
         // inspection_number: nextInspectionNumber,
         client_status_detail: "Inspection submitted - awaiting sample collection",
-        created_date: new Date().toISOString() // Add the current date
+        created_at: new Date().toISOString() // Add the current date
       };
 
       // Extract mold_images and mold_locations from visible_mold_details
