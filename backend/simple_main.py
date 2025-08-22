@@ -890,7 +890,8 @@ def create_inspection():
             'created_by_id': data.get('created_by'),
             'email': data.get('email'),
             'is_sample': data.get('is_sample', False),
-            'created_date': data.get('created_date')
+          'created_date': data.get('created_date'),
+            'app_id': 'mold'  # Default app_id for all inspections
         }
         
         # Handle image fields using correct database column names
