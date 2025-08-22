@@ -383,6 +383,40 @@ export const AsbestosInspection = {
       }
     });
     return response;
+  },
+
+  findUnique: async (filters = {}) => {
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams();
+    
+    if (filters.id) {
+      queryParams.append('id', filters.id);
+    }
+    
+    const response = await apiCall(`/asbestos-inspections?${queryParams.toString()}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    
+    // Return the first inspection if it's an array, or the response directly
+    if (Array.isArray(response) && response.length > 0) {
+      return response[0];
+    }
+    return response;
+  },
+
+  update: async (id, data) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/asbestos-inspections/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response;
   }
 };
 
