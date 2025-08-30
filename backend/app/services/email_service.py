@@ -82,6 +82,27 @@ class EmailService:
 </body>
 </html>"""
             },
+            "lab_received_asbestos": {
+                "subject": "Total Testing - Asbestos Lab Samples Received (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <p>Hi {full_name},</p>
+    
+    <p>Just a quick update, your asbestos test samples have been received by our lab and are now being processed.</p>
+    
+    <p>Our team is reviewing the findings and preparing your personalized asbestos analysis report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
+    
+    <p>You can track the status of your report here: <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold;">Track My Report</a></p>
+    
+    <p>We'll notify you the moment your report is ready.</p>
+    
+    <p>Thank you for trusting Total Testing with your asbestos testing needs!</p>
+    
+    <br>
+    <p>Warm regards,<br>Total Testing</p>
+</body>
+</html>"""
+            },
             "report_ready": {
                 "subject": "Total Testing - Report Ready (Inspection #{inspection_number})",
                 "body": """<html>
@@ -106,6 +127,31 @@ class EmailService:
 </body>
 </html>"""
             },
+            "report_ready_asbestos": {
+                "subject": "Total Testing - Asbestos Report Ready (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <p>Hi {full_name},</p>
+    
+    <p>Your lab results and asbestos inspection report are now ready to view in your secure portal.</p>
+    
+    <p><strong>This report includes:</strong></p>
+    <ul style="margin-left: 20px; line-height: 1.6;">
+        <li>Asbestos inspection findings</li>
+        <li>Lab-verified analysis of your samples</li>
+        <li>Asbestos types identified and concentration levels</li>
+        <li>Material condition assessment</li>
+        <li>Professional interpretation and next steps (if needed)</li>
+    </ul>
+    
+    <p>🔗 View your report now by visiting your portal:</p>
+    <p>👉 <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold; background-color: #f0f8ff; padding: 8px 16px; border-radius: 5px; display: inline-block;">Access Your Report</a></p>
+    
+    <br>
+    <p>Thanks again for choosing Total Testing!</p>
+</body>
+</html>"""
+            },
             "review_request": {
                 "subject": "Total Testing - Review Request (Inspection #{inspection_number})",
                 "body": """<html>
@@ -113,6 +159,20 @@ class EmailService:
     <h2>Total Testing - Review Request</h2>
     <p>Dear {full_name},</p>
     <p>Thank you for using our mold testing services. We hope you found our service helpful.</p>
+    <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
+    <p>Thank you for choosing Total Testing.</p>
+    <br>
+    <p>Best regards,<br>Total Testing Team</p>
+</body>
+</html>"""
+            },
+            "review_request_asbestos": {
+                "subject": "Total Testing - Asbestos Review Request (Inspection #{inspection_number})",
+                "body": """<html>
+<body>
+    <h2>Total Testing - Asbestos Review Request</h2>
+    <p>Dear {full_name},</p>
+    <p>Thank you for using our asbestos testing services. We hope you found our service helpful.</p>
     <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
     <p>Thank you for choosing Total Testing.</p>
     <br>
@@ -159,6 +219,49 @@ class EmailService:
     <p style="font-size: 12px; color: #6c757d;">
         This email was sent to {email} regarding inspection #{inspection_number}. 
         You received this because you created a new mold inspection with Total Testing.
+    </p>
+</body>
+</html>"""
+            },
+            "inspection_created_asbestos": {
+                "subject": "Welcome to Total Testing - Asbestos Inspection #{inspection_number} Created",
+                "body": """<html>
+<body>
+    <h2>Welcome to Total Testing!</h2>
+    <p>Dear {full_name},</p>
+    <p>Congratulations! Your asbestos inspection has been successfully created.</p>
+    
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
+        <h3 style="color: #004aac; margin-top: 0;">Your Asbestos Inspection Details:</h3>
+        <p><strong>Inspection Number:</strong> {inspection_number}</p>
+        <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
+        <p><strong>Status:</strong> Ready for Sample Collection</p>
+    </div>
+    
+    <h3>📋 Next Steps:</h3>
+    <ol>
+        <li><strong>Collect Your Samples:</strong> Follow the asbestos sampling guide provided during your inspection setup</li>
+        <li><strong>Send Samples to Lab:</strong> Use the prepaid shipping materials to send your samples</li>
+        <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
+        <li><strong>Receive Results:</strong> Get your detailed asbestos analysis report within 3-5 business days</li>
+    </ol>
+    
+    <div style="text-align: center; margin: 30px 0;">
+        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            View My Inspections
+        </a>
+    </div>
+    
+    <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
+    <p>Thank you for choosing Total Testing for your asbestos inspection needs!</p>
+    
+    <br>
+    <p>Best regards,<br>The Total Testing Team</p>
+    
+    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
+    <p style="font-size: 12px; color: #6c757d;">
+        This email was sent to {email} regarding asbestos inspection #{inspection_number}. 
+        You received this because you created a new asbestos inspection with Total Testing.
     </p>
 </body>
 </html>"""
@@ -421,7 +524,13 @@ class EmailService:
         """
         try:
             templates = self.get_templates()
-            template = templates.get('lab_received', self.default_templates['lab_received'])
+            
+            # Determine template based on inspection type
+            inspection_type = inspection_data.get('inspection_type', 'mold')
+            if inspection_type == 'asbestos':
+                template = templates.get('lab_received_asbestos', self.default_templates['lab_received_asbestos'])
+            else:
+                template = templates.get('lab_received', self.default_templates['lab_received'])
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
@@ -443,7 +552,13 @@ class EmailService:
         """
         try:
             templates = self.get_templates()
-            template = templates.get('report_ready', self.default_templates['report_ready'])
+            
+            # Determine template based on inspection type
+            inspection_type = inspection_data.get('inspection_type', 'mold')
+            if inspection_type == 'asbestos':
+                template = templates.get('report_ready_asbestos', self.default_templates['report_ready_asbestos'])
+            else:
+                template = templates.get('report_ready', self.default_templates['report_ready'])
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
@@ -465,7 +580,13 @@ class EmailService:
         """
         try:
             templates = self.get_templates()
-            template = templates.get('review_request', self.default_templates['review_request'])
+            
+            # Determine template based on inspection type
+            inspection_type = inspection_data.get('inspection_type', 'mold')
+            if inspection_type == 'asbestos':
+                template = templates.get('review_request_asbestos', self.default_templates['review_request_asbestos'])
+            else:
+                template = templates.get('review_request', self.default_templates['review_request'])
             
             # Add dashboard URL to inspection data (for future template use)
             inspection_data_with_url = inspection_data.copy()
@@ -490,7 +611,13 @@ class EmailService:
             print(f"🔍 EMAIL DEBUG: Inspection data: {inspection_data}")
             
             templates = self.get_templates()
-            template = templates.get('inspection_created', self.default_templates['inspection_created'])
+            
+            # Determine template based on inspection type
+            inspection_type = inspection_data.get('inspection_type', 'mold')
+            if inspection_type == 'asbestos':
+                template = templates.get('inspection_created_asbestos', self.default_templates['inspection_created_asbestos'])
+            else:
+                template = templates.get('inspection_created', self.default_templates['inspection_created'])
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()

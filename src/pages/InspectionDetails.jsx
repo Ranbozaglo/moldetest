@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Camera, Download, ArrowLeft, FileText, AlertTriangle, CheckCircle, Clock, User, MapPin, Calendar, Home, Mail, Phone, Thermometer, Droplets, FlaskConical, Eye, Edit, Save, Upload, X, Plus, Trash2, Star, Database, Image, File, MoreHorizontal, Send, CheckCircle2, XCircle, PauseCircle, PlayCircle, RotateCcw, Zap, BarChart3, PieChart, TrendingUp, Users, Search, Filter, RefreshCw, Loader2, Download as DownloadIcon, Mail as MailIcon, Eye as EyeIcon, Edit as EditIcon, Trash2 as Trash2Icon, Plus as PlusIcon, X as XIcon, Star as StarIcon, Database as DatabaseIcon, Image as ImageIcon, File as FileIcon, MoreHorizontal as MoreHorizontalIcon, Send as SendIcon, CheckCircle2 as CheckCircle2Icon, XCircle as XCircleIcon, PauseCircle as PauseCircleIcon, PlayCircle as PlayCircleIcon, RotateCcw as RotateCcwIcon, Zap as ZapIcon, BarChart3 as BarChart3Icon, PieChart as PieChartIcon, TrendingUp as TrendingUpIcon, Users as UsersIcon, Search as SearchIcon, Filter as FilterIcon, RefreshCw as RefreshCcwIcon, ImageOff, ZoomIn, Copy } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
@@ -16,6 +18,7 @@ import { format } from "date-fns";
 import { generateReportHtmlContent } from "@/pages/AdminDashboard.jsx";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { Core } from "@/api/integrations";
+import { supabase } from "@/lib/supabase";
 // Removed requireSupabaseSession - using Flask backend authentication
 
 export default function InspectionDetails() {
@@ -120,6 +123,10 @@ export default function InspectionDetails() {
   const [labImageErrors, setLabImageErrors] = useState({});
   const [selectedLabImages, setSelectedLabImages] = useState([]);
   const [inspectionType, setInspectionType] = useState(null);
+  const [isEditingMaterials, setIsEditingMaterials] = useState(false);
+  const [editingMaterialType, setEditingMaterialType] = useState('');
+  const [editingMaterialCondition, setEditingMaterialCondition] = useState('');
+  const [customMaterialType, setCustomMaterialType] = useState('');
   const { user: currentUser } = useAuth();
 
   // Debug useEffect to track inspection state changes
@@ -1074,7 +1081,223 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
     }
   };
 
+  const handleSaveMaterials = async () => {
+    setSaving(true);
+    try {
+      if (!inspectionId || !inspection || !inspectionType) {
+        throw new Error('Missing required data for saving materials');
+      }
 
+      if (inspectionType !== 'asbestos') {
+        throw new Error('Material editing is only available for asbestos inspections');
+      }
+
+      // Validate material type
+      let finalMaterialType = editingMaterialType;
+      if (editingMaterialType === 'other') {
+        if (!customMaterialType.trim()) {
+          alert("Please specify the custom material type");
+          return;
+        }
+        finalMaterialType = customMaterialType.trim();
+      } else if (!editingMaterialType.trim()) {
+        alert("Please select a material type");
+        return;
+      }
+
+      // Validate material condition
+      if (!editingMaterialCondition) {
+        alert("Please select a material condition");
+        return;
+      }
+
+      console.log("🔍 DEBUG: Saving material changes for asbestos inspection ID:", inspectionId);
+      console.log("🔍 DEBUG: Material Type:", finalMaterialType);
+      console.log("🔍 DEBUG: Material Condition:", editingMaterialCondition);
+
+      // Update the asbestos inspection with new material data
+      await AsbestosInspection.update(inspectionId, {
+        material_type: finalMaterialType,
+        material_condition: editingMaterialCondition,
+        material_images: inspection.material_images || []
+      });
+
+      // Update local state
+      setInspection(prev => ({
+        ...prev,
+        material_type: finalMaterialType,
+        material_condition: editingMaterialCondition
+      }));
+
+      console.log("🔍 DEBUG: Material changes saved successfully");
+      setIsEditingMaterials(false);
+      alert("Material assessment updated successfully!");
+      
+    } catch (error) {
+      console.error("❌ Error saving materials:", error);
+      alert("Failed to save material changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStartEditMaterials = () => {
+    const materialType = inspection.material_type || '';
+    setEditingMaterialType(materialType);
+    
+    // Check if the material type is not in our predefined list
+    const predefinedTypes = ['roofing', 'insulation', 'flooring', 'ceiling_tiles', 'wallboard', 'textured_coatings', 'pipe_insulation', 'duct_insulation', 'fireproofing'];
+    if (materialType && !predefinedTypes.includes(materialType)) {
+      setEditingMaterialType('other');
+      setCustomMaterialType(materialType);
+    } else {
+      setCustomMaterialType('');
+    }
+    
+    setEditingMaterialCondition(inspection.material_condition || '');
+    setIsEditingMaterials(true);
+  };
+
+  const handleCancelEditMaterials = () => {
+    setIsEditingMaterials(false);
+    setEditingMaterialType('');
+    setEditingMaterialCondition('');
+    setCustomMaterialType('');
+  };
+
+  const handleMaterialImageUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    setUploadingImage(true);
+    try {
+      const uploadedUrls = [];
+      
+      for (const file of files) {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          console.warn(`Skipping non-image file: ${file.name}`);
+          continue;
+        }
+        
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          console.warn(`Skipping large file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+          continue;
+        }
+        
+        // Create a unique filename
+        const timestamp = Date.now();
+        const filename = `material_${inspectionId}_${timestamp}_${file.name}`;
+        
+        // Upload to Supabase storage
+        const { data, error } = await supabase.storage
+          .from('mold.images')
+          .upload(`uploads/${filename}`, file);
+        
+        if (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          continue;
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('mold.images')
+          .getPublicUrl(`uploads/${filename}`);
+        
+        uploadedUrls.push(publicUrl);
+      }
+      
+      if (uploadedUrls.length === 0) {
+        alert("No images were successfully uploaded. Please check file types and sizes.");
+        return;
+      }
+      
+      // Update the inspection with new material images
+      const currentImages = inspection.material_images || [];
+      const newImages = [...currentImages, ...uploadedUrls];
+      
+      await AsbestosInspection.update(inspectionId, {
+        material_images: newImages
+      });
+      
+      // Update local state
+      setInspection(prev => ({
+        ...prev,
+        material_images: newImages
+      }));
+      
+      alert(`Successfully uploaded ${uploadedUrls.length} material image(s)`);
+      
+    } catch (error) {
+      console.error("❌ Error uploading material images:", error);
+      alert("Failed to upload material images. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveMaterialImage = async (imageIndex) => {
+    if (!confirm('Are you sure you want to remove this material image?')) return;
+    
+    try {
+      const currentImages = inspection.material_images || [];
+      const newImages = currentImages.filter((_, index) => index !== imageIndex);
+      
+      await AsbestosInspection.update(inspectionId, {
+        material_images: newImages
+      });
+      
+      // Update local state
+      setInspection(prev => ({
+        ...prev,
+        material_images: newImages
+      }));
+      
+      alert('Material image removed successfully');
+      
+    } catch (error) {
+      console.error("❌ Error removing material image:", error);
+      alert("Failed to remove material image. Please try again.");
+    }
+  };
+
+  const handleUpdateMaterialImages = async (newImages) => {
+    try {
+      await AsbestosInspection.update(inspectionId, {
+        material_images: newImages
+      });
+      
+      // Update local state
+      setInspection(prev => ({
+        ...prev,
+        material_images: newImages
+      }));
+      
+      console.log("🔍 DEBUG: Material images updated successfully");
+      alert(`Successfully updated material images. ${newImages.length} image(s) now available.`);
+      
+    } catch (error) {
+      console.error("❌ Error updating material images:", error);
+      alert("Failed to update material images. Please try again.");
+    }
+  };
+
+  const handleAddMaterialImageUrl = async () => {
+    const url = prompt('Enter the URL of the material image:');
+    if (!url || !url.trim()) return;
+    
+    try {
+      const currentImages = inspection.material_images || [];
+      const newImages = [...currentImages, url.trim()];
+      
+      await handleUpdateMaterialImages(newImages);
+      
+    } catch (error) {
+      console.error("❌ Error adding material image URL:", error);
+      alert("Failed to add material image URL. Please try again.");
+    }
+  };
 
   if (loading) {
     return (
@@ -1132,6 +1355,27 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                 'bg-gray-100 text-gray-800'
               }`}>
                 {inspectionType === 'mold' ? 'Mold Inspection' : 'Asbestos Inspection'}
+              </Badge>
+            )}
+            
+            {/* Material Type Badge for Asbestos Inspections */}
+            {inspectionType === 'asbestos' && inspection.material_type && (
+              <Badge className="mt-2 px-3 py-1 text-sm bg-orange-50 text-orange-700 border border-orange-200">
+                Material: {inspection.material_type}
+              </Badge>
+            )}
+            
+            {/* Material Condition Badge for Asbestos Inspections */}
+            {inspectionType === 'asbestos' && inspection.material_condition && (
+              <Badge className={`mt-2 px-3 py-1 text-sm ${
+                inspection.material_condition === 'Good' ? 'bg-green-100 text-green-700 border-green-200' :
+                inspection.material_condition === 'Fair' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                inspection.material_condition === 'Poor' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                inspection.material_condition === 'Deteriorating' ? 'bg-red-100 text-red-700 border-red-200' :
+                inspection.material_condition === 'Damaged' ? 'bg-red-100 text-red-700 border-red-200' :
+                'bg-gray-100 text-gray-700 border-gray-200'
+              } border`}>
+                Condition: {inspection.material_condition}
               </Badge>
             )}
           </div>
@@ -1283,6 +1527,42 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                          {inspection.year_built && parseInt(inspection.year_built) < 1980 ? "High Risk" : "Low Risk"}
                        </Badge>
                      </div>
+                     
+                     {/* Material Overview for Asbestos */}
+                     {inspection.material_type && (
+                       <div className="text-center">
+                         <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 bg-green-100 text-green-600">
+                           <Database className="w-6 h-6" />
+                         </div>
+                         <p className="text-sm font-medium text-slate-700">Material Type</p>
+                         <Badge variant="outline" className="mt-1">
+                           {inspection.material_type}
+                         </Badge>
+                       </div>
+                     )}
+                     
+                     {inspection.material_condition && (
+                       <div className="text-center">
+                         <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                           inspection.material_condition === 'Good' ? 'bg-green-100 text-green-600' :
+                           inspection.material_condition === 'Fair' ? 'bg-yellow-100 text-yellow-600' :
+                           inspection.material_condition === 'Poor' ? 'bg-orange-100 text-orange-600' :
+                           inspection.material_condition === 'Deteriorating' ? 'bg-red-100 text-red-600' :
+                           inspection.material_condition === 'Damaged' ? 'bg-red-100 text-red-600' :
+                           'bg-gray-100 text-gray-600'
+                         }`}>
+                           <AlertTriangle className="w-6 h-6" />
+                         </div>
+                         <p className="text-sm font-medium text-slate-700">Material Condition</p>
+                         <Badge variant={inspection.material_condition === 'Good' ? "default" : 
+                                       inspection.material_condition === 'Fair' ? "secondary" :
+                                       inspection.material_condition === 'Poor' ? "destructive" :
+                                       inspection.material_condition === 'Deteriorating' ? "destructive" :
+                                       inspection.material_condition === 'Damaged' ? "destructive" : "secondary"} className="mt-1">
+                           {inspection.material_condition}
+                         </Badge>
+                       </div>
+                     )}
                   </>
                 )}
                 
@@ -1429,55 +1709,57 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               
               
 
-              {/* Environmental Conditions */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Thermometer className="w-5 h-5 text-blue-600" />
-                  <Label className="text-slate-700 font-semibold text-lg">Environmental Conditions</Label>
-                </div>
-                
-                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-                  {inspection.environmental_data_method === 'photo' && inspection.thermostat_image ? (
-                    <div className="space-y-3">
-                      <p className="font-medium text-blue-800">Thermostat Reading</p>
-                      <div className="max-w-md">
-                        <img
-                          src={inspection.thermostat_image}
-                          alt="Thermostat reading"
-                          className="w-full h-auto rounded border-2 border-blue-300"
-                        />
-                      </div>
-                    </div>
-                  ) : inspection.environmental_data_method === 'manual' ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-blue-800">Temperature</p>
-                        <p className="text-lg font-semibold">{inspection.temperature || 'N/A'}°F</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-blue-800">Humidity</p>
-                        <p className={`text-lg font-semibold ${inspection.humidity && parseFloat(inspection.humidity) > 60 ? 'text-red-600' : ''}`}>
-                          {inspection.humidity || 'N/A'}%
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-blue-600">Environmental data not provided</p>
-                  )}
+              {/* Environmental Conditions - Only for Mold Inspections */}
+              {inspectionType === 'mold' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Thermometer className="w-5 h-5 text-blue-600" />
+                    <Label className="text-slate-700 font-semibold text-lg">Environmental Conditions</Label>
+                  </div>
                   
-                  {inspection.humidity && parseFloat(inspection.humidity) > 60 && (
-                    <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                        <p className="text-sm font-medium text-yellow-800">
-                          ⚠️ HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
-                          Current humidity of {inspection.humidity}% may contribute to mold development.
-                        </p>
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                    {inspection.environmental_data_method === 'photo' && inspection.thermostat_image ? (
+                      <div className="space-y-3">
+                        <p className="font-medium text-blue-800">Thermostat Reading</p>
+                        <div className="max-w-md">
+                          <img
+                            src={inspection.thermostat_image}
+                            alt="Thermostat reading"
+                            className="w-full h-auto rounded border-2 border-blue-300"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    ) : inspection.environmental_data_method === 'manual' ? (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-blue-800">Temperature</p>
+                          <p className="text-lg font-semibold">{inspection.temperature || 'N/A'}°F</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-blue-800">Humidity</p>
+                          <p className={`text-lg font-semibold ${inspection.humidity && parseFloat(inspection.humidity) > 60 ? 'text-red-600' : ''}`}>
+                            {inspection.humidity || 'N/A'}%
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-blue-600">Environmental data not provided</p>
+                    )}
+                    
+                    {inspection.humidity && parseFloat(inspection.humidity) > 60 && (
+                      <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                          <p className="text-sm font-medium text-yellow-800">
+                            ⚠️ HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
+                            Current humidity of {inspection.humidity}% may contribute to mold development.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
 
                              {/* Recommendations */}
@@ -1630,6 +1912,292 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                          professionals before any construction work.
                        </p>
                      </div>
+                   </div>
+                 </div>
+                 
+                 {/* Material Assessment Section */}
+                 <div className="bg-white/50 p-4 rounded-lg border border-orange-200">
+                   <div className="flex items-center justify-between mb-3">
+                     <h4 className="font-semibold text-orange-800">Material Assessment</h4>
+                     {currentUser && (currentUser.role === 'admin' || currentUser.is_admin) && (
+                       <Button
+                         variant="outline"
+                         size="sm"
+                         onClick={isEditingMaterials ? handleCancelEditMaterials : handleStartEditMaterials}
+                         className="text-orange-600 border-orange-300 hover:bg-orange-50"
+                       >
+                         {isEditingMaterials ? (
+                           <>
+                             <X className="w-4 h-4 mr-2" />
+                             Cancel
+                           </>
+                         ) : (
+                           <>
+                             <Edit className="w-4 h-4 mr-2" />
+                             Edit
+                           </>
+                         )}
+                       </Button>
+                     )}
+                   </div>
+                   
+                   {isEditingMaterials ? (
+                     <div className="space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div>
+                             <Label className="text-slate-600 text-sm">Material Type</Label>
+                             <Select value={editingMaterialType} onValueChange={setEditingMaterialType}>
+                               <SelectTrigger className="mt-1">
+                                 <SelectValue placeholder="Select material type" />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 <SelectItem value="roofing">Roofing</SelectItem>
+                                 <SelectItem value="insulation">Insulation</SelectItem>
+                                 <SelectItem value="flooring">Flooring</SelectItem>
+                                 <SelectItem value="ceiling_tiles">Ceiling Tiles</SelectItem>
+                                 <SelectItem value="wallboard">Wallboard</SelectItem>
+                                 <SelectItem value="textured_coatings">Textured Coatings</SelectItem>
+                                 <SelectItem value="pipe_insulation">Pipe Insulation</SelectItem>
+                                 <SelectItem value="duct_insulation">Duct Insulation</SelectItem>
+                                 <SelectItem value="fireproofing">Fireproofing</SelectItem>
+                                 <SelectItem value="other">Other</SelectItem>
+                               </SelectContent>
+                             </Select>
+                             
+                             {/* Custom input for "Other" */}
+                             {editingMaterialType === 'other' && (
+                               <Input
+                                 value={customMaterialType}
+                                 onChange={(e) => setCustomMaterialType(e.target.value)}
+                                 placeholder="Specify material type"
+                                 className="mt-2"
+                               />
+                             )}
+                           </div>
+                         <div>
+                           <Label className="text-slate-600 text-sm">Material Condition</Label>
+                           <Select value={editingMaterialCondition} onValueChange={setEditingMaterialCondition}>
+                             <SelectTrigger className="mt-1">
+                               <SelectValue placeholder="Select condition" />
+                             </SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="Good">Good</SelectItem>
+                               <SelectItem value="Fair">Fair</SelectItem>
+                               <SelectItem value="Poor">Poor</SelectItem>
+                               <SelectItem value="Deteriorating">Deteriorating</SelectItem>
+                               <SelectItem value="Damaged">Damaged</SelectItem>
+                             </SelectContent>
+                           </Select>
+                         </div>
+                       </div>
+                       
+                                                <div className="flex gap-2">
+                           <Button
+                             onClick={handleSaveMaterials}
+                             disabled={saving}
+                             className="bg-orange-600 hover:bg-orange-700"
+                           >
+                             {saving ? (
+                               <>
+                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                 Saving...
+                               </>
+                             ) : (
+                               <>
+                                 <Save className="w-4 h-4 mr-2" />
+                                 Save Changes
+                               </>
+                             )}
+                           </Button>
+                           <Button
+                             variant="outline"
+                             onClick={handleCancelEditMaterials}
+                             className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                           >
+                             Cancel
+                           </Button>
+                         </div>
+                         
+                         {/* Material Images URL Editor */}
+                         <div className="mt-4">
+                           <Label className="text-slate-600 text-sm">Material Images URLs (one per line)</Label>
+                           <Textarea
+                             value={inspection.material_images ? inspection.material_images.join('\n') : ''}
+                             onChange={(e) => {
+                               const urls = e.target.value.split('\n').filter(url => url.trim());
+                               setInspection(prev => ({
+                                 ...prev,
+                                 material_images: urls
+                               }));
+                             }}
+                             placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"
+                             className="mt-1 font-mono text-xs"
+                             rows={3}
+                           />
+                           <p className="text-xs text-slate-500 mt-1">
+                             Enter image URLs, one per line. Changes will be saved when you click "Save Changes".
+                           </p>
+                           
+                           <div className="flex gap-2 mt-2">
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={handleAddMaterialImageUrl}
+                               className="text-xs px-2 py-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                             >
+                               Add URL
+                             </Button>
+                             
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 const urls = prompt('Enter image URLs (one per line):', 
+                                   inspection.material_images ? inspection.material_images.join('\n') : '');
+                                 if (urls !== null) {
+                                   const urlArray = urls.split('\n').filter(url => url.trim());
+                                   handleUpdateMaterialImages(urlArray);
+                                 }
+                               }}
+                               className="text-xs px-2 py-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                             >
+                               Replace All URLs
+                             </Button>
+                           </div>
+                         </div>
+                     </div>
+                   ) : (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div>
+                         <Label className="text-slate-600 text-sm">Material Type</Label>
+                         <p className="font-medium text-slate-800 mt-1">
+                           {inspection.material_type || 'Not specified'}
+                         </p>
+                       </div>
+                       <div>
+                         <Label className="text-slate-600 text-sm">Material Condition</Label>
+                         <p className="font-medium text-slate-800 mt-1">
+                           {inspection.material_condition || 'Not assessed'}
+                         </p>
+                       </div>
+                     </div>
+                   )}
+                   
+                                        {/* Material Images */}
+                     <div className="mt-4">
+                       <div className="flex items-center justify-between mb-2">
+                         <Label className="text-slate-600 text-sm">Material Images</Label>
+                         {currentUser && (currentUser.role === 'admin' || currentUser.is_admin) && (
+                           <div className="flex items-center gap-2">
+                             <input
+                               type="file"
+                               multiple
+                               accept="image/*"
+                               onChange={handleMaterialImageUpload}
+                               className="hidden"
+                               id="material-image-upload"
+                             />
+                             <label
+                               htmlFor="material-image-upload"
+                               className="cursor-pointer inline-flex items-center gap-2 px-3 py-1 text-xs bg-orange-100 text-orange-700 rounded-md hover:bg-orange-200 transition-colors"
+                             >
+                               <Upload className="w-3 h-3" />
+                               Upload Images
+                             </label>
+                           </div>
+                         )}
+                       </div>
+                     
+                     {inspection.material_images && inspection.material_images.length > 0 ? (
+                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                         {inspection.material_images.map((image, index) => (
+                           <div key={index} className="relative group">
+                             <img
+                               src={image}
+                               alt={`Material ${index + 1}`}
+                               className="w-full h-24 object-cover rounded-lg border border-orange-200 cursor-pointer hover:opacity-80 transition-opacity"
+                               onClick={() => window.open(image, '_blank')}
+                               onError={(e) => {
+                                 e.target.style.display = 'none';
+                                 e.target.nextElementSibling.style.display = 'flex';
+                               }}
+                             />
+                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 rounded-lg flex items-center justify-center">
+                               <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                             </div>
+                             
+                             {/* Delete button for admin users */}
+                             {currentUser && (currentUser.role === 'admin' || currentUser.is_admin) && (
+                               <button
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   handleRemoveMaterialImage(index);
+                                 }}
+                                 className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                                 title="Remove image"
+                               >
+                                 <X className="w-3 h-3" />
+                               </button>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
+                       <div className="text-center py-8 text-slate-500 border-2 border-dashed border-orange-200 rounded-lg">
+                         <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                         <p className="text-sm">No material images uploaded yet</p>
+                         {currentUser && (currentUser.role === 'admin' || currentUser.is_admin) && (
+                           <div className="mt-3 space-y-2">
+                             <input
+                               type="file"
+                               multiple
+                               accept="image/*"
+                               onChange={handleMaterialImageUpload}
+                               className="hidden"
+                               id="material-image-upload-empty"
+                             />
+                             <label
+                               htmlFor="material-image-upload-empty"
+                               className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-md hover:bg-orange-200 transition-colors"
+                             >
+                               <Upload className="w-4 h-4" />
+                               Upload Material Images
+                             </label>
+                             
+                             <div className="text-xs text-slate-500">
+                               <p>Or add image URLs directly:</p>
+                               <div className="flex gap-2 mt-1">
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={() => {
+                                     const urls = prompt('Enter image URLs (one per line):');
+                                     if (urls !== null) {
+                                       const urlArray = urls.split('\n').filter(url => url.trim());
+                                       if (urlArray.length > 0) {
+                                         handleUpdateMaterialImages(urlArray);
+                                       }
+                                     }
+                                   }}
+                                   className="text-xs px-2 py-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                 >
+                                   Add URLs
+                                 </Button>
+                                 
+                                 <Button
+                                   variant="outline"
+                                   size="sm"
+                                   onClick={handleAddMaterialImageUrl}
+                                   className="text-xs px-2 py-1 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                 >
+                                   Add Single URL
+                                 </Button>
+                               </div>
+                             </div>
+                           </div>
+                         )}
+                       </div>
+                     )}
                    </div>
                  </div>
                </CardContent>

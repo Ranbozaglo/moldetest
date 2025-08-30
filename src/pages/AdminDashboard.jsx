@@ -1216,7 +1216,13 @@ export default function AdminDashboard() {
       return;
     }
     
-
+    // Determine if this is a mold or asbestos inspection
+    const isAsbestosInspection = inspection.app_id === 'asbestos' || 
+                                inspection.app_id === 'Aasbestos' || 
+                                inspection.app_id === 'Asbestos';
+    
+    console.log(`🔍 DEBUG: Inspection type detected: ${isAsbestosInspection ? 'asbestos' : 'mold'}`);
+    console.log(`🔍 DEBUG: App ID: ${inspection.app_id}`);
     
     try {
       console.log(`🔍 DEBUG: Sending lab received email for inspection ${inspectionId}`);
@@ -1239,39 +1245,64 @@ export default function AdminDashboard() {
       if (!dbId) {
         console.log(`🔍 DEBUG: Database ID not found, trying to get detailed inspection data using inspection_number: ${inspectionId}`);
         try {
-          const detailedInspection = await MoldInspection.getDetailed(inspectionId);
-          dbId = detailedInspection.id;
-          console.log(`🔍 DEBUG: Retrieved database ID from detailed inspection: ${dbId}`);
-        } catch (detailError) {
-          console.error(`🔍 DEBUG: Error getting detailed inspection:`, detailError);
-          console.log(`🔍 DEBUG: Skipping status update due to missing database ID, but email was sent successfully`);
-          // Don't throw error - email was sent successfully, just skip the status update
-          dbId = null;
-        }
-      }
+                     if (isAsbestosInspection) {
+             const detailedInspection = await AsbestosInspection.getDetailed(inspectionId);
+             dbId = detailedInspection.id;
+             console.log(`🔍 DEBUG: Retrieved database ID from detailed asbestos inspection: ${dbId}`);
+           } else {
+             const detailedInspection = await MoldInspection.getDetailed(inspectionId);
+             dbId = detailedInspection.id;
+             console.log(`🔍 DEBUG: Retrieved database ID from detailed mold inspection: ${dbId}`);
+           }
+         } catch (detailError) {
+           console.error(`🔍 DEBUG: Error getting detailed inspection:`, detailError);
+           console.log(`🔍 DEBUG: Skipping status update due to missing database ID, but email was sent successfully`);
+           // Don't throw error - email was sent successfully, just skip the status update
+           dbId = null;
+         }
+       }
       
-      console.log(`🔍 DEBUG: About to call MoldInspection.update with database ID: ${dbId}`);
+      console.log(`🔍 DEBUG: About to call ${isAsbestosInspection ? 'AsbestosInspection' : 'MoldInspection'}.update with database ID: ${dbId}`);
       console.log(`🔍 DEBUG: inspection_number being used for email: ${inspectionId}`);
       
       // Only update status if we have a valid database ID
       if (dbId) {
-        const updatedInspection = await MoldInspection.update(dbId, { 
-        status: 'in_progress',
+        const updateData = { 
+          status: 'in_progress',
           client_status_detail: "Your samples have been received and are now in lab analysis.",
           updated_date: new Date().toISOString()
-        });
+        };
         
-        console.log("🔍 DEBUG: MoldInspection.update response:", updatedInspection);
-        
-        // Update the local state immediately
-        // Use the same database ID for matching
-        setInspections(prevInspections => 
-          prevInspections.map(insp => 
-            insp.id === dbId
-              ? { ...insp, status: 'in_progress', client_status_detail: "Your samples have been received and are now in lab analysis." }
-              : insp
-          )
-        );
+        let updatedInspection;
+        if (isAsbestosInspection) {
+          // For asbestos inspections, only update status (client_status_detail doesn't exist)
+          const asbestosUpdateData = { 
+            status: 'in_progress'
+          };
+          updatedInspection = await AsbestosInspection.update(dbId, asbestosUpdateData);
+          console.log("🔍 DEBUG: AsbestosInspection.update response:", updatedInspection);
+          
+          // Update the local asbestos inspections state
+          setAsbestosInspections(prevInspections => 
+            prevInspections.map(insp => 
+              insp.id === dbId
+                ? { ...insp, status: 'in_progress' }
+                : insp
+            )
+          );
+        } else {
+          updatedInspection = await MoldInspection.update(dbId, updateData);
+          console.log("🔍 DEBUG: MoldInspection.update response:", updatedInspection);
+          
+          // Update the local mold inspections state
+          setInspections(prevInspections => 
+            prevInspections.map(insp => 
+              insp.id === dbId
+                ? { ...insp, status: 'in_progress', client_status_detail: "Your samples have been received and are now in lab analysis." }
+                : insp
+            )
+          );
+        }
       } else {
         console.log(`🔍 DEBUG: Skipping status update - no valid database ID available`);
         showPopup({
@@ -1321,6 +1352,13 @@ export default function AdminDashboard() {
       return;
     }
     
+    // Determine if this is a mold or asbestos inspection
+    const isAsbestosInspection = inspection.app_id === 'asbestos' || 
+                                inspection.app_id === 'Aasbestos' || 
+                                inspection.app_id === 'Asbestos';
+    
+    console.log(`🔍 DEBUG: Inspection type detected: ${isAsbestosInspection ? 'asbestos' : 'mold'}`);
+    console.log(`🔍 DEBUG: App ID: ${inspection.app_id}`);
 
     setEmailSending(inspectionId, 'report');
     
@@ -1345,21 +1383,43 @@ export default function AdminDashboard() {
       // Step 3: Update the inspection status to 'completed' in the database
       const dbId = inspection.id;
       if (dbId) {
-        await MoldInspection.update(dbId, { 
-        status: 'completed',
-        client_status_detail: "Your detailed analysis and report are complete and available for download.",
+        const updateData = { 
+          status: 'completed',
+          client_status_detail: "Your detailed analysis and report are complete and available for download.",
           report_html_url: reportUrl,
           updated_date: new Date().toISOString()
-        });
+        };
         
-        // Step 4: Update the local state immediately
-        setInspections(prevInspections => 
-          prevInspections.map(insp => 
-            insp.id === dbId
-              ? { ...insp, status: 'completed', client_status_detail: "Your detailed analysis and report are complete and available for download." }
-              : insp
-          )
-        );
+        if (isAsbestosInspection) {
+          // For asbestos inspections, only update status (client_status_detail doesn't exist)
+          const asbestosUpdateData = { 
+            status: 'completed'
+          };
+          await AsbestosInspection.update(dbId, asbestosUpdateData);
+          console.log("🔍 DEBUG: AsbestosInspection.update completed");
+          
+          // Step 4: Update the local asbestos inspections state immediately
+          setAsbestosInspections(prevInspections => 
+            prevInspections.map(insp => 
+              insp.id === dbId
+                ? { ...insp, status: 'completed' }
+                : insp
+            )
+          );
+        } else {
+          // For mold inspections, update status and client_status_detail
+          await MoldInspection.update(dbId, updateData);
+          console.log("🔍 DEBUG: MoldInspection.update completed");
+          
+          // Step 4: Update the local mold inspections state immediately
+          setInspections(prevInspections => 
+            prevInspections.map(insp => 
+              insp.id === dbId
+                ? { ...insp, status: 'completed', client_status_detail: "Your detailed analysis and report are complete and available for download." }
+                : insp
+            )
+          );
+        }
       }
       
       // Step 5: Invalidate cache and refresh the UI to ensure we have the latest data
@@ -2397,7 +2457,14 @@ export default function AdminDashboard() {
                                       let detailedInspection = inspection;
                                       try {
                                         const inspectionId = inspection.id || inspection.inspection_number;
-                                        detailedInspection = await MoldInspection.getDetailed(inspectionId);
+                                        const isAsbestosInspection = inspection.inspectionType === 'asbestos';
+                                        if (isAsbestosInspection) {
+                                          detailedInspection = await AsbestosInspection.getDetailed(inspectionId);
+                                          console.log(`🔍 DEBUG: Retrieved database ID from detailed asbestos inspection: ${detailedInspection.id}`);
+                                        } else {
+                                          detailedInspection = await MoldInspection.getDetailed(inspectionId);
+                                          console.log(`🔍 DEBUG: Retrieved database ID from detailed mold inspection: ${detailedInspection.id}`);
+                                        }
                                         console.log("🔍 DEBUG: Retrieved detailed inspection data:", detailedInspection);
                                       } catch (detailError) {
                                         console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);

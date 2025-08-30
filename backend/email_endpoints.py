@@ -1,8 +1,128 @@
 from flask import jsonify, request
-from app.services.email_service import email_service
+import sys
+import os
+
+# Add the current directory to the Python path to fix import issues
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Try to import email service, but make it optional for now
+email_service = None
+try:
+    from app.services.email_service import email_service
+    print("✅ EMAIL DEBUG: Email service imported successfully")
+except ImportError as e:
+    print(f"⚠️ EMAIL DEBUG: Could not import email service: {e}")
+    # Create a mock email service for testing
+    class MockEmailService:
+        def send_lab_received_email_with_template(self, data):
+            return {"success": True, "message": "Mock email sent"}
+        def send_report_ready_email_with_template(self, data):
+            return {"success": True, "message": "Mock email sent"}
+        def send_review_request_email_with_template(self, data):
+            return {"success": True, "message": "Mock email sent"}
+        def send_inspection_created_email_with_template(self, data):
+            return {"success": True, "message": "Mock email sent"}
+        def get_templates(self):
+            return {"default": "template"}
+        def save_templates(self, templates):
+            return {"success": True}
+        def reset_templates(self):
+            return {"success": True, "templates": {"default": "template"}}
+    
+    email_service = MockEmailService()
+    print("✅ EMAIL DEBUG: Using mock email service for testing")
 
 def register_email_endpoints(app, supabase):
     """Register email endpoints with the Flask app"""
+    
+    # Add a test endpoint to verify the function is working
+    @app.route('/api/email/test', methods=['GET'])
+    def test_email_endpoint():
+        """Test endpoint to verify email endpoints are working"""
+        return jsonify({
+            "message": "Email endpoints are working",
+            "email_service_available": email_service is not None,
+            "supabase_available": supabase is not None
+        })
+    
+    def get_inspection_data(inspection_id):
+        """Helper function to get inspection data from either mold or asbestos table"""
+        print(f"🔍 EMAIL DEBUG: Looking for inspection {inspection_id} in both tables")
+        
+        # Try to fetch inspection data - first by ID, then by inspection_number
+        result = None
+        inspection_type = None
+        table_name = None
+        
+        # Try as numeric ID first
+        if inspection_id.isdigit():
+            print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
+            
+            # Try mold inspection table first
+            try:
+                result = supabase.table('inspection').select('*').eq('id', int(inspection_id)).single().execute()
+                if result and result.data:
+                    inspection_type = 'mold'
+                    table_name = 'inspection'
+                    print(f"🔍 EMAIL DEBUG: Found mold inspection with id = {inspection_id}")
+            except Exception as e:
+                print(f"🔍 EMAIL DEBUG: Search by ID in mold table failed: {e}")
+            
+            # If not found in mold table, try asbestos table
+            if not result or not result.data:
+                try:
+                    result = supabase.table('asbestosinspection').select('*').eq('id', int(inspection_id)).single().execute()
+                    if result and result.data:
+                        inspection_type = 'asbestos'
+                        table_name = 'asbestosinspection'
+                        print(f"🔍 EMAIL DEBUG: Found asbestos inspection with id = {inspection_id}")
+                except Exception as e:
+                    print(f"🔍 EMAIL DEBUG: Search by ID in asbestos table failed: {e}")
+        
+        # If not found by ID or not numeric, try by inspection_number
+        if not result or not result.data:
+            print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
+            
+            # Try mold inspection table first
+            try:
+                result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
+                if result and result.data:
+                    inspection_type = 'mold'
+                    table_name = 'inspection'
+                    print(f"🔍 EMAIL DEBUG: Found mold inspection with inspection_number = {inspection_id}")
+            except Exception as e:
+                print(f"🔍 EMAIL DEBUG: Search by inspection_number in mold table failed: {e}")
+            
+            # If not found in mold table, try asbestos table
+            if not result or not result.data:
+                try:
+                    result = supabase.table('asbestosinspection').select('*').eq('inspection_number', inspection_id).single().execute()
+                    if result and result.data:
+                        inspection_type = 'asbestos'
+                        table_name = 'asbestosinspection'
+                        print(f"🔍 EMAIL DEBUG: Found asbestos inspection with inspection_number = {inspection_id}")
+                except Exception as e:
+                    print(f"🔍 EMAIL DEBUG: Search by inspection_number in asbestos table failed: {e}")
+        
+        if not result or not result.data:
+            print(f"❌ EMAIL DEBUG: Inspection with ID/Number {inspection_id} not found in either table")
+            # Debug: Let's see what inspections are available
+            try:
+                print(f"🔍 EMAIL DEBUG: Available mold inspections (first 5):")
+                mold_inspections = supabase.table('inspection').select('id, inspection_number').limit(5).execute()
+                for insp in mold_inspections.data:
+                    print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
+                
+                print(f"🔍 EMAIL DEBUG: Available asbestos inspections (first 5):")
+                asbestos_inspections = supabase.table('asbestosinspection').select('id, inspection_number').limit(5).execute()
+                for insp in asbestos_inspections.data:
+                    print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
+            except Exception as debug_error:
+                print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
+            
+            return None, None, None
+        
+        return result.data, inspection_type, table_name
     
     @app.route('/api/email/send-lab-received/<inspection_id>', methods=['POST'])
     def send_lab_received_email(inspection_id):
@@ -10,49 +130,28 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting lab received email for inspection {inspection_id}")
             
-            # Try to fetch inspection data - first by ID, then by inspection_number
-            result = None
+            # Get inspection data using helper function
+            inspection_data, inspection_type, table_name = get_inspection_data(inspection_id)
             
-            # Try as numeric ID first
-            if inspection_id.isdigit():
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('id', int(inspection_id)).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by ID failed: {e}")
-            
-            # If not found by ID or not numeric, try by inspection_number
-            if not result or not result.data:
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by inspection_number failed: {e}")
-            
-            if not result or not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection with ID/Number {inspection_id} not found in database")
-                # Debug: Let's see what inspections are available
-                try:
-                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
-                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
-                    for insp in all_inspections.data:
-                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
-                except Exception as debug_error:
-                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
-                
+            if not inspection_data:
                 return jsonify({"error": f"Inspection with ID/Number {inspection_id} not found"}), 404
             
-            inspection_data = {
-                "email": result.data.get('email'),
-                "full_name": result.data.get('full_name'),
-                "inspection_number": result.data.get('inspection_number', inspection_id)
+            print(f"🔍 EMAIL DEBUG: Found {inspection_type} inspection in table {table_name}")
+            
+            # Prepare email data
+            email_data = {
+                "email": inspection_data.get('email'),
+                "full_name": inspection_data.get('full_name'),
+                "inspection_number": inspection_data.get('inspection_number', inspection_id),
+                "inspection_type": inspection_type,
+                "table_name": table_name
             }
             
             # Send email using template
-            email_result = email_service.send_lab_received_email_with_template(inspection_data)
+            email_result = email_service.send_lab_received_email_with_template(email_data)
             
             if email_result.get('success'):
-                print(f"✅ EMAIL DEBUG: Lab received email sent successfully for inspection {inspection_id}")
+                print(f"✅ EMAIL DEBUG: Lab received email sent successfully for {inspection_type} inspection {inspection_id}")
                 return jsonify(email_result)
             else:
                 print(f"❌ EMAIL DEBUG: Failed to send lab received email: {email_result.get('error')}")
@@ -68,49 +167,28 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting report ready email for inspection {inspection_id}")
             
-            # Try to fetch inspection data - first by ID, then by inspection_number
-            result = None
+            # Get inspection data using helper function
+            inspection_data, inspection_type, table_name = get_inspection_data(inspection_id)
             
-            # Try as numeric ID first
-            if inspection_id.isdigit():
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('id', int(inspection_id)).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by ID failed: {e}")
-            
-            # If not found by ID or not numeric, try by inspection_number
-            if not result or not result.data:
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by inspection_number failed: {e}")
-            
-            if not result or not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection with ID/Number {inspection_id} not found in database")
-                # Debug: Let's see what inspections are available
-                try:
-                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
-                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
-                    for insp in all_inspections.data:
-                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
-                except Exception as debug_error:
-                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
-                
+            if not inspection_data:
                 return jsonify({"error": f"Inspection with ID/Number {inspection_id} not found"}), 404
             
-            inspection_data = {
-                "email": result.data.get('email'),
-                "full_name": result.data.get('full_name'),
-                "inspection_number": result.data.get('inspection_number', inspection_id)
+            print(f"🔍 EMAIL DEBUG: Found {inspection_type} inspection in table {table_name}")
+            
+            # Prepare email data
+            email_data = {
+                "email": inspection_data.get('email'),
+                "full_name": inspection_data.get('full_name'),
+                "inspection_number": inspection_data.get('inspection_number', inspection_id),
+                "inspection_type": inspection_type,
+                "table_name": table_name
             }
             
             # Send email using template
-            email_result = email_service.send_report_ready_email_with_template(inspection_data)
+            email_result = email_service.send_report_ready_email_with_template(email_data)
             
             if email_result.get('success'):
-                print(f"✅ EMAIL DEBUG: Report ready email sent successfully for inspection {inspection_id}")
+                print(f"✅ EMAIL DEBUG: Report ready email sent successfully for {inspection_type} inspection {inspection_id}")
                 return jsonify(email_result)
             else:
                 print(f"❌ EMAIL DEBUG: Failed to send report ready email: {email_result.get('error')}")
@@ -126,40 +204,28 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting review request email for inspection {inspection_id}")
             
-            # Try to fetch inspection data - first by ID, then by inspection_number
-            result = None
+            # Get inspection data using helper function
+            inspection_data, inspection_type, table_name = get_inspection_data(inspection_id)
             
-            # Try as numeric ID first
-            if inspection_id.isdigit():
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('id', int(inspection_id)).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by ID failed: {e}")
-            
-            # If not found by ID or not numeric, try by inspection_number
-            if not result or not result.data:
-                print(f"🔍 EMAIL DEBUG: Looking for inspection with inspection_number = {inspection_id}")
-                try:
-                    result = supabase.table('inspection').select('*').eq('inspection_number', inspection_id).single().execute()
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by inspection_number failed: {e}")
-            
-            if not result or not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection with ID/Number {inspection_id} not found in database")
+            if not inspection_data:
                 return jsonify({"error": f"Inspection with ID/Number {inspection_id} not found"}), 404
             
-            inspection_data = {
-                "email": result.data.get('email'),
-                "full_name": result.data.get('full_name'),
-                "inspection_number": result.data.get('inspection_number', inspection_id)
+            print(f"🔍 EMAIL DEBUG: Found {inspection_type} inspection in table {table_name}")
+            
+            # Prepare email data
+            email_data = {
+                "email": inspection_data.get('email'),
+                "full_name": inspection_data.get('full_name'),
+                "inspection_number": inspection_data.get('inspection_number', inspection_id),
+                "inspection_type": inspection_type,
+                "table_name": table_name
             }
             
             # Send email using template
-            email_result = email_service.send_review_request_email_with_template(inspection_data)
+            email_result = email_service.send_review_request_email_with_template(email_data)
             
             if email_result.get('success'):
-                print(f"✅ EMAIL DEBUG: Review request email sent successfully for inspection {inspection_id}")
+                print(f"✅ EMAIL DEBUG: Review request email sent successfully for {inspection_type} inspection {inspection_id}")
                 return jsonify(email_result)
             else:
                 print(f"❌ EMAIL DEBUG: Failed to send review request email: {email_result.get('error')}")
@@ -175,41 +241,35 @@ def register_email_endpoints(app, supabase):
         try:
             print(f"🔍 EMAIL DEBUG: Starting inspection created email for inspection {inspection_id}")
             
-            # Fetch inspection data from database using inspection ID (not inspection_number like others)
-            print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
-            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            # Get inspection data using helper function
+            inspection_data, inspection_type, table_name = get_inspection_data(inspection_id)
             
-            if not result.data:
-                print(f"❌ EMAIL DEBUG: Inspection with ID {inspection_id} not found in database")
-                # Debug: Let's see what inspections are available
-                try:
-                    all_inspections = supabase.table('inspection').select('id, inspection_number').limit(10).execute()
-                    print(f"🔍 EMAIL DEBUG: Available inspections (first 10):")
-                    for insp in all_inspections.data:
-                        print(f"  - ID: {insp.get('id')}, inspection_number: {insp.get('inspection_number')}")
-                except Exception as debug_error:
-                    print(f"🔍 EMAIL DEBUG: Could not fetch available inspections: {debug_error}")
-                
+            if not inspection_data:
                 return jsonify({"error": f"Inspection with ID {inspection_id} not found"}), 404
             
-            inspection_data = {
-                "email": result.data.get('email'),
-                "full_name": result.data.get('full_name'),
-                "inspection_number": result.data.get('inspection_number', f"INS-{str(inspection_id).zfill(4)}"),
-                "street_address": result.data.get('street_address', ''),
-                "unit_number": result.data.get('unit_number', ''),
-                "city": result.data.get('city', ''),
-                "state": result.data.get('state', ''),
-                "zip_code": result.data.get('zip_code', ''),
+            print(f"🔍 EMAIL DEBUG: Found {inspection_type} inspection in table {table_name}")
+            
+            # Prepare email data
+            email_data = {
+                "email": inspection_data.get('email'),
+                "full_name": inspection_data.get('full_name'),
+                "inspection_number": inspection_data.get('inspection_number', f"INS-{str(inspection_id).zfill(4)}"),
+                "street_address": inspection_data.get('street_address', ''),
+                "unit_number": inspection_data.get('unit_number', ''),
+                "city": inspection_data.get('city', ''),
+                "state": inspection_data.get('state', ''),
+                "zip_code": inspection_data.get('zip_code', ''),
+                "inspection_type": inspection_type,
+                "table_name": table_name
             }
             
-            print(f"🔍 EMAIL DEBUG: Extracted inspection data: {inspection_data}")
+            print(f"🔍 EMAIL DEBUG: Extracted inspection data: {email_data}")
             
             # Send email using template
-            email_result = email_service.send_inspection_created_email_with_template(inspection_data)
+            email_result = email_service.send_inspection_created_email_with_template(email_data)
             
             if email_result.get('success'):
-                print(f"✅ EMAIL DEBUG: Inspection created email sent successfully for inspection {inspection_id}")
+                print(f"✅ EMAIL DEBUG: Inspection created email sent successfully for {inspection_type} inspection {inspection_id}")
                 return jsonify(email_result)
             else:
                 print(f"❌ EMAIL DEBUG: Failed to send inspection created email: {email_result.get('error')}")

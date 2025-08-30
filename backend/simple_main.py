@@ -846,7 +846,10 @@ def create_asbestos_inspection():
             'status': data.get('status', 'pending'),
             'created_by_id': data.get('created_by'),
             'email': data.get('email'),
-            'app_id': 'asbestos'
+            'app_id': 'asbestos',
+            'material_type': data.get('material_type'),
+            'material_condition': data.get('material_condition'),
+            'material_images': data.get('material_images', [])
         }
         
         # Insert new asbestos inspection
