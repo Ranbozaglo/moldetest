@@ -19,6 +19,7 @@ import { downloadPDF, downloadHTML } from "@/utils/pdfDownload";
 import EmailTemplateManager from "@/components/EmailTemplateManager";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
+import { usePopup } from "@/components/ui/popup";
 
 // Export this function for use in other components
 export const generateReportHtmlContent = async (inspection, samples) => {
@@ -568,6 +569,7 @@ export default function AdminDashboard() {
   });
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
+  const { showPopup } = usePopup();
 
   // Loading skeleton component
   const LoadingSkeleton = () => (
@@ -675,7 +677,11 @@ export default function AdminDashboard() {
       console.error("Error details:", error.message);
       console.error("Error stack:", error.stack);
       setInspections([]);
-      alert("Failed to load inspections. Please refresh the page.");
+      showPopup({
+        title: "Error",
+        message: "Failed to load inspections. Please refresh the page.",
+        type: "error"
+      });
     } finally {
       setLoading(false);
     }
@@ -986,7 +992,11 @@ export default function AdminDashboard() {
       
     } catch (error) {
       console.error(`❌ Error processing deletion IDs:`, error);
-      alert(`Error preparing deletion: ${error.message}`);
+      showPopup({
+        title: "Error",
+        message: `Error preparing deletion: ${error.message}`,
+        type: "error"
+      });
       return;
     }
     
@@ -1121,13 +1131,21 @@ export default function AdminDashboard() {
         alertMessage = `⚠️ Partially completed:\n✅ Successfully deleted: ${deletionResults.successful.length} inspection(s)\n❌ Failed to delete: ${deletionResults.failed.length} inspection(s)\n\nCheck the console for detailed error information.`;
       }
       
-      // Show single alert with refresh confirmation
+      // Show single popup with refresh confirmation
       alertMessage += '\n\nThe list has been refreshed.';
-      alert(alertMessage);
+      showPopup({
+        title: "Deletion Results",
+        message: alertMessage,
+        type: deletionResults.failed.length === 0 ? "success" : deletionResults.successful.length === 0 ? "error" : "warning"
+      });
       
     } catch (error) {
       console.error("❌ Unexpected error during bulk deletion:", error);
-      alert("An unexpected error occurred during deletion. Please try again.");
+      showPopup({
+        title: "Error",
+        message: "An unexpected error occurred during deletion. Please try again.",
+        type: "error"
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -1190,7 +1208,11 @@ export default function AdminDashboard() {
       console.error("❌ ERROR: Available fields:", Object.keys(inspection));
       console.error("❌ ERROR: inspection.id =", inspection.id);
       console.error("❌ ERROR: inspection.inspection_number =", inspection.inspection_number);
-      alert("Error: Could not identify the inspection. Please try again.");
+      showPopup({
+        title: "Error",
+        message: "Error: Could not identify the inspection. Please try again.",
+        type: "error"
+      });
       return;
     }
     
@@ -1252,7 +1274,11 @@ export default function AdminDashboard() {
         );
       } else {
         console.log(`🔍 DEBUG: Skipping status update - no valid database ID available`);
-        alert("Email sent successfully, but status update failed. Please refresh the page to see the latest status.");
+        showPopup({
+          title: "Warning",
+          message: "Email sent successfully, but status update failed. Please refresh the page to see the latest status.",
+          type: "warning"
+        });
       }
       
       // Invalidate cache and reload inspections to ensure we have the latest data
@@ -1265,7 +1291,11 @@ export default function AdminDashboard() {
       console.error("❌ Error sending lab received email:", error);
       
       // Show error to user
-      alert(`Failed to send lab email and update status: ${error.message}`);
+      showPopup({
+        title: "Error",
+        message: `Failed to send lab email and update status: ${error.message}`,
+        type: "error"
+      });
     }
   };
 
@@ -1283,7 +1313,11 @@ export default function AdminDashboard() {
     
     if (!inspectionId) {
       console.error("❌ ERROR: No valid inspection ID found");
-      alert("Error: Could not identify the inspection. Please try again.");
+      showPopup({
+        title: "Error",
+        message: "Error: Could not identify the inspection. Please try again.",
+        type: "error"
+      });
       return;
     }
     
@@ -1348,7 +1382,11 @@ export default function AdminDashboard() {
     
     if (!inspectionId) {
       console.error("❌ ERROR: No valid inspection ID found");
-      alert("Error: Could not identify the inspection. Please try again.");
+      showPopup({
+        title: "Error",
+        message: "Error: Could not identify the inspection. Please try again.",
+        type: "error"
+      });
       return;
     }
     
@@ -1454,10 +1492,18 @@ export default function AdminDashboard() {
         )
       );
       
-      alert(`Status updated to ${statusStr}`);
+      showPopup({
+        title: "Success",
+        message: `Status updated to ${statusStr}`,
+        type: "success"
+      });
     } catch (error) {
       console.error("❌ Error updating inspection status:", error);
-      alert(`Failed to update status: ${error.message}`);
+      showPopup({
+        title: "Error",
+        message: `Failed to update status: ${error.message}`,
+        type: "error"
+      });
     }
   };
 
@@ -2068,7 +2114,11 @@ export default function AdminDashboard() {
                                     navigate(url);
                                   } catch (error) {
                                     console.error("Failed to navigate to inspection details:", error);
-                                    alert("Failed to open inspection details. Please try again.");
+                                    showPopup({
+                                      title: "Error",
+                                      message: "Failed to open inspection details. Please try again.",
+                                      type: "error"
+                                    });
                                   }
                                 }}
                                 className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
@@ -2278,7 +2328,11 @@ export default function AdminDashboard() {
                                       navigate(url);
                                     } catch (error) {
                                       console.error("🔍 ERROR: Failed to navigate to inspection details:", error);
-                                      alert("Failed to open inspection details. Please try again.");
+                                      showPopup({
+                                        title: "Error",
+                                        message: "Failed to open inspection details. Please try again.",
+                                        type: "error"
+                                      });
                                     }
                                   }}
                                   className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
@@ -2395,7 +2449,11 @@ export default function AdminDashboard() {
                                             downloadLink.click();
                                             document.body.removeChild(downloadLink);
                                             URL.revokeObjectURL(blobUrl);
-                                            alert('Report downloaded! Open the HTML file in your browser to view.');
+                                            showPopup({
+                                              title: "Success",
+                                              message: "Report downloaded! Open the HTML file in your browser to view.",
+                                              type: "success"
+                                            });
                                           } else {
                                             // Open in same tab
                                             document.body.removeChild(downloadLink);
@@ -2438,7 +2496,11 @@ export default function AdminDashboard() {
                                       }
                                     } catch (error) {
                                       console.error("❌ Error viewing report:", error);
-                                      alert("Failed to generate report. Please try again.");
+                                      showPopup({
+                                        title: "Error",
+                                        message: "Failed to generate report. Please try again.",
+                                        type: "error"
+                                      });
                                     }
                                   }}
                                   className="flex items-center gap-2"
