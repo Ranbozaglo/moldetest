@@ -703,6 +703,216 @@ def register():
         print(f"🔍 DEBUG: Registration error: {e}")
         return jsonify({"error": "Registration failed"}), 500
 
+# ============================================================================
+# ASBESTOS INSPECTION ENDPOINTS
+# ============================================================================
+
+@app.route('/api/asbestosinspection', methods=['GET'])
+def get_asbestos_inspections():
+    """Get all asbestos inspections with filtering and pagination"""
+    try:
+        # Get query parameters
+        sort_by = request.args.get('sort', '-created_at')
+        limit = int(request.args.get('limit', 50))
+        email = request.args.get('email')
+        
+        # Limit the maximum number of inspections to prevent performance issues
+        if limit > 100:
+            limit = 100
+        
+        # Check if user is admin from database
+        is_admin = False
+        if email:
+            try:
+                user_result = supabase.table('user_profiles').select('role, is_admin').eq('email', email).execute()
+                if user_result.data:
+                    user_data = user_result.data[0]
+                    is_admin = user_data.get('role') == 'admin' or user_data.get('is_admin', False)
+            except Exception as e:
+                print(f"⚠️ Error checking user admin status: {e}")
+                is_admin = False
+        
+        print(f"🔍 DEBUG: Fetching asbestos inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
+        
+        # Build the query - select only essential fields for list view
+        query = supabase.table('asbestosinspection').select(
+            'id,created_at,updated_date,created_by_id,'
+            'full_name,email,client_type,street_address,city,state,zip_code,'
+            'property_type,square_footage,status,app_id'
+        )
+        
+        # Apply sorting - handle different sort fields
+        if sort_by:
+            if sort_by == '-created_at':
+                query = query.order('created_at', desc=True)
+            elif sort_by.startswith('-'):
+                # Handle other descending sorts
+                field = sort_by[1:]
+                query = query.order(field, desc=True)
+            else:
+                query = query.order(sort_by)
+        
+        # Apply limit
+        query = query.limit(limit)
+
+        print(f"🔍 DEBUG: Executing asbestos inspection query...")
+        result = query.execute()
+        inspections = result.data
+        print(f"🔍 DEBUG: Found {len(inspections)} asbestos inspections")
+        
+        # Filter by email if provided (for non-admin users)
+        if email and not is_admin:
+            inspections = [i for i in inspections if i.get('email') == email]
+
+        # Convert to expected format
+        result_list = []
+        for inspection in inspections:
+            inspection_data = {
+                # Basic identification
+                "id": inspection['id'],
+                "created_at": inspection['created_at'],
+                "updated_date": inspection.get('updated_date'),
+                "created_by_id": inspection.get('created_by_id'),
+                "app_id": inspection.get('app_id', 'asbestos'),
+                
+                # Client information
+                "full_name": inspection.get('full_name'),
+                "email": inspection.get('email'),
+                "client_type": inspection.get('client_type'),
+                
+                # Property information
+                "street_address": inspection.get('street_address'),
+                "city": inspection.get('city'),
+                "state": inspection.get('state'),
+                "zip_code": inspection.get('zip_code'),
+                "property_type": inspection.get('property_type'),
+                "square_footage": inspection.get('square_footage'),
+                
+                # Status and metadata
+                "status": inspection.get('status', 'pending'),
+            }
+            
+            result_list.append(inspection_data)
+        
+        print(f"🔍 DEBUG: Returning {len(result_list)} asbestos inspections")
+        return jsonify(result_list)
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Get asbestos inspections error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch asbestos inspections: {str(e)}"}), 500
+
+@app.route('/api/asbestosinspection/<int:inspection_id>', methods=['GET'])
+def get_asbestos_inspection_by_id(inspection_id):
+    """Get a single asbestos inspection by ID"""
+    try:
+        print(f"🔍 DEBUG: Getting asbestos inspection with ID: {inspection_id}")
+        
+        result = supabase.table('asbestosinspection').select('*').eq('id', inspection_id).execute()
+        inspections = result.data
+        
+        if inspections and len(inspections) > 0:
+            inspection = inspections[0]
+            print(f"🔍 DEBUG: Found asbestos inspection - ID: {inspection.get('id')}")
+            return jsonify(inspection)
+        else:
+            print(f"🔍 DEBUG: No asbestos inspection found with ID: {inspection_id}")
+            return jsonify({"error": "Asbestos inspection not found"}), 404
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Get asbestos inspection by ID error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to fetch asbestos inspection: {str(e)}"}), 500
+
+@app.route('/api/asbestosinspection', methods=['POST'])
+def create_asbestos_inspection():
+    """Create new asbestos inspection"""
+    try:
+        data = request.get_json()
+        print(f"🔍 DEBUG: Creating asbestos inspection with data:", data)
+        
+        # Prepare data for insertion
+        inspection_data = {
+            'full_name': data.get('full_name'),
+            'street_address': data.get('street_address'),
+            'city': data.get('city'),
+            'state': data.get('state'),
+            'zip_code': data.get('zip_code'),
+            'property_type': data.get('property_type'),
+            'client_type': data.get('client_type'),
+            'square_footage': data.get('square_footage'),
+            'status': data.get('status', 'pending'),
+            'created_by_id': data.get('created_by'),
+            'email': data.get('email'),
+            'app_id': 'asbestos'
+        }
+        
+        # Insert new asbestos inspection
+        result = supabase.table('asbestosinspection').insert(inspection_data).execute()
+        
+        if result.data:
+            print(f"✅ DEBUG: Asbestos inspection created successfully with ID: {result.data[0]['id']}")
+            return jsonify({
+                "message": "Asbestos inspection created successfully",
+                "id": result.data[0]['id']
+            }), 201
+        else:
+            print(f"❌ DEBUG: Failed to create asbestos inspection")
+            return jsonify({"error": "Failed to create asbestos inspection"}), 500
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Create asbestos inspection error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to create asbestos inspection: {str(e)}"}), 500
+
+@app.route('/api/asbestosinspection/<int:inspection_id>', methods=['PUT'])
+def update_asbestos_inspection(inspection_id):
+    """Update asbestos inspection"""
+    try:
+        data = request.get_json()
+        print(f"🔍 DEBUG: Updating asbestos inspection {inspection_id} with data:", data)
+        
+        # Update the asbestos inspection
+        result = supabase.table('asbestosinspection').update(data).eq('id', inspection_id).execute()
+        
+        if result.data:
+            print(f"✅ DEBUG: Asbestos inspection {inspection_id} updated successfully")
+            return jsonify({
+                "message": "Asbestos inspection updated successfully",
+                "id": inspection_id
+            })
+        else:
+            print(f"❌ DEBUG: Failed to update asbestos inspection {inspection_id}")
+            return jsonify({"error": "Failed to update asbestos inspection"}), 500
+            
+    except Exception as e:
+        print(f"🔍 DEBUG: Update asbestos inspection error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to update asbestos inspection: {str(e)}"}), 500
+
+@app.route('/api/asbestosinspection/<int:inspection_id>', methods=['DELETE'])
+def delete_asbestos_inspection(inspection_id):
+    """Delete asbestos inspection"""
+    try:
+        print(f"🔍 DEBUG: Deleting asbestos inspection with ID: {inspection_id}")
+        
+        result = supabase.table('asbestosinspection').delete().eq('id', inspection_id).execute()
+        
+        print(f"🔍 DEBUG: Delete asbestos inspection result:", result)
+        
+        return jsonify({
+            "message": "Asbestos inspection deleted successfully"
+        })
+    except Exception as e:
+        print(f"🔍 DEBUG: Delete asbestos inspection error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to delete asbestos inspection: {str(e)}"}), 500
+
 @app.route('/api/inspection', methods=['GET'])
 def get_inspections():
     """Get lightweight inspection list - optimized for performance"""
@@ -1147,102 +1357,6 @@ def get_samples():
     except Exception as e:
         print(f"🔍 DEBUG: Get samples error: {e}")
         return jsonify({"error": "Failed to fetch samples"}), 500
-
-@app.route('/api/asbestos-inspections', methods=['GET'])
-def get_asbestos_inspections():
-    """Get all asbestos inspections"""
-    try:
-        # Get query parameters
-        sort_by = request.args.get('sort', '-created_at')
-        limit = int(request.args.get('limit', 50))  # Default to 50, max 100
-        email = request.args.get('email')
-        
-        # Limit the maximum number of inspections to prevent performance issues
-        if limit > 100:
-            limit = 100
-        
-        # Check if user is admin from database
-        is_admin = False
-        if email:
-            try:
-                user_result = supabase.table('user_profiles').select('role, is_admin').eq('email', email).execute()
-                if user_result.data:
-                    user_data = user_result.data[0]
-                    is_admin = user_data.get('role') == 'admin' or user_data.get('is_admin', False)
-            except Exception as e:
-                print(f"⚠️ Error checking user admin status: {e}")
-                is_admin = False
-        
-        print(f"🔍 DEBUG: Fetching asbestos inspections with sort={sort_by}, limit={limit}, is_admin={is_admin}")
-        
-        # Build the query - select only essential fields for list view
-        query = supabase.table('asbestosinspection').select(
-            'id,created_at,updated_date,created_by_id,'
-            'full_name,email,client_type,street_address,city,state,zip_code,'
-            'property_type,square_footage,status,app_id'
-        )
-        
-        # Apply sorting - handle different sort fields
-        if sort_by:
-            if sort_by == '-created_at':
-                query = query.order('created_at', desc=True)
-            elif sort_by.startswith('-'):
-                # Handle other descending sorts
-                field = sort_by[1:]
-                query = query.order(field, desc=True)
-            else:
-                query = query.order(sort_by)
-        
-        # Apply limit
-        query = query.limit(limit)
-
-        print(f"🔍 DEBUG: Executing asbestos inspection query...")
-        result = query.execute()
-        inspections = result.data
-        print(f"🔍 DEBUG: Found {len(inspections)} asbestos inspections")
-        
-        # Filter by email if provided (for non-admin users)
-        if email and not is_admin:
-            inspections = [i for i in inspections if i.get('email') == email]
-
-        # Convert to expected format
-        result_list = []
-        for inspection in inspections:
-            inspection_data = {
-                # Basic identification
-                "id": inspection['id'],
-                "created_at": inspection['created_at'],
-                "updated_date": inspection.get('updated_date'),
-                "created_by_id": inspection.get('created_by_id'),
-                "app_id": inspection.get('app_id', 'asbestos'),
-                
-                # Client information
-                "full_name": inspection.get('full_name'),
-                "email": inspection.get('email'),
-                "client_type": inspection.get('client_type'),
-                
-                # Property information
-                "street_address": inspection.get('street_address'),
-                "city": inspection.get('city'),
-                "state": inspection.get('state'),
-                "zip_code": inspection.get('zip_code'),
-                "property_type": inspection.get('property_type'),
-                "square_footage": inspection.get('square_footage'),
-                
-                # Status and metadata
-                "status": inspection.get('status', 'pending'),
-            }
-            
-            result_list.append(inspection_data)
-        
-        print(f"🔍 DEBUG: Returning {len(result_list)} asbestos inspections")
-        return jsonify(result_list)
-            
-    except Exception as e:
-        print(f"🔍 DEBUG: Get asbestos inspections error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Failed to fetch asbestos inspections: {str(e)}"}), 500
 
 @app.route('/api/samples', methods=['POST'])
 def create_sample():
@@ -2108,7 +2222,11 @@ if __name__ == '__main__':
     print("   - DELETE /api/inspection/<int:inspection_id>/lab-image/<int:image_index>")
     print("   - GET  /api/samples")
     print("   - POST /api/samples")
-    print("   - GET  /api/asbestos-inspections")
+    print("   - GET  /api/asbestosinspection")
+    print("   - GET  /api/asbestosinspection/<int:inspection_id>")
+    print("   - POST /api/asbestosinspection")
+    print("   - PUT  /api/asbestosinspection/<int:inspection_id>")
+    print("   - DELETE /api/asbestosinspection/<int:inspection_id>")
     print("   - POST /api/llm/summarize")
     print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
     print("   - POST /api/validate-lab-image (OCR validation before database save)")

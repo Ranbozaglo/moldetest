@@ -1023,15 +1023,36 @@ export default function AdminDashboard() {
         }
         
         console.log(`🔍 DEBUG: Attempting to delete inspection ${id}...`);
+        
+        // Find the inspection to determine its type
+        const inspection = [...inspections, ...asbestosInspections].find(insp => insp.id == id);
+        if (!inspection) {
+          console.error(`❌ Inspection ${id} not found in current state`);
+          deletionResults.failed.push({ id, error: 'Inspection not found in current state' });
+          continue;
+        }
+        
         try {
-        await MoldInspection.delete(id);
-          deletionResults.successful.push(id);
-          console.log(`✅ Successfully deleted inspection ${id}`);
+          // Determine inspection type and call appropriate delete method
+          const inspectionType = getInspectionType(inspection);
+          console.log(`🔍 DEBUG: Deleting ${inspectionType} inspection ${id}...`);
           
-          // Immediately remove from UI state to provide instant feedback
+          if (inspectionType === 'asbestos') {
+            await AsbestosInspection.delete(id);
+            // Remove from asbestos inspections state
+            setAsbestosInspections(prevAsbestosInspections => 
+              prevAsbestosInspections.filter(inspection => inspection.id !== id)
+            );
+          } else {
+            await MoldInspection.delete(id);
+            // Remove from mold inspections state
           setInspections(prevInspections => 
             prevInspections.filter(inspection => inspection.id !== id)
           );
+          }
+          
+          deletionResults.successful.push(id);
+          console.log(`✅ Successfully deleted ${inspectionType} inspection ${id}`);
           
           // Remove from selected inspections immediately if successful
           if (selectedInspections.has(id)) {
@@ -1062,15 +1083,15 @@ export default function AdminDashboard() {
         }
       }
       
-      // Force refresh the UI to show updated list
-      console.log(`🔄 REFRESH: Force refreshing UI after deletion...`);
+      // Refresh the UI to show updated list (only once)
+      console.log(`🔄 REFRESH: Refreshing UI after deletion...`);
       invalidateCache();
       
       // Small delay to ensure backend has processed all deletions
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Force refresh to ensure UI is completely up to date
-      await loadInspections(true);
+      // Refresh both inspection types to ensure UI is completely up to date
+      await smartRefresh();
       
       // Final cleanup: ensure all successfully deleted inspections are removed from selection
       if (deletionResults.successful.length > 0) {
@@ -1081,27 +1102,28 @@ export default function AdminDashboard() {
         });
       }
       
-      // Provide detailed feedback based on results
+      // Provide detailed feedback based on results (single alert)
       console.log(`🔍 DEBUG: Deletion completed. Successful: ${deletionResults.successful.length}, Failed: ${deletionResults.failed.length}`);
       console.log(`🔄 REFRESH: UI refresh completed after deletion`);
       
+      // Create a single, comprehensive alert message
+      let alertMessage = '';
       if (deletionResults.failed.length === 0) {
         // All deletions successful
-        alert(`Successfully deleted ${deletionResults.successful.length} inspection(s). The list has been refreshed.`);
+        alertMessage = `✅ Successfully deleted ${deletionResults.successful.length} inspection(s).`;
       } else if (deletionResults.successful.length === 0) {
         // All deletions failed
         console.log(`❌ All deletions failed. Errors:`, deletionResults.failed);
-        alert(`Failed to delete any inspections. Please check the console for details or contact support.`);
+        alertMessage = `❌ Failed to delete any inspections. Please check the console for details.`;
       } else {
         // Mixed results
         console.log(`⚠️ Mixed deletion results:`, { successful: deletionResults.successful, failed: deletionResults.failed });
-        alert(
-          `Partially completed:\n` +
-          `✅ Successfully deleted: ${deletionResults.successful.length} inspection(s)\n` +
-          `❌ Failed to delete: ${deletionResults.failed.length} inspection(s)\n\n` +
-          `The list has been refreshed. Check the console for detailed error information. Please try again for the failed inspections.`
-        );
+        alertMessage = `⚠️ Partially completed:\n✅ Successfully deleted: ${deletionResults.successful.length} inspection(s)\n❌ Failed to delete: ${deletionResults.failed.length} inspection(s)\n\nCheck the console for detailed error information.`;
       }
+      
+      // Show single alert with refresh confirmation
+      alertMessage += '\n\nThe list has been refreshed.';
+      alert(alertMessage);
       
     } catch (error) {
       console.error("❌ Unexpected error during bulk deletion:", error);

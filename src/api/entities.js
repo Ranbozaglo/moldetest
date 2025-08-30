@@ -377,7 +377,7 @@ export const AsbestosInspection = {
       queryParams.append('email', email);
     }
     
-    const response = await apiCall(`/asbestos-inspections?${queryParams.toString()}`, {
+    const response = await apiCall(`/asbestosinspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
       }
@@ -393,7 +393,7 @@ export const AsbestosInspection = {
       queryParams.append('id', filters.id);
     }
     
-    const response = await apiCall(`/asbestos-inspections?${queryParams.toString()}`, {
+    const response = await apiCall(`/asbestosinspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''
       }
@@ -406,15 +406,49 @@ export const AsbestosInspection = {
     return response;
   },
 
+  findById: async (id) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/asbestosinspection/${id}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
+  },
+
+  create: async (data) => {
+    const token = getAuthToken();
+    const response = await apiCall('/asbestosinspection', {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response;
+  },
+
   update: async (id, data) => {
     const token = getAuthToken();
-    const response = await apiCall(`/asbestos-inspections/${id}`, {
+    const response = await apiCall(`/asbestosinspection/${id}`, {
       method: 'PUT',
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
+    });
+    return response;
+  },
+
+  delete: async (id) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/asbestosinspection/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
     });
     return response;
   }
