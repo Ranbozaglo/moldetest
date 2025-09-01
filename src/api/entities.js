@@ -387,12 +387,14 @@ export const AsbestosInspection = {
 
   findUnique: async (filters = {}) => {
     const token = getAuthToken();
-    const queryParams = new URLSearchParams();
     
     if (filters.id) {
-      queryParams.append('id', filters.id);
+      // Use findById for detailed data when ID is provided
+      return await AsbestosInspection.findById(filters.id);
     }
     
+    // Fallback to list endpoint for other filters
+    const queryParams = new URLSearchParams();
     const response = await apiCall(`/asbestosinspection?${queryParams.toString()}`, {
       headers: {
         'Authorization': token ? `Bearer ${token}` : ''

@@ -268,6 +268,15 @@ export default function InspectionDetails() {
       console.log("  - lab_conclusion:", inspection.lab_conclusion || "EMPTY");
       console.log("  - lab_recommendations:", inspection.lab_recommendations || "EMPTY");
       console.log("  - lab_analysis_images:", inspection.lab_analysis_images || "EMPTY");
+      
+      // Debug: Log asbestos-specific fields
+      if (currentInspectionType === 'asbestos') {
+        console.log("🔍 DEBUG: Asbestos-specific fields:");
+        console.log("  - material_type:", inspection.material_type || "EMPTY");
+        console.log("  - material_condition:", inspection.material_condition || "EMPTY");
+        console.log("  - material_images:", inspection.material_images || "EMPTY");
+        console.log("  - location_description:", inspection.location_description || "EMPTY");
+      }
 
       // Parse lab_analysis_images if it's a string
       if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
@@ -1445,6 +1454,15 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                   <Label className="text-slate-600">Background Information</Label>
                   <p className="font-medium">
                     {inspection.background_info}
+                  </p>
+                </div>
+              )}
+
+              {inspection.location_description && (
+                <div>
+                  <Label className="text-slate-600">Location Description</Label>
+                  <p className="font-medium">
+                    {inspection.location_description}
                   </p>
                 </div>
               )}
