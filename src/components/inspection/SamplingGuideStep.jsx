@@ -69,6 +69,7 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
           <h4 className="font-medium text-slate-700 flex items-center gap-2">
             <Camera className="w-4 h-4" />
             Sample Collection Photo
+            <span className="text-red-500 text-sm">*</span>
           </h4>
           
           {!sample.sample_image ? (
@@ -84,10 +85,10 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
               <label htmlFor={`sample-upload-${index}`} className="cursor-pointer">
                 <Upload className="w-6 h-6 text-slate-400 mx-auto mb-2" />
                 <p className="text-slate-600 font-medium">
-                  {isUploading ? "Uploading..." : "Upload Sample Photo"}
+                  {isUploading ? "Uploading..." : "Upload Sample Photo (Required)"}
                 </p>
                 <p className="text-sm text-slate-500">
-                  Show the collection process or sample location
+                  Show the collection process or sample location - required for all samples
                 </p>
               </label>
             </div>
@@ -184,6 +185,17 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
   }, []);
 
   const handleNext = () => {
+    // Validate samples - require image if location is provided
+    const samplesWithLocation = samples.filter(sample => sample.location && sample.location.trim() !== '');
+    
+    for (let i = 0; i < samplesWithLocation.length; i++) {
+      const sample = samplesWithLocation[i];
+      if (!sample.sample_image || sample.sample_image.trim() === '') {
+        alert(`Sample ${samples.indexOf(sample) + 1} is missing a collection photo. Please upload an image showing the sample collection process or location.`);
+        return;
+      }
+    }
+    
     // Scroll to top of the page
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
@@ -345,6 +357,10 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
                 <div className="flex items-start gap-2 sm:gap-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                   <p><strong>Collection Time:</strong> Note the date and time of sample collection for tracking purposes</p>
+                </div>
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
+                  <p><strong>Photo Required:</strong> Each sample must include a photo showing the collection process or sample location for verification</p>
                 </div>
               </div>
             </div>
