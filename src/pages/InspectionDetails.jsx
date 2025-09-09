@@ -271,14 +271,11 @@ export default function InspectionDetails() {
       
       // Debug: Log asbestos-specific fields
       if (currentInspectionType === 'asbestos') {
-        console.log("🔍 DEBUG: Asbestos-specific fields from asbestosinspection table:");
-        console.log("  - Table: asbestosinspection");
+        console.log("🔍 DEBUG: Asbestos-specific fields:");
         console.log("  - material_type:", inspection.material_type || "EMPTY");
         console.log("  - material_condition:", inspection.material_condition || "EMPTY");
         console.log("  - material_images:", inspection.material_images || "EMPTY");
         console.log("  - location_description:", inspection.location_description || "EMPTY");
-        console.log("  - lab_analysis_images (raw from DB):", inspection.lab_analysis_images || "EMPTY");
-        console.log("📋 DATA FLOW: AsbestosInspection.findUnique() → asbestosinspection.lab_analysis_images → display");
       }
 
       // Parse lab_analysis_images if it's a string
@@ -296,18 +293,12 @@ export default function InspectionDetails() {
         inspection.lab_analysis_images = [];
       }
       
-      // Debug: Log final parsed lab_analysis_images
-      if (currentInspectionType === 'asbestos') {
-        console.log("🔍 DEBUG: Final parsed lab_analysis_images for asbestos inspection:", inspection.lab_analysis_images);
-        console.log("🔍 DEBUG: Number of lab analysis images:", inspection.lab_analysis_images ? inspection.lab_analysis_images.length : 0);
-      }
-      
       // Check if there are no lab analysis images and clear conclusion/recommendations if needed
       if (!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) {
         console.log("🔍 DEBUG: No lab analysis images found, clearing conclusion and recommendations");
         
-        // Only update database if there are conclusion/recommendations to clear (and not asbestos)
-        if (currentInspectionType !== 'asbestos' && (inspection.lab_conclusion || inspection.lab_recommendations)) {
+        // Only update database if there are conclusion/recommendations to clear
+        if (inspection.lab_conclusion || inspection.lab_recommendations) {
           console.log("🔍 DEBUG: Clearing lab_conclusion and lab_recommendations from database");
           
           // Use the appropriate entity to update
@@ -366,69 +357,10 @@ export default function InspectionDetails() {
     setUploadProgress(0);
     
     try {
-      console.log("🔍 DEBUG: Starting lab image upload process");
+      console.log("🔍 DEBUG: Starting lab image upload and OCR analysis process");
       console.log("🔍 DEBUG: Inspection ID:", inspectionId);
       console.log("🔍 DEBUG: Files to process:", files.length);
-      console.log("🔍 DEBUG: Inspection type:", inspectionType);
       
-      // For asbestos inspections, only upload images without OCR processing
-      if (inspectionType === 'asbestos') {
-        console.log("🔍 DEBUG: Asbestos inspection - skipping OCR processing");
-        
-        // Upload files without OCR processing
-        const uploadedFiles = [];
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          setUploadProgress(((i + 1) / files.length) * 100);
-          setUploadedCount(i + 1);
-          
-          try {
-            console.log(`📤 UPLOAD: Uploading ${file.name} to lab-analysis/lab-analysis-images bucket...`);
-            const uploadResult = await UploadLabAnalysisImage(file);
-            
-            if (uploadResult && uploadResult.file_url) {
-              console.log(`✅ UPLOAD: Successfully uploaded ${file.name} to lab-analysis/lab-analysis-images bucket`);
-              console.log(`🔗 UPLOAD: File URL: ${uploadResult.file_url}`);
-              console.log(`📁 UPLOAD: File path: ${uploadResult.file_path}`);
-              console.log(`🪣 UPLOAD: Bucket: ${uploadResult.bucket}`);
-              uploadedFiles.push({
-                filename: file.name,
-                file_url: uploadResult.file_url,
-                file_path: uploadResult.file_path,
-                bucket: uploadResult.bucket
-              });
-            }
-          } catch (error) {
-            console.error(`❌ UPLOAD: Error uploading ${file.name}:`, error);
-          }
-        }
-        
-        // Save uploaded files to database without analysis
-        if (uploadedFiles.length > 0) {
-          const labImageUrls = uploadedFiles.map(file => file.file_url);
-          
-          console.log("🔍 DEBUG: About to save to AsbestosInspection table:");
-          console.log("  - Table: asbestosinspection");
-          console.log("  - Field: lab_analysis_images");
-          console.log("  - Inspection ID:", inspectionId);
-          console.log("  - Lab image URLs:", labImageUrls);
-          
-          await AsbestosInspection.update(inspectionId, {
-            lab_analysis_images: labImageUrls
-          });
-          
-          console.log(`✅ Asbestos lab images uploaded! ${uploadedFiles.length} files saved to asbestosinspection.lab_analysis_images`);
-          console.log("📋 DATA FLOW: Upload → AsbestosInspection.update() → asbestosinspection.lab_analysis_images");
-          
-          // Reload data to see the updated images
-          console.log("🔄 Reloading inspection data to reflect uploaded images...");
-          loadInspectionData();
-        }
-        
-        return; // Skip OCR processing for asbestos
-      }
-      
-      // For mold inspections, continue with OCR processing
       // Step 1: Upload ALL files to lab-analysis bucket first
       const uploadedFiles = [];
       const processedFiles = [];
@@ -785,15 +717,11 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         
         // Use the appropriate entity to update
         const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-        const updateData = { lab_analysis_images: labImageUrls };
-        
-        // Only add conclusion/recommendations for mold inspections
-        if (inspectionType !== 'asbestos') {
-          updateData.lab_conclusion = conclusion;
-          updateData.lab_recommendations = recommendations;
-        }
-        
-        await updateEntity.update(inspectionId, updateData);
+        await updateEntity.update(inspectionId, {
+          lab_analysis_images: labImageUrls,
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
+        });
         
         console.log(`✅ ${inspectionType === 'asbestos' ? 'Asbestos' : 'Lab'} analysis complete! Lab images uploaded to bucket and analysis saved to database.`);
         
@@ -1088,14 +1016,12 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
           lab_recommendations: recommendations
         }));
 
-        // Also save to database (only for mold inspections)
-        if (inspectionType !== 'asbestos') {
-          const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-          await updateEntity.update(inspectionId, {
-            lab_conclusion: conclusion,
-            lab_recommendations: recommendations
-          });
-        }
+        // Also save to database
+        const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
+        await updateEntity.update(inspectionId, {
+          lab_conclusion: conclusion,
+          lab_recommendations: recommendations
+        });
         
         console.log("🔍 DEBUG: Updated inspection with separated conclusion and recommendations");
         console.log("🔍 DEBUG: Conclusion:", conclusion);
@@ -1141,16 +1067,14 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
       console.log("🔍 DEBUG: Lab Conclusion:", inspection.lab_conclusion);
       console.log("🔍 DEBUG: Lab Recommendations:", inspection.lab_recommendations);
 
-      // Use the appropriate entity to save changes (only for mold inspections)
-      if (inspectionType !== 'asbestos') {
-        const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-        
-        // Save the lab analysis changes
-        await updateEntity.update(inspectionId, {
-          lab_conclusion: inspection.lab_conclusion,
-          lab_recommendations: inspection.lab_recommendations
-        });
-      }
+      // Use the appropriate entity to save changes
+      const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
+      
+      // Save the lab analysis changes
+      await updateEntity.update(inspectionId, {
+        lab_conclusion: inspection.lab_conclusion,
+        lab_recommendations: inspection.lab_recommendations
+      });
 
       console.log("🔍 DEBUG: Changes saved successfully");
       alert(inspectionType === 'asbestos' 
@@ -1477,9 +1401,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         </div>
       </div>
 
-             <div className="grid gap-8 lg:grid-cols-2">
+             <div className={`grid gap-8 ${inspectionType === 'asbestos' ? 'lg:grid-cols-1 max-w-4xl mx-auto' : 'lg:grid-cols-2'}`}>
          {/* Left Column - Inspection Details */}
-         <div className="space-y-6">
+         <div className={`space-y-6 ${inspectionType === 'asbestos' ? 'max-w-none' : ''}`}>
           {/* Customer Information */}
           <Card>
             <CardHeader>
@@ -2330,8 +2254,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
            )}
         </div>
 
-        {/* Right Column - Lab Analysis & Report */}
-        <div className="space-y-6">
+        {/* Right Column - Lab Analysis & Report (Only for Mold Inspections) */}
+        {inspectionType !== 'asbestos' && (
+          <div className="space-y-6">
           {/* Lab Analysis Upload */}
           <Card>
             <CardHeader>
@@ -2472,7 +2397,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                   lab_analysis_images: updatedImages
                                 };
                                 
-                                if (shouldClearAnalysis && inspectionType !== 'asbestos') {
+                                if (shouldClearAnalysis) {
                                   updateData.lab_conclusion = "";
                                   updateData.lab_recommendations = "";
                                   console.log("🔍 DEBUG: Clearing analysis fields since no images remain");
@@ -2507,7 +2432,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         Add More Images
                       </Button>
                       
-                      {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && inspectionType !== 'asbestos' && (
+                      {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -2532,14 +2457,11 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                  
                                  console.log("🔍 DEBUG: About to save:", { newConclusion, newRecommendations });
                                  
-                                 // Only save to database for mold inspections
-                                 if (inspectionType !== 'asbestos') {
-                                   const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-                                   await updateEntity.update(inspectionId, {
-                                     lab_conclusion: newConclusion,
-                                     lab_recommendations: newRecommendations
-                                   });
-                                 }
+                                 const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
+                                 await updateEntity.update(inspectionId, {
+                                   lab_conclusion: newConclusion,
+                                   lab_recommendations: newRecommendations
+                                 });
                                  
                                  console.log("✅ Mock analysis saved to database!");
                                  
@@ -2585,15 +2507,11 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                           if (confirm('Are you sure you want to remove all lab analysis images?')) {
                             console.log("🔍 DEBUG: Removing all lab analysis images for inspection ID:", inspectionId);
                             const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-                            const updateData = { lab_analysis_images: [] };
-                            
-                            // Only add conclusion/recommendations for mold inspections
-                            if (inspectionType !== 'asbestos') {
-                              updateData.lab_conclusion = "";
-                              updateData.lab_recommendations = "";
-                            }
-                            
-                            updateEntity.update(inspectionId, updateData).then(() => {
+                            updateEntity.update(inspectionId, {
+                              lab_analysis_images: [],
+                              lab_conclusion: "",
+                              lab_recommendations: ""
+                            }).then(() => {
                               loadInspectionData();
                             }).catch((error) => {
                               console.error("❌ Error removing all images:", error);
@@ -2608,6 +2526,16 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                       </Button>
                     </div>
                   </div>
+                  
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleLabImageUpload}
+                    className="hidden"
+                    id="lab-analysis-upload"
+                    disabled={uploadingImage}
+                  />
                 </div>
               )}
 
@@ -2641,22 +2569,10 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                   </p>
                 </div>
               )}
-              
-              {/* Hidden file input for lab analysis uploads - always available */}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleLabImageUpload}
-                className="hidden"
-                id="lab-analysis-upload"
-                disabled={uploadingImage}
-              />
             </CardContent>
           </Card>
 
-          {/* Conclusions & Recommendations - Only for Mold Inspections */}
-          {inspectionType !== 'asbestos' && (
+          {/* Conclusions & Recommendations */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -2734,12 +2650,12 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               </Button>
             </CardContent>
           </Card>
-          )}
 
 
 
 
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
