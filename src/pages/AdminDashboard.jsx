@@ -22,6 +22,8 @@ import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calend
 import { usePopup } from "@/components/ui/popup";
 
 // Export this function for use in other components
+import { generateAsbestosReport } from '@/utils/reportGenerator';
+
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
@@ -56,7 +58,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; }
         .section { margin-bottom: 25px; }
         .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
-        .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
+        .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 15px; margin: 10px 0; }
         .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
         .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; }
         .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
@@ -94,7 +96,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             .cover-detail-item { font-size: 18px; }
             .report-container { max-width: 800px; padding: 40px; }
             .section h2 { font-size: 22px; }
-            .disclaimer-box, .limitations-section { padding: 25px; }
+            .disclaimer-box, .limitations-section { padding: 15px; margin: 10px 0; }
             .disclaimer-title, .limitations-title { font-size: 20px; }
             .disclaimer-text, .limitations-text { font-size: 14px; }
             .client-info-grid { grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -174,6 +176,71 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     console.log("🔍 DEBUG: Parsed moldLocations:", moldLocations);
     console.log("🔍 DEBUG: Parsed waterDamageLocations:", waterDamageLocations);
     
+    // Generate report content based on inspection type
+    if (inspection.app_id === 'asbestos') {
+      return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+          <title>Asbestos Assessment Report</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="robots" content="noindex">
+          <style>${css}</style>
+      </head>
+      <body>
+          <div class="cover-page">
+              <h1 class="cover-title">Asbestos Assessment Report</h1>
+              <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
+              <div class="cover-details">
+                  <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
+                  <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
+              </div>
+              <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
+          </div>
+
+          <div class="report-container">
+              <div class="disclaimer-box" style="margin-top: 10px;">
+                  <h3 class="disclaimer-title">Disclaimer</h3>
+                  <p class="disclaimer-text">This report provides a preliminary assessment of potential asbestos-containing materials. It is not a substitute for a comprehensive asbestos survey by a certified professional. The findings and recommendations are based on visual inspection and basic material assessment. For definitive identification of asbestos-containing materials, laboratory testing by accredited facilities is required. If renovation or demolition is planned, a thorough asbestos survey must be conducted by qualified professionals in accordance with local regulations.</p>
+              </div>
+
+              <div class="section">
+                  <h2>Client Information</h2>
+                  <div class="client-info-grid">
+                      <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(inspection.full_name || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(inspection.email || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${(inspection.client_type || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || '').toUpperCase()}</div></div>
+                      <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage} SQ FT</div></div>
+                      ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.background_info}</div></div>` : ''}
+                  </div>
+              </div>
+
+              <div class="section">
+                  <h2>Asbestos Assessment</h2>
+                  ${generateAsbestosReport(inspection)}
+              </div>
+
+              <div class="page-break"></div>
+
+              <div class="limitations-section">
+                  <h3 class="limitations-title">Limitations of Assessment</h3>
+                  <p class="limitations-text">This assessment is limited to visual inspection and basic material condition assessment. No destructive testing or sampling was performed. The presence of asbestos can only be confirmed through laboratory analysis by accredited facilities. Hidden or inaccessible materials were not assessed. Conditions may change over time or during renovation activities. This report should not be considered a comprehensive asbestos survey as required for renovation or demolition activities.</p>
+              </div>
+
+              <div class="footer">
+                  <p>Total Testing</p>
+                  <p>Report generated on ${format(new Date(), "MMMM d, yyyy")}</p>
+              </div>
+          </div>
+      </body>
+      </html>
+      `;
+    }
+
+    // For mold inspections, generate the mold report content
     const visibleMoldHtml = inspection.mold_images && inspection.mold_images.length > 0 && moldLocations.length > 0
       ? moldLocations.map((location, i) => {
           const locationImage = inspection.mold_images[i] || null;
@@ -183,27 +250,27 @@ export const generateReportHtmlContent = async (inspection, samples) => {
               ${createPriorityBadge('medium', 'high Priority')}
             </div>
             <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
-            <div style="text-align: center; margin: 15px 0;">
-              ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #fecaca;" />` : ''}
-            </div>
+                 <div style="text-align: center; margin: 8px 0;">
+                   ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 200px; max-height: 150px; object-fit: contain; border-radius: 4px; border: 1px solid #fecaca;" />` : ''}
+                 </div>
           </div>`;
         }).join('')
       : '<p>No visible mold was reported during this inspection.</p>';
 
     const waterDamageHtml = inspection.water_damage_images && inspection.water_damage_images.length > 0 && waterDamageLocations.length > 0
-      ? `<div style="margin-bottom: 20px;">
-          <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+      ? `<div style="margin-bottom: 15px;">
+          <h3 style="color: #ea580c; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
             💧 Water Damage Detected
           </h3>
           ${waterDamageLocations.map((location, i) => `
-            <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
+            <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <h4 style="color: #ea580c; font-weight: bold; margin: 0; font-size: 14px;">Location #${i + 1}: ${location || 'N/A'}</h4>
                 ${createPriorityBadge('medium', 'Medium Priority')}
               </div>
-              <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">💧 Water damage detected - may contribute to mold growth</p>
-              <div style="text-align: center; margin: 15px 0;">
-                ${createImageList(inspection.water_damage_images)}
+              <p style="color: #ea580c; font-size: 12px; margin: 4px 0;">💧 Water damage detected - may contribute to mold growth</p>
+              <div style="text-align: center; margin: 6px 0;">
+                ${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" style="max-width: 180px; max-height: 120px; object-fit: contain; border-radius: 4px; border: 1px solid #fed7aa;" />` : ''}
               </div>
             </div>
           `).join('')}

@@ -453,6 +453,17 @@ export const AsbestosInspection = {
       }
     });
     return response;
+  },
+
+  // Get detailed inspection data including user profile
+  getDetailed: async (id) => {
+    const token = getAuthToken();
+    const response = await apiCall(`/asbestosinspection/${id}`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      }
+    });
+    return response;
   }
 };
 

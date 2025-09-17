@@ -279,18 +279,26 @@ export default function InspectionDetails() {
         console.log("  - location_description:", inspection.location_description || "EMPTY");
       }
 
-      // Parse lab_analysis_images if it's a string
-      if (inspection.lab_analysis_images && typeof inspection.lab_analysis_images === 'string') {
-        try {
-          inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
-        } catch (parseError) {
-          console.error("❌ Error parsing lab_analysis_images JSON:", parseError);
+      // Handle lab_analysis_images parsing
+      console.log("🔍 DEBUG: Raw lab_analysis_images:", inspection.lab_analysis_images);
+      
+      if (inspection.lab_analysis_images) {
+        if (typeof inspection.lab_analysis_images === 'string') {
+          try {
+            inspection.lab_analysis_images = JSON.parse(inspection.lab_analysis_images);
+            console.log("🔍 DEBUG: Parsed lab_analysis_images from string:", inspection.lab_analysis_images);
+          } catch (parseError) {
+            console.error("❌ Error parsing lab_analysis_images JSON:", parseError);
+            inspection.lab_analysis_images = [];
+          }
+        } else if (Array.isArray(inspection.lab_analysis_images)) {
+          console.log("🔍 DEBUG: lab_analysis_images is already an array:", inspection.lab_analysis_images);
+        } else {
+          console.log("❌ WARNING: lab_analysis_images is neither string nor array:", typeof inspection.lab_analysis_images);
           inspection.lab_analysis_images = [];
         }
-      } else if (Array.isArray(inspection.lab_analysis_images)) {
-        // Already an array, keep as is
       } else {
-        // No lab analysis images, set to empty array
+        console.log("🔍 DEBUG: No lab_analysis_images found, setting empty array");
         inspection.lab_analysis_images = [];
       }
       
@@ -415,32 +423,35 @@ export default function InspectionDetails() {
               lab_analysis_images: [...(prev.lab_analysis_images || []), uploadResult.url]
             }));
             
-            // Step 2: Process uploaded file with OCR
-            console.log(`📡 OCR: Making Google Vision API call for uploaded file: ${file.name}`);
-            const ocrResult = await ProcessLabImageWithOCR(file);
-            console.log("🔍 DEBUG: OCR processing result:", ocrResult);
-            
-            if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
-              console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
-              // Apply auto-filters to remove noisy lines
-              const filteredText = applyAutoFilters(ocrResult.extracted_text);
-              processedFiles.push({
-                filename: file.name,
-                file_url: uploadResult.file_url,
-                extracted_text: filteredText,
-                confidence: ocrResult.confidence
-              });
+            // Only process with OCR and OpenAI for mold inspections
+            if (inspectionType !== 'asbestos') {
+              // Step 2: Process uploaded file with OCR
+              console.log(`📡 OCR: Making Google Vision API call for uploaded file: ${file.name}`);
+              const ocrResult = await ProcessLabImageWithOCR(file);
+              console.log("🔍 DEBUG: OCR processing result:", ocrResult);
               
-              // Combine all extracted text for analysis
-              allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
-              
-            } else {
-              const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
-              console.warn(`❌ OCR: Google Vision API failed for ${file.name}:`, errorMessage);
-              skippedFiles.push({ 
-                file: file.name, 
-                reason: `Google Vision API failed: ${errorMessage}` 
-              });
+              if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
+                console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
+                // Apply auto-filters to remove noisy lines
+                const filteredText = applyAutoFilters(ocrResult.extracted_text);
+                processedFiles.push({
+                  filename: file.name,
+                  file_url: uploadResult.file_url,
+                  extracted_text: filteredText,
+                  confidence: ocrResult.confidence
+                });
+                
+                // Combine all extracted text for analysis
+                allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
+                
+              } else {
+                const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
+                console.warn(`❌ OCR: Google Vision API failed for ${file.name}:`, errorMessage);
+                skippedFiles.push({ 
+                  file: file.name, 
+                  reason: `Google Vision API failed: ${errorMessage}` 
+                });
+              }
             }
           } else {
             console.error(`❌ UPLOAD: Failed to upload ${file.name} to lab-analysis bucket`);
@@ -465,35 +476,54 @@ export default function InspectionDetails() {
         alert(`${skippedFiles.length} file(s) were skipped:\n\n${skippedMessage}\n\n${processedFiles.length} file(s) were processed with OCR.`);
       }
       
-      if (processedFiles.length === 0) {
-        throw new Error('No files could be processed with OCR. No analysis will be generated.');
+      // Only check processed files for mold inspections
+      if (inspectionType !== 'asbestos') {
+        if (processedFiles.length === 0) {
+          throw new Error('No files could be processed with OCR. No analysis will be generated.');
+        }
+        console.log(`✅ UPLOAD & OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
+      } else {
+        console.log(`✅ UPLOAD: ${uploadedFiles.length} out of ${files.length} files uploaded successfully`);
       }
       
-      console.log(`✅ UPLOAD & OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
-      
-      // Clean the extracted text to filter only mold-related content
-      let cleanedExtractedText = cleanExtractedText(allExtractedText);
-      console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
-      console.log("🔍 DEBUG: Cleaned extracted text length:", cleanedExtractedText.length);
-      console.log("🔍 DEBUG: Cleaned extracted text:", cleanedExtractedText);
-      // Remove any template/instructional lines from the cleanedExtractedText
-      const instructionKeywords = [
-        "please analyze", "conclusion", "recommendations", "return your response", "make the analysis", "- summarize", "- assess", "- evaluate", "- compare", "- consider", "- immediate actions", "- preventive measures", "- professional services", "- timeline", "- environmental controls", "- follow-up testing"
-      ];
-      cleanedExtractedText = cleanedExtractedText
-        .split('\n')
-        .filter(line => {
-          const lower = line.toLowerCase();
-          return !instructionKeywords.some(keyword => lower.includes(keyword));
-        })
-        .join('\n');
-      
-      // Step 3: Generate analysis from cleaned extracted text
-      console.log("🔍 STEP 3: Generating analysis from cleaned extracted text...");
-      
-      try {
+      // Skip text analysis for asbestos inspections
+      if (inspectionType !== 'asbestos') {
+        // Clean the extracted text to filter only mold-related content
+        let cleanedExtractedText = cleanExtractedText(allExtractedText);
+        console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
+        console.log("🔍 DEBUG: Cleaned extracted text length:", cleanedExtractedText.length);
+        console.log("🔍 DEBUG: Cleaned extracted text:", cleanedExtractedText);
+        // Remove any template/instructional lines from the cleanedExtractedText
+        const instructionKeywords = [
+          "please analyze", "conclusion", "recommendations", "return your response", "make the analysis", "- summarize", "- assess", "- evaluate", "- compare", "- consider", "- immediate actions", "- preventive measures", "- professional services", "- timeline", "- environmental controls", "- follow-up testing"
+        ];
+        cleanedExtractedText = cleanedExtractedText
+          .split('\n')
+          .filter(line => {
+            const lower = line.toLowerCase();
+            return !instructionKeywords.some(keyword => lower.includes(keyword));
+          })
+          .join('\n');
+        
+        // Step 3: Generate analysis from cleaned extracted text
+        console.log("🔍 STEP 3: Generating analysis from cleaned extracted text...");
+        
+        try {
         // Construct comprehensive prompt with all inspection data
-        const propertyDetailsSection = `**Property Details:**
+        const propertyDetailsSection = inspectionType === 'asbestos' 
+          ? `**Property Details and Asbestos Assessment:**
+Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
+Property Type: ${inspection.property_type || 'Not specified'}
+Square Footage: ${inspection.square_footage || 'Not specified'}
+Year Built: ${inspection.year_built || 'Not specified'}
+Material Type: ${inspection.material_type || 'Not specified'}
+Material Condition: ${inspection.material_condition || 'Not specified'}
+Location Description: ${inspection.location_description || 'Not specified'}
+
+Risk Assessment: ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? 'HIGH RISK - Property built before 1980' : 'LOWER RISK - Property built after 1980'}
+
+`
+          : `**Property Details:**
 Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
 Property Type: ${inspection.property_type || 'Not specified'}
 Square Footage: ${inspection.square_footage || 'Not specified'}
@@ -733,15 +763,62 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         
         console.log(`✅ ${inspectionType === 'asbestos' ? 'Asbestos' : 'Lab'} analysis complete! Lab images uploaded to bucket and analysis saved to database.`);
         
-      } catch (analysisError) {
-        console.error("❌ OCR ANALYSIS: Error during analysis generation:", analysisError);
-        throw new Error(`Failed to generate ${inspectionType === 'asbestos' ? 'asbestos' : 'lab'} analysis from OCR text: ${analysisError.message}`);
+        } catch (analysisError) {
+          console.error("❌ OCR ANALYSIS: Error during analysis generation:", analysisError);
+          throw new Error(`Failed to generate lab analysis from OCR text: ${analysisError.message}`);
+        }
       }
       
       // Show success message
-      const totalProcessed = files.length;
-      const totalSuccessful = processedFiles.length;
-      const totalSkipped = skippedFiles.length;
+      if (inspectionType === 'asbestos') {
+        // For asbestos, update database with images and show success
+        const totalUploaded = uploadedFiles.length;
+        if (totalUploaded > 0) {
+          // Get the image URLs
+          const labImageUrls = uploadedFiles.map(file => file.file_url);
+          
+          // Update database
+          const updateEntity = AsbestosInspection;
+          try {
+            // Ensure we're sending an array
+            const imageArray = Array.isArray(labImageUrls) ? labImageUrls : [labImageUrls];
+            console.log("🔍 DEBUG: Updating database with lab images:", imageArray);
+            
+            // Update the database
+            await updateEntity.update(inspectionId, {
+              lab_analysis_images: imageArray
+            });
+            console.log("✅ Successfully updated asbestos inspection with lab images:", labImageUrls);
+            
+            // Verify the update by getting the latest data
+            const verifyData = await AsbestosInspection.findUnique({ id: inspectionId });
+            console.log("🔍 DEBUG: Verification - Database data after update:", {
+              id: verifyData.id,
+              lab_analysis_images: verifyData.lab_analysis_images
+            });
+            
+            // Reload inspection data to refresh UI
+            await loadInspectionData();
+            
+            alert(`Successfully uploaded ${totalUploaded} lab analysis image(s).`);
+          } catch (dbError) {
+            console.error("❌ Failed to update database with lab images:", dbError);
+            alert("Images uploaded but failed to save to database. Please try again.");
+            throw dbError;
+          }
+        }
+      } else {
+        // For mold, show processing results
+        const totalProcessed = files.length;
+        const totalSuccessful = processedFiles.length;
+        const totalSkipped = skippedFiles.length;
+        
+        if (skippedFiles.length > 0) {
+          const skippedMessage = skippedFiles.map(f => `• ${f.file}: ${f.reason}`).join('\n');
+          console.warn("⚠️ Some files were skipped:", skippedFiles);
+          alert(`${skippedFiles.length} file(s) were skipped:\n\n${skippedMessage}\n\n${processedFiles.length} file(s) were processed with OCR.`);
+        }
+      }
       
     } catch (error) {
       console.error("❌ Error in lab image upload process:", error);
@@ -1408,9 +1485,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         </div>
       </div>
 
-             <div className={`grid gap-8 ${inspectionType === 'asbestos' ? 'lg:grid-cols-1 max-w-4xl mx-auto' : 'lg:grid-cols-2'}`}>
+             <div className="grid lg:grid-cols-2 gap-8">
          {/* Left Column - Inspection Details */}
-         <div className={`space-y-6 ${inspectionType === 'asbestos' ? 'max-w-none' : ''}`}>
+         <div className="space-y-6">
           {/* Customer Information */}
           <Card>
             <CardHeader>
@@ -2281,7 +2358,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             </CardHeader>
             <CardContent className="space-y-4">
               
-              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0 || !inspection.lab_conclusion || !inspection.lab_recommendations) ? (
+              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0 || (inspectionType !== 'asbestos' && (!inspection.lab_conclusion || !inspection.lab_recommendations))) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   {console.log("🔍 DEBUG: No lab analysis images found, showing upload section")}
                   <input
@@ -2317,11 +2394,16 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                           </p>
                           <p className="text-slate-500 text-sm mt-2">
                             {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? (
-                              <span className="text-orange-600">Images uploaded. Please click "Analyze with AI" to generate the report and view images.</span>
+                              <span className="text-orange-600">
+                                {inspectionType === 'asbestos' 
+                                  ? 'Images uploaded successfully. You can upload more images if needed.'
+                                  : 'Images uploaded. Please click "Analyze with AI" to generate the report and view images.'
+                                }
+                              </span>
                             ) : (
                               inspectionType === 'asbestos'
-                                ? 'Click to select one or more images of the asbestos lab analysis results'
-                                : 'Click to select one or more images of the lab analysis results'
+                              ? 'Click to select one or more images of the asbestos lab analysis results'
+                              : 'Click to select one or more images of the lab analysis results'
                             )}
                           </p>
                           <p className="text-slate-400 text-xs mt-2">
@@ -2479,10 +2561,43 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                  console.log("📝 Updating with mock analysis...");
                                  
                                  const newConclusion = inspectionType === 'asbestos' 
-                                   ? `Asbestos lab analysis results for ${inspection.street_address}: Based on the uploaded images, professional asbestos assessment required. Please examine the lab results and update this conclusion with specific findings.`
+                                   ? `Asbestos Assessment Report for ${inspection.street_address}:
+
+Material Analysis:
+- Type: ${inspection.material_type || 'Pending professional assessment'}
+- Current Condition: ${inspection.material_condition || 'Pending assessment'}
+- Location: ${inspection.location_description || 'Detailed location to be documented'}
+
+Building Risk Factors:
+- Year Built: ${inspection.year_built || 'Not specified'} ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '(HIGH RISK - Pre-1980 construction)' : ''}
+- Property Type: ${inspection.property_type || 'Not specified'}
+- Square Footage: ${inspection.square_footage || 'Not specified'}
+
+Professional assessment is required to confirm asbestos content and determine appropriate management or remediation strategies.`
                                    : `Lab analysis results for ${inspection.street_address}: Based on the uploaded images, professional review required. Please examine the lab results and update this conclusion with specific findings.`;
+                                   
                                  const newRecommendations = inspectionType === 'asbestos'
-                                   ? `1. Review asbestos lab results manually\n2. Consult with asbestos specialist if needed\n3. Implement asbestos management plan based on findings\n4. Schedule follow-up asbestos testing if required`
+                                   ? `Immediate Actions Required:
+1. Material Handling: ${inspection.material_condition === 'Poor' || inspection.material_condition === 'Deteriorating' || inspection.material_condition === 'Damaged'
+  ? 'URGENT - Due to poor material condition, immediate professional intervention required.'
+  : 'Do not disturb potential asbestos-containing materials. Professional handling required.'}
+
+2. Access Control: ${inspection.material_condition === 'Poor' || inspection.material_condition === 'Deteriorating' || inspection.material_condition === 'Damaged'
+  ? 'Restrict access to areas with damaged materials immediately.'
+  : 'Monitor access to areas containing potential asbestos materials.'}
+
+Professional Assessment Required:
+• Full inspection by certified asbestos professional
+• Material testing to confirm asbestos content
+• Development of management/removal plan
+${inspection.material_type ? `• Specific assessment of identified ${inspection.material_type}` : ''}
+
+Risk Management Plan:
+• Documentation of all identified materials
+• Regular condition monitoring
+• Emergency procedures
+• Contractor notification protocols
+${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandatory assessment before any renovation (Pre-1980 building)' : '• Professional assessment before renovation'}`
                                    : `1. Review lab results manually\n2. Consult with mold specialist if needed\n3. Implement remediation based on findings\n4. Schedule follow-up testing`;
                                  
                                  console.log("🔍 DEBUG: About to save:", { newConclusion, newRecommendations });
@@ -2602,74 +2717,70 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             </CardContent>
           </Card>
 
-          {/* Conclusions & Recommendations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                {inspectionType === 'asbestos' ? 'Asbestos Report Content' : 'Report Content'}
+          {/* Conclusions & Recommendations - Only for Mold Inspections */}
+          {inspectionType !== 'asbestos' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Report Content
+                  {generatingAnalysis && (
+                    <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  )}
+                </CardTitle>
                 {generatingAnalysis && (
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                  <CardDescription>
+                    Analyzing lab results and generating report...
+                  </CardDescription>
                 )}
-              </CardTitle>
-              {generatingAnalysis && (
-                <CardDescription>
-                  Analyzing lab results and generating report...
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {generatingAnalysis ? (
-                <div className="space-y-4">
-                  <div>
-                    <Label className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generating Conclusion...
-                    </Label>
-                    <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {generatingAnalysis ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating Conclusion...
+                      </Label>
+                      <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
+                    </div>
+                    
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating Recommendations...
+                      </Label>
+                      <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
+                    </div>
                   </div>
-                  
-                  <div>
-                    <Label className="flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generating Recommendations...
-                    </Label>
-                    <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
-                  </div>
-                </div>
-              ) : (
-                <>
-              <div>
-                <Label htmlFor="conclusion">Conclusion</Label>
-                <Textarea
-                  id="conclusion"
-                      value={inspection.lab_conclusion || ""}
-                  onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
-                  placeholder={inspectionType === 'asbestos' 
-                    ? "Professional conclusion and recommendations based on asbestos lab analysis..."
-                    : "Professional conclusion and recommendations based on lab analysis..."
-                  }
-                  className="min-h-32 mt-2"
-                />
-              </div>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="conclusion">Conclusion</Label>
+                      <Textarea
+                        id="conclusion"
+                        value={inspection.lab_conclusion || ""}
+                        onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
+                        placeholder="Professional conclusion and recommendations based on lab analysis..."
+                        className="min-h-32 mt-2"
+                      />
+                    </div>
 
-              <div>
-                <Label htmlFor="recommendations">Recommendations</Label>
-                <Textarea
-                  id="recommendations"
-                  value={inspection.lab_recommendations || ""}
-                  onChange={e => setInspection({ ...inspection, lab_recommendations: e.target.value })}
-                  placeholder={inspectionType === 'asbestos' 
-                    ? "Detailed asbestos assessment recommendations for the client..."
-                    : "Detailed recommendations for the client..."
-                  }
-                  className="min-h-32 mt-2"
-                />
-              </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                    <div>
+                      <Label htmlFor="recommendations">Recommendations</Label>
+                      <Textarea
+                        id="recommendations"
+                        value={inspection.lab_recommendations || ""}
+                        onChange={e => setInspection({ ...inspection, lab_recommendations: e.target.value })}
+                        placeholder="Detailed recommendations for the client..."
+                        className="min-h-32 mt-2"
+                      />
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
               {saving && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -2708,8 +2819,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                   </>
                 )}
               </Button>
-        </div>
-      )}
+          </div>
+        )}
       </div>
     </div>
   );
