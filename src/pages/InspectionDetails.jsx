@@ -2316,8 +2316,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                             {inspectionType === 'asbestos' ? 'Upload Asbestos Lab Analysis Images' : 'Upload Lab Analysis Images'}
                           </p>
                           <p className="text-slate-500 text-sm mt-2">
-                            {!inspection.lab_conclusion || !inspection.lab_recommendations ? (
-                              <span className="text-orange-600">Please wait for Report Content to be generated before viewing lab images</span>
+                            {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? (
+                              <span className="text-orange-600">Images uploaded. Please click "Analyze with AI" to generate the report and view images.</span>
                             ) : (
                               inspectionType === 'asbestos'
                                 ? 'Click to select one or more images of the asbestos lab analysis results'
