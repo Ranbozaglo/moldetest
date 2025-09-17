@@ -55,29 +55,29 @@ def register_email_endpoints(app, supabase):
         table_name = None
         
         # Try as numeric ID first
-        if inspection_id.isdigit():
-            print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
-            
-            # Try mold inspection table first
+        inspection_id_str = str(inspection_id)
+        print(f"🔍 EMAIL DEBUG: Looking for inspection with id = {inspection_id}")
+        
+        # Try mold inspection table first
+        try:
+            result = supabase.table('inspection').select('*').eq('id', inspection_id).single().execute()
+            if result and result.data:
+                inspection_type = 'mold'
+                table_name = 'inspection'
+                print(f"🔍 EMAIL DEBUG: Found mold inspection with id = {inspection_id}")
+        except Exception as e:
+            print(f"🔍 EMAIL DEBUG: Search by ID in mold table failed: {e}")
+        
+        # If not found in mold table, try asbestos table
+        if not result or not result.data:
             try:
-                result = supabase.table('inspection').select('*').eq('id', int(inspection_id)).single().execute()
+                result = supabase.table('asbestosinspection').select('*').eq('id', inspection_id).single().execute()
                 if result and result.data:
-                    inspection_type = 'mold'
-                    table_name = 'inspection'
-                    print(f"🔍 EMAIL DEBUG: Found mold inspection with id = {inspection_id}")
+                    inspection_type = 'asbestos'
+                    table_name = 'asbestosinspection'
+                    print(f"🔍 EMAIL DEBUG: Found asbestos inspection with id = {inspection_id}")
             except Exception as e:
-                print(f"🔍 EMAIL DEBUG: Search by ID in mold table failed: {e}")
-            
-            # If not found in mold table, try asbestos table
-            if not result or not result.data:
-                try:
-                    result = supabase.table('asbestosinspection').select('*').eq('id', int(inspection_id)).single().execute()
-                    if result and result.data:
-                        inspection_type = 'asbestos'
-                        table_name = 'asbestosinspection'
-                        print(f"🔍 EMAIL DEBUG: Found asbestos inspection with id = {inspection_id}")
-                except Exception as e:
-                    print(f"🔍 EMAIL DEBUG: Search by ID in asbestos table failed: {e}")
+                print(f"🔍 EMAIL DEBUG: Search by ID in asbestos table failed: {e}")
         
         # If not found by ID or not numeric, try by inspection_number
         if not result or not result.data:

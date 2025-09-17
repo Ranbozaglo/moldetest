@@ -18,8 +18,8 @@ def setup_supabase():
             with open(env_file, 'w') as f:
                 f.write("# Supabase Configuration\n")
                 f.write("# Replace these with your actual Supabase credentials\n")
-                f.write("VITE_SUPABASE_URL=https://your-project-id.supabase.co\n")
-                f.write("VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here\n")
+                f.write("SUPABASE_URL=https://your-project-id.supabase.co\n")
+                f.write("SUPABASE_ANON_KEY=your_supabase_anon_key_here\n")
                 f.write("\n# Backend Configuration\n")
                 f.write("SECRET_KEY=your_secret_key_here\n")
                 f.write("ACCESS_TOKEN_EXPIRE_MINUTES=30\n")
@@ -34,11 +34,11 @@ def setup_supabase():
     load_dotenv()
     
     # Check if Supabase URL is configured
-    supabase_url = os.getenv('VITE_SUPABASE_URL')
-    supabase_key = os.getenv('VITE_SUPABASE_ANON_KEY')
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_ANON_KEY')
     
     if supabase_url == 'https://your-project-id.supabase.co' or not supabase_url:
-        print("\n⚠️  Please update VITE_SUPABASE_URL in your .env file")
+        print("\n⚠️  Please update SUPABASE_URL in your .env file")
         print("   Get your Supabase URL from: https://supabase.com/dashboard")
         print("   Go to Settings > API > Project URL")
     else:

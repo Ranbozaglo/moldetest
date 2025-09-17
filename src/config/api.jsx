@@ -1,5 +1,5 @@
 // API Configuration for Flask Backend
-import { getEnvironmentConfig, getBaseApiUrl, getBackendUrl } from './environment.js';
+import { getEnvironmentConfig, getBaseApiUrl, getBackendUrl } from './environment.jsx';
 
 const envConfig = getEnvironmentConfig();
 

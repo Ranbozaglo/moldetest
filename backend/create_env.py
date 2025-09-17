@@ -9,8 +9,8 @@ def create_env_file():
     """Create .env file with Supabase configuration template"""
     env_content = """# Supabase Configuration
 # Replace these with your actual Supabase credentials
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 # Backend Configuration
 SECRET_KEY=your_secret_key_here

@@ -2254,8 +2254,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
            )}
         </div>
 
-        {/* Right Column - Lab Analysis & Report (Only for Mold Inspections) */}
-        {inspectionType !== 'asbestos' && (
+         {/* Right Column - Lab Analysis & Report */}
+         {/* Show for both Mold and Asbestos inspections */}
+         {(inspectionType === 'mold' || inspectionType === 'asbestos') && (
           <div className="space-y-6">
           {/* Lab Analysis Upload */}
           <Card>
@@ -2333,28 +2334,29 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                       {inspection.lab_analysis_images.map((imageUrl, index) => (
                         <div key={index} className="relative group">
                           {!labImageErrors[index] ? (
-                          <img
-                            src={imageUrl}
-                            alt={`Lab Analysis Results ${index + 1}`}
-                            className="w-full h-48 object-cover rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
-                            onClick={() => {
-                              // Open image in new tab for full view
-                              window.open(imageUrl, '_blank');
-                            }}
-                            title="Click to view full size"
-                            onError={(e) => {
-                              console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
-                                // Prevent further error propagation
-                                e.preventDefault();
-                                
-                                // Use React state instead of direct DOM manipulation
-                                setLabImageErrors(prev => {
-                                  const newErrors = { ...prev };
-                                  newErrors[index] = true;
-                                  return newErrors;
-                                });
-                            }}
-                          />
+                           <div className="relative aspect-square">
+                             <img
+                               src={imageUrl}
+                               alt={`Lab Analysis Results ${index + 1}`}
+                               className="absolute inset-0 w-full h-full object-contain rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer bg-white"
+                               onClick={() => {
+                                 window.open(imageUrl, '_blank');
+                               }}
+                               title="Click to view full size"
+                               onError={(e) => {
+                                 console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
+                                 e.preventDefault();
+                                 setLabImageErrors(prev => {
+                                   const newErrors = { ...prev };
+                                   newErrors[index] = true;
+                                   return newErrors;
+                                 });
+                               }}
+                             />
+                             <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                               {index + 1} of {inspection.lab_analysis_images.length}
+                             </div>
+                           </div>
                           ) : (
                             <div className="w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center">
                             <div className="text-center">

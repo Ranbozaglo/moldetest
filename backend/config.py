@@ -15,8 +15,8 @@ else:
     print("📝 Please create a .env file with your Supabase credentials:")
 
 # Supabase Configuration
-SUPABASE_URL = os.getenv('VITE_SUPABASE_URL', 'your_supabase_url_here')
-SUPABASE_ANON_KEY = os.getenv('VITE_SUPABASE_ANON_KEY', 'your_supabase_anon_key_here')
+SUPABASE_URL = os.getenv('SUPABASE_URL', 'your_supabase_url_here')
+SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'your_supabase_anon_key_here')
 
 # Backend Configuration
 SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key_here')
@@ -63,8 +63,8 @@ OCR_MAX_IMAGE_SIZE_MB = 10
 def validate_config():
     """Validate that required environment variables are set"""
     if SUPABASE_URL == 'your_supabase_url_here':
-        print("❌ VITE_SUPABASE_URL not configured")
-        print("   Please add VITE_SUPABASE_URL=your_supabase_url to .env file")
+        print("❌ SUPABASE_URL not configured")
+        print("   Please add SUPABASE_URL=your_supabase_url to .env file")
         return False
     
     if SUPABASE_ANON_KEY == 'your_supabase_anon_key_here':

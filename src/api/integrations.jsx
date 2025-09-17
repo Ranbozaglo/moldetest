@@ -1,8 +1,8 @@
 // Backend API integrations
 // These services now connect to the Python OCR-GPT backend API
 
-import { EmailService } from './entities.js';
-import { getBaseApiUrl } from '@/config/environment.js';
+import { EmailService } from './entities.jsx';
+import { getBaseApiUrl } from '@/config/environment.jsx';
 
 // WebP conversion utility
 const convertToWebP = async (file) => {

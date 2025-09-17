@@ -1,6 +1,6 @@
 // API client for Flask backend communication
-import { getApiConfig } from '@/config/api.js';
-import { logEnvironmentInfo } from '@/config/environment.js';
+import { getApiConfig } from '@/config/api.jsx';
+import { logEnvironmentInfo } from '@/config/environment.jsx';
 
 const API_CONFIG = getApiConfig();
 
