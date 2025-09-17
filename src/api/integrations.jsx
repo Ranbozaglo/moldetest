@@ -202,17 +202,10 @@ export const Core = {
         };
       }
       
-      // Determine bucket and folder based on type
-      let bucketName, folderName;
-      if (bucketType === 'lab-analysis') {
-        bucketName = 'lab-analysis';
-        folderName = 'lab-analysis-images';
-        console.log('🔍 DEBUG: Using lab-analysis bucket configuration:', { bucketName, folderName });
-      } else {
-        bucketName = 'mold-images';
-        folderName = 'mold-inspections';
-        console.log('🔍 DEBUG: Using mold-images bucket configuration:', { bucketName, folderName });
-      }
+      // Set default bucket and folder
+      const bucketName = 'mold-images';
+      const folderName = 'mold-inspections';
+      console.log('🔍 DEBUG: Using mold-images bucket configuration:', { bucketName, folderName });
       
       // Upload to Supabase Storage
       console.log('🔍 DEBUG: Uploading to Supabase Storage:', { bucketName, folderName, fileName: uploadFile.name });
@@ -258,44 +251,7 @@ export const Core = {
     return await Core.UploadFile(file, 'inspection');
   },
   
-  UploadLabAnalysisImage: async (file) => {
-    console.log('🔍 DEBUG: UploadLabAnalysisImage called with:', { 
-      fileName: file.name, 
-      fileSize: file.size, 
-      fileType: file.type 
-    });
-    
-    try {
-      // Upload to lab-analysis bucket with lab-analysis-images folder
-      const result = await Core.UploadFile(file, 'lab-analysis');
-      
-      console.log('🔍 DEBUG: UploadLabAnalysisImage result:', result);
-      
-      // Verify the upload was successful
-      if (!result.file_url && !result.url) {
-        throw new Error('Upload failed: No public URL returned');
-      }
-      
-      // Ensure the URL is from the correct bucket
-      const publicUrl = result.file_url || result.url;
-      if (!publicUrl.includes('lab-analysis')) {
-        console.warn('⚠️ Upload URL does not contain lab-analysis bucket reference:', publicUrl);
-      }
-      
-      return {
-        file_url: publicUrl,
-        file_path: result.file_path || result.path,
-        bucket: 'lab-analysis',
-        size: result.size || file.size,
-        type: result.type || file.type,
-        success: true
-      };
-      
-    } catch (error) {
-      console.error('❌ UploadLabAnalysisImage error:', error);
-      throw new Error(`Lab analysis image upload failed: ${error.message}`);
-    }
-  },
+  // Lab analysis image upload is now handled by the regular UploadFile function
   
   GenerateImage: async (prompt) => {
     // Mock image generation - in production, this would use an image generation service

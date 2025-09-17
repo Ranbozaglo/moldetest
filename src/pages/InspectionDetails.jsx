@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection, AsbestosInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { ProcessLabImageWithOCR, InvokeLLM, UploadLabAnalysisImage } from "@/api/integrations";
+import { ProcessLabImageWithOCR, InvokeLLM } from "@/api/integrations";
+import { uploadLabImage, deleteLabImage } from '@/lib/labAnalysis';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -361,13 +362,13 @@ export default function InspectionDetails() {
       console.log("🔍 DEBUG: Inspection ID:", inspectionId);
       console.log("🔍 DEBUG: Files to process:", files.length);
       
-      // Step 1: Upload ALL files to lab-analysis bucket first
+      // Step 1: Upload ALL files
       const uploadedFiles = [];
       const processedFiles = [];
       const skippedFiles = [];
       let allExtractedText = "";
       
-      console.log("🔍 STEP 1: Uploading all files to lab-analysis bucket...");
+      console.log("🔍 STEP 1: Uploading files...");
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -391,21 +392,28 @@ export default function InspectionDetails() {
           continue;
         }
 
-        console.log(`🔍 DEBUG: Uploading file ${i + 1}/${files.length} to lab-analysis bucket: ${file.name}`);
+        console.log(`🔍 DEBUG: Uploading file ${i + 1}/${files.length}: ${file.name}`);
         
         try {
-          // Upload file to lab-analysis bucket
-        const uploadResult = await UploadLabAnalysisImage(file);
-        console.log("🔍 DEBUG: Upload result:", uploadResult);
+          // Upload lab analysis image
+          const uploadResult = await uploadLabImage(file, inspectionId);
+          console.log("🔍 DEBUG: Upload result:", uploadResult);
         
-          if (uploadResult && uploadResult.file_url) {
-            console.log(`✅ UPLOAD: Successfully uploaded ${file.name} to lab-analysis bucket`);
-            uploadedFiles.push({
+          if (uploadResult && uploadResult.url) {
+            console.log(`✅ UPLOAD: Successfully uploaded ${file.name}`);
+            const newImage = {
               filename: file.name,
-              file_url: uploadResult.file_url,
-              file_path: uploadResult.file_path,
-              bucket: uploadResult.bucket
-            });
+              file_url: uploadResult.url,
+              file_path: uploadResult.path,
+              bucket: 'mold-images'
+            };
+            uploadedFiles.push(newImage);
+
+            // Update inspection state with new image immediately
+            setInspection(prev => ({
+              ...prev,
+              lab_analysis_images: [...(prev.lab_analysis_images || []), uploadResult.url]
+            }));
             
             // Step 2: Process uploaded file with OCR
             console.log(`📡 OCR: Making Google Vision API call for uploaded file: ${file.name}`);
@@ -2388,6 +2396,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                             onClick={(e) => {
                               e.stopPropagation();
                               if (confirm(`Are you sure you want to remove lab analysis image ${index + 1}?`)) {
+                                const imageUrl = inspection.lab_analysis_images[index];
                                 const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
                                 console.log("🔍 DEBUG: Removing image at index:", index);
                                 console.log("🔍 DEBUG: Updated images:", updatedImages);
@@ -2404,9 +2413,26 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                   updateData.lab_recommendations = "";
                                   console.log("🔍 DEBUG: Clearing analysis fields since no images remain");
                                 }
-                                
+
+                                // Update UI immediately
+                                setInspection(prev => ({
+                                  ...prev,
+                                  lab_analysis_images: updatedImages,
+                                  ...(shouldClearAnalysis ? {
+                                    lab_conclusion: "",
+                                    lab_recommendations: ""
+                                  } : {})
+                                }));
+
+                                // Delete from storage and update database
                                 const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-                                updateEntity.update(inspectionId, updateData).then(() => {
+                                
+                                Promise.all([
+                                  deleteLabImage(imageUrl).catch(error => {
+                                    console.error("❌ Failed to delete image from storage:", error);
+                                  }),
+                                  updateEntity.update(inspectionId, updateData)
+                                ]).then(() => {
                                   loadInspectionData();
                                 }).catch((error) => {
                                   console.error("❌ Error removing image:", error);

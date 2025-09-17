@@ -428,14 +428,14 @@ def check_supabase_storage():
         
         # Test storage bucket access
         try:
-            # Try to list files in lab-analysis bucket
-            result = supabase.storage.from_("lab-analysis").list()
-            print("✅ Successfully accessed lab-analysis bucket")
+            # Try to list files in mold-images bucket
+            result = supabase.storage.from_("mold-images").list()
+            print("✅ Successfully accessed mold-images bucket")
             print(f"📊 Bucket contains {len(result)} files/folders")
         except Exception as e:
-            print(f"❌ Failed to access lab-analysis bucket: {e}")
+            print(f"❌ Failed to access mold-images bucket: {e}")
             print("📝 Please check:")
-            print("   1. Bucket 'lab-analysis' exists in Supabase")
+            print("   1. Bucket 'mold-images' exists in Supabase")
             print("   2. Bucket is public or has proper RLS policies")
             print("   3. Your anon key has storage permissions")
             print("   4. Storage policies allow anon access")
@@ -443,7 +443,7 @@ def check_supabase_storage():
         # Test storage permissions
         try:
             # Try to get bucket info
-            bucket_info = supabase.storage.get_bucket("lab-analysis")
+            bucket_info = supabase.storage.get_bucket("mold-images")
             print("✅ Successfully retrieved bucket information")
             print(f"📊 Bucket public: {bucket_info.public}")
         except Exception as e:
@@ -456,7 +456,7 @@ def check_supabase_storage():
             
             print(f"🔍 Testing upload with path: {test_path}")
             
-            upload_result = supabase.storage.from_("lab-analysis").upload(
+            upload_result = supabase.storage.from_("mold-images").upload(
                 path=test_path,
                 file=test_content,
                 file_options={"content-type": "text/plain"}
@@ -470,7 +470,7 @@ def check_supabase_storage():
                 
                 # Clean up test file
                 try:
-                    supabase.storage.from_("lab-analysis").remove([test_path])
+                    supabase.storage.from_("mold-images").remove([test_path])
                     print("✅ Test file cleaned up")
                 except Exception as cleanup_error:
                     print(f"⚠️ Failed to cleanup test file: {cleanup_error}")
