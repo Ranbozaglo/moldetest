@@ -906,10 +906,21 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         {/* Status Detail */}
                         <div className="bg-slate-100 rounded-lg p-3">
                           <p className="text-sm font-medium text-slate-700">Current Status:</p>
-                          <p className="text-sm text-slate-600">{inspection.client_status_detail || 
-                             (inspection.status === 'completed' ? 'Inspection completed - samples documented' :
-                              inspection.status === 'report_ready' ? 'Your detailed report is ready for download' :
-                              'Inspection submitted - awaiting sample collection')}
+                          <p className="text-sm text-slate-600">
+                            {inspection.client_status_detail || (() => {
+                              switch (inspection.status) {
+                                case 'pending':
+                                  return 'Lab analysis pending - Please send your samples to the lab using the prepaid shipping label';
+                                case 'in_progress':
+                                  return 'Lab analysis in progress - Your samples are being analyzed by our certified lab technicians';
+                                case 'completed':
+                                  return 'Lab analysis completed - Your results have been processed and report is being generated';
+                                case 'report_ready':
+                                  return 'Lab analysis report is ready - You can now view and download your detailed report';
+                                default:
+                                  return 'Inspection submitted - awaiting next steps';
+                              }
+                            })()}
                           </p>
                         </div>
 
