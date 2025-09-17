@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MoldInspection, AsbestosInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { ProcessLabImageWithOCR, InvokeLLM } from "@/api/integrations";
-import { uploadLabImage, deleteLabImage } from '@/lib/labAnalysis';
+import { uploadLabImage, deleteLabImage } from '@/lib/labAnalysis.jsx';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
