@@ -397,7 +397,7 @@ export default function InspectionDetails() {
         try {
           // Upload lab analysis image
           const uploadResult = await uploadLabImage(file, inspectionId);
-          console.log("🔍 DEBUG: Upload result:", uploadResult);
+        console.log("🔍 DEBUG: Upload result:", uploadResult);
         
           if (uploadResult && uploadResult.url) {
             console.log(`✅ UPLOAD: Successfully uploaded ${file.name}`);
@@ -1351,9 +1351,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
   }
 
   return (
-    <div className="max-w-6xl mx-auto py-12 px-6">
-      {/* Header */}
-      <div className="mb-8">
+    <div className="max-w-6xl mx-auto py-12 px-6" key="inspection-details">
+      <div className="space-y-8">
         <Link to={createPageUrl("AdminDashboard")} className="inline-flex items-center text-blue-600 hover:text-blue-700 mb-6 group">
           <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
           Back to Dashboard
@@ -2282,7 +2281,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             </CardHeader>
             <CardContent className="space-y-4">
               
-              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
+              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0 || !inspection.lab_conclusion || !inspection.lab_recommendations) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   {console.log("🔍 DEBUG: No lab analysis images found, showing upload section")}
                   <input
@@ -2317,10 +2316,13 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                             {inspectionType === 'asbestos' ? 'Upload Asbestos Lab Analysis Images' : 'Upload Lab Analysis Images'}
                           </p>
                           <p className="text-slate-500 text-sm mt-2">
-                            {inspectionType === 'asbestos'
-                              ? 'Click to select one or more images of the asbestos lab analysis results'
-                              : 'Click to select one or more images of the lab analysis results'
-                            }
+                            {!inspection.lab_conclusion || !inspection.lab_recommendations ? (
+                              <span className="text-orange-600">Please wait for Report Content to be generated before viewing lab images</span>
+                            ) : (
+                              inspectionType === 'asbestos'
+                                ? 'Click to select one or more images of the asbestos lab analysis results'
+                                : 'Click to select one or more images of the lab analysis results'
+                            )}
                           </p>
                           <p className="text-slate-400 text-xs mt-2">
                             Supports: JPEG, PNG, GIF • Max size: 10MB per image
@@ -2343,24 +2345,24 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         <div key={index} className="relative group">
                           {!labImageErrors[index] ? (
                            <div className="relative aspect-square">
-                             <img
-                               src={imageUrl}
-                               alt={`Lab Analysis Results ${index + 1}`}
+                          <img
+                            src={imageUrl}
+                            alt={`Lab Analysis Results ${index + 1}`}
                                className="absolute inset-0 w-full h-full object-contain rounded-lg border-2 border-slate-200 hover:border-blue-300 transition-colors cursor-pointer bg-white"
-                               onClick={() => {
-                                 window.open(imageUrl, '_blank');
-                               }}
-                               title="Click to view full size"
-                               onError={(e) => {
-                                 console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
-                                 e.preventDefault();
-                                 setLabImageErrors(prev => {
-                                   const newErrors = { ...prev };
-                                   newErrors[index] = true;
-                                   return newErrors;
-                                 });
-                               }}
-                             />
+                            onClick={() => {
+                              window.open(imageUrl, '_blank');
+                            }}
+                            title="Click to view full size"
+                            onError={(e) => {
+                              console.error(`❌ Failed to load image ${index + 1}:`, imageUrl);
+                                e.preventDefault();
+                                setLabImageErrors(prev => {
+                                  const newErrors = { ...prev };
+                                  newErrors[index] = true;
+                                  return newErrors;
+                                });
+                            }}
+                          />
                              <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
                                {index + 1} of {inspection.lab_analysis_images.length}
                              </div>
@@ -2413,7 +2415,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                   updateData.lab_recommendations = "";
                                   console.log("🔍 DEBUG: Clearing analysis fields since no images remain");
                                 }
-
+                                
                                 // Update UI immediately
                                 setInspection(prev => ({
                                   ...prev,
@@ -2584,7 +2586,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                 </div>
               )}
 
-              {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && !generatingAnalysis && (
+              {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && inspection.lab_conclusion && inspection.lab_recommendations && !generatingAnalysis && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-600" />
@@ -2606,16 +2608,42 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 {inspectionType === 'asbestos' ? 'Asbestos Report Content' : 'Report Content'}
+                {generatingAnalysis && (
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                )}
               </CardTitle>
+              {generatingAnalysis && (
+                <CardDescription>
+                  Analyzing lab results and generating report...
+                </CardDescription>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
+              {generatingAnalysis ? (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating Conclusion...
+                    </Label>
+                    <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
+                  </div>
+                  
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating Recommendations...
+                    </Label>
+                    <div className="min-h-32 mt-2 bg-slate-50 rounded-lg border-2 border-slate-200 animate-pulse"></div>
+                  </div>
+                </div>
+              ) : (
+                <>
               <div>
                 <Label htmlFor="conclusion">Conclusion</Label>
                 <Textarea
                   id="conclusion"
-                  value={
-                    (inspection.lab_conclusion || "") 
-                  }
+                      value={inspection.lab_conclusion || ""}
                   onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
                   placeholder={inspectionType === 'asbestos' 
                     ? "Professional conclusion and recommendations based on asbestos lab analysis..."
@@ -2638,6 +2666,10 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                   className="min-h-32 mt-2"
                 />
               </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
               {saving && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -2676,15 +2708,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                   </>
                 )}
               </Button>
-            </CardContent>
-          </Card>
-
-
-
-
-          </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );
-};
+}
