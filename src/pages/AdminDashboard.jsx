@@ -190,7 +190,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       <body>
           <div class="cover-page">
               <h1 class="cover-title">Asbestos Assessment Report</h1>
-              <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
+              <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/asbestlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
