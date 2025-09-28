@@ -1,5 +1,7 @@
 import { format } from 'date-fns';
-import { MoldInspection, Sample } from '@/api/entities';
+import { MoldInspection, Sample, AsbestosInspection } from '@/api/entities';
+import { uploadToSupabaseStorage } from '@/lib/supabase';
+import html2pdf from 'html2pdf.js';
 
 /**
  * Simple HTML to PDF download using browser's print functionality
@@ -24,8 +26,13 @@ export const downloadPDF = async (
     let detailedInspection = inspection;
     try {
       const inspectionId = inspection.id || inspection.inspection_number;
-      detailedInspection = await MoldInspection.getDetailed(inspectionId);
-      console.log("🔍 DEBUG: Retrieved detailed inspection data for PDF:", detailedInspection);
+      if (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') {
+        detailedInspection = await AsbestosInspection.getDetailed(inspectionId);
+        console.log("🔍 DEBUG: Retrieved detailed asbestos inspection data for PDF:", detailedInspection);
+      } else {
+        detailedInspection = await MoldInspection.getDetailed(inspectionId);
+        console.log("🔍 DEBUG: Retrieved detailed mold inspection data for PDF:", detailedInspection);
+      }
     } catch (detailError) {
       console.error("🔍 DEBUG: Error fetching detailed inspection data for PDF:", detailError);
     }
@@ -50,6 +57,60 @@ export const downloadPDF = async (
     
     console.log("🔍 DEBUG: Generated HTML length:", reportHtml.length);
     
+    // Create PDF blob and upload to appropriate bucket
+    try {
+      const pdfBlob = await html2pdf().from(reportHtml).output('blob');
+      // Create a clean filename from inspection details
+      const cleanName = (inspection.full_name || 'report').replace(/[^a-zA-Z0-9]/g, '_');
+      const reportType = (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') ? 'Asbestos' : 'Mold';
+      const file = new File([pdfBlob], `${reportType}_Report_${displayNum}_${cleanName}.pdf`, { type: 'application/pdf' });
+      
+      // Select the correct bucket based on inspection type
+      const bucketName = (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') ? 'asbestosReport' : 'moldReport';
+      console.log(`🔍 DEBUG: Uploading report to ${bucketName} bucket`);
+      
+      // Prepare metadata for the upload
+      const metadata = {
+        reportType: (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') ? 'asbestos' : 'mold',
+        inspectionId: inspection.id || inspection.inspection_number,
+        inspectionNumber: displayNum,
+        clientName: inspection.full_name || 'Unknown',
+        clientEmail: inspection.email || 'Not provided',
+        propertyAddress: [
+          inspection.street_address,
+          inspection.unit_number,
+          inspection.city,
+          inspection.state,
+          inspection.zip_code
+        ].filter(Boolean).join(', '),
+        propertyType: inspection.property_type || 'Not specified',
+        yearBuilt: inspection.year_built || 'Not specified',
+        squareFootage: inspection.square_footage || 'Not specified',
+        createdAt: inspection.created_at || new Date().toISOString(),
+        updatedAt: inspection.updated_date || new Date().toISOString(),
+        status: inspection.status || 'completed',
+        generatedDate: new Date().toISOString()
+      };
+
+      // For asbestos reports, add asbestos-specific metadata
+      if (metadata.reportType === 'asbestos') {
+        Object.assign(metadata, {
+          materialType: inspection.material_type || 'Not specified',
+          materialCondition: inspection.material_condition || 'Not specified',
+          locationDescription: inspection.location_description || 'Not specified',
+          riskLevel: inspection.risk_level || 'Not specified'
+        });
+      }
+
+      console.log('🔍 DEBUG: Uploading report with metadata:', metadata);
+      const inspectionId = inspection.id || inspection.inspection_number;
+      const uploadResult = await uploadToSupabaseStorage(file, bucketName, '', inspectionId);
+      console.log(`✅ Report uploaded to ${bucketName} bucket:`, uploadResult);
+    } catch (uploadError) {
+      console.error('⚠️ Upload warning:', uploadError);
+      // Continue with PDF display even if upload fails
+    }
+
     // Create a complete HTML document with print-friendly CSS
     const completeHtml = `
       <!DOCTYPE html>
@@ -583,7 +644,13 @@ export const downloadHTML = async (
     let detailedInspection = inspection;
     try {
       const inspectionId = inspection.id || inspection.inspection_number;
-      detailedInspection = await MoldInspection.getDetailed(inspectionId);
+      if (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') {
+        detailedInspection = await AsbestosInspection.getDetailed(inspectionId);
+        console.log("🔍 DEBUG: Retrieved detailed asbestos inspection data for HTML:", detailedInspection);
+      } else {
+        detailedInspection = await MoldInspection.getDetailed(inspectionId);
+        console.log("🔍 DEBUG: Retrieved detailed mold inspection data for HTML:", detailedInspection);
+      }
     } catch (detailError) {
       console.error("🔍 DEBUG: Error fetching detailed inspection data:", detailError);
     }
@@ -610,7 +677,8 @@ export const downloadHTML = async (
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
+    const reportType = (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') ? 'Asbestos_Assessment' : 'Mold_Inspection';
+    link.download = `${reportType}_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

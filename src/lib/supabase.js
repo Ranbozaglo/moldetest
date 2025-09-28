@@ -65,7 +65,7 @@ export const getCurrentUser = async () => {
 };
 
 // Helper function to upload file to Supabase Storage
-export const uploadToSupabaseStorage = async (file, bucketName, folder = '') => {
+export const uploadToSupabaseStorage = async (file, bucketName, folder = '', inspectionId = '') => {
   try {
     // Check for custom authentication instead of Supabase session
     const savedUser = localStorage.getItem('mth_user');
@@ -73,10 +73,17 @@ export const uploadToSupabaseStorage = async (file, bucketName, folder = '') => 
       throw new Error('Authentication required. Please log in to upload files. If you are already logged in, try refreshing the page.');
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
+    // Generate structured file path with date-based folders
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const timestamp = now.getTime();
     const fileExtension = file.name.split('.').pop();
-    const fileName = `${folder}/${timestamp}_${Math.random().toString(36).substring(2)}.${fileExtension}`;
+    const randomId = Math.random().toString(36).substring(2);
+    
+    // Structure: {folder}/{year}/{month}/{day}/{timestamp}_{randomId}.{extension}
+    const fileName = `${folder}/${year}/${month}/${day}/${timestamp}_${randomId}.${fileExtension}`;
 
     console.log('🔍 DEBUG: Uploading to Supabase Storage:', {
       bucket: bucketName,
@@ -91,7 +98,8 @@ export const uploadToSupabaseStorage = async (file, bucketName, folder = '') => 
       .from(bucketName)
       .upload(fileName, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        metadata: { inspection_id: String(inspectionId) }
       });
 
     if (error) {

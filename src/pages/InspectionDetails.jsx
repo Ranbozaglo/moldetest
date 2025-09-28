@@ -15,7 +15,7 @@ import { useLocation, Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { getUrlParam } from "@/utils/urlUtils";
 import { useAuth } from '@/contexts/AuthContext';
-import { format } from "date-fns";
+import { format, yearsToDays } from "date-fns";
 import { generateReportHtmlContent } from "@/pages/AdminDashboard.jsx";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { Core } from "@/api/integrations";
@@ -251,7 +251,9 @@ export default function InspectionDetails() {
         full_name: inspection.full_name,
         email: inspection.email,
         status: inspection.status,
-        type: currentInspectionType
+        type: currentInspectionType,
+        year_built: year_built
+        
       });
 
       // Check if regular user is trying to access someone else's inspection

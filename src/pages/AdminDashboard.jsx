@@ -21,9 +21,6 @@ import EmailTemplateManager from "@/components/EmailTemplateManager";
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 import { usePopup } from "@/components/ui/popup";
 
-// Export this function for use in other components
-import { generateAsbestosReport } from '@/utils/reportGenerator';
-
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     
@@ -195,6 +192,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
+                  <div class="cover-detail-item">
+                    <span class="cover-detail-label">Year Built:</span>
+                    <span class="cover-detail-value" style="${inspection.year_built && parseInt(inspection.year_built) < 1980 ? 'color: #dc2626; font-weight: bold;' : 'color: #059669;'}">
+                      ${inspection.year_built ? `${inspection.year_built}${parseInt(inspection.year_built) < 1980 ? ' (HIGH RISK)' : ''}` : 'Not specified'}
+                    </span>
+                  </div>
               </div>
               <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
           </div>
@@ -214,13 +217,160 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
                       <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || '').toUpperCase()}</div></div>
                       <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage} SQ FT</div></div>
+                      <div class="client-info-item">
+                        <div class="client-info-label">Year Built:</div>
+                        <div class="client-info-value" style="${inspection.year_built && parseInt(inspection.year_built) < 1980 ? 'color: #dc2626; font-weight: bold;' : inspection.year_built ? 'color: #059669;' : ''}">
+                          ${inspection.year_built ? `${inspection.year_built} ${parseInt(inspection.year_built) < 1980 ? '⚠️ HIGH RISK - Pre-1980 Construction' : '✅ LOWER RISK - Post-1980 Construction'}` : 'Not specified'}
+                        </div>
+                      </div>
                       ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.background_info}</div></div>` : ''}
                   </div>
               </div>
 
               <div class="section">
-                  <h2>Asbestos Assessment</h2>
-                  ${generateAsbestosReport(inspection)}
+                  ${(inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') ? `
+                      
+
+                    </div>
+
+                    <div class="page-break"></div>
+
+                    <!-- Material Assessment -->
+                    <div class="page content-page">
+                      <div class="section">
+                        <h2 style="color: #1e40af; font-size: 24px; margin-bottom: 25px; border-bottom: 3px solid #1e40af; padding-bottom: 10px;">
+                          Material Assessment
+                        </h2>
+                        <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Type</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.material_type || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Condition</div>
+                              <div style="font-size: 16px; ${
+                                inspection.material_condition === 'Poor' || inspection.material_condition === 'Deteriorating' || inspection.material_condition === 'Damaged'
+                                  ? 'color: #dc2626; font-weight: bold; background: #fee2e2; padding: 4px 8px; border-radius: 4px; display: inline-block;'
+                                  : inspection.material_condition === 'Fair'
+                                  ? 'color: #ea580c; font-weight: bold; background: #fff7ed; padding: 4px 8px; border-radius: 4px; display: inline-block;'
+                                  : inspection.material_condition === 'Good'
+                                  ? 'color: #059669; font-weight: bold; background: #f0fdf4; padding: 4px 8px; border-radius: 4px; display: inline-block;'
+                                  : 'color: #6b7280; font-style: italic;'
+                              }">${inspection.material_condition || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Location Description</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.location_description || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Surface Area</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.surface_area || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Accessibility</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.accessibility || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Damage Extent</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.damage_extent || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Disturbance Potential</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.disturbance_potential || 'Not specified'}</div>
+                            </div>
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Occupant Activity</div>
+                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.occupant_activity || 'Not specified'}</div>
+                            </div>
+                          </div>
+                          
+                          ${inspection.material_notes ? `
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Assessment Notes</div>
+                              <div style="font-size: 16px; color: #1e3a8a; white-space: pre-wrap; line-height: 1.6;">${inspection.material_notes}</div>
+                            </div>
+                          ` : ''}
+                          
+                          ${inspection.risk_notes ? `
+                            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
+                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Risk Assessment Notes</div>
+                              <div style="font-size: 16px; color: #1e3a8a; white-space: pre-wrap; line-height: 1.6;">${inspection.risk_notes}</div>
+                            </div>
+                          ` : ''}
+                        </div>
+                    <div class="page-break"></div>
+
+                        ${inspection.material_images && inspection.material_images.length > 0 ? `
+                          <div style="margin-top: 30px;">
+                            <h3 style="color: #004aac; margin-bottom: 15px;">Material Photos</h3>
+                            <div class="image-gallery">
+                              ${inspection.material_images.map((image, index) => `
+                                <div style="text-align: center;">
+                                  <img src="${image}" alt="Material Photo ${index + 1}" class="evidence-image" />
+                                  <p style="margin-top: 5px; color: #004aac; font-size: 12px;">Material Photo ${index + 1}</p>
+                                </div>
+                              `).join('')}
+                            </div>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>
+
+                    <div class="page-break"></div>
+
+                    <!-- Warning Box -->
+                    <div style="margin-top: 40px; background: #fee2e2; border: 2px solid #fecaca; border-radius: 12px; padding: 25px;">
+                      <h3 style="color: #dc2626; font-size: 20px; margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">
+                        ⚠️ Professional Assessment Required
+                      </h3>
+                      <p style="color: #7f1d1d; margin: 0; font-size: 16px; line-height: 1.6;">
+                        ${inspection.material_condition === 'Poor' || inspection.material_condition === 'Deteriorating' || inspection.material_condition === 'Damaged'
+                          ? '⚠️ URGENT: Due to the poor condition of materials, immediate professional assessment is required.'
+                          : 'A certified asbestos professional should be consulted to perform a comprehensive assessment and testing.'}
+                      </p>
+                    </div>
+
+                    <!-- Lab Analysis -->
+                    <div style="margin-top: 40px;">
+                      <h2 style="color: #1e40af; font-size: 24px; margin-bottom: 25px; border-bottom: 3px solid #1e40af; padding-bottom: 10px;">
+                        Laboratory Analysis
+                      </h2>
+                      ${inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? `
+                        <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 25px;">
+                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                            ${inspection.lab_analysis_images.map((image, index) => `
+                              <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                                <img src="${image}" alt="Lab Analysis ${index + 1}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px;" />
+                                <p style="color: #1e40af; font-weight: 600; margin: 0;">Lab Analysis Result ${index + 1}</p>
+                              </div>
+                            `).join('')}
+                          </div>
+                        </div>
+                      ` : `
+                        <div style="background: #f8f9fa; border: 2px solid #e2e8f0; border-radius: 12px; padding: 25px; text-align: center;">
+                          <p style="color: #64748b; font-style: italic; margin: 0; font-size: 16px;">Laboratory analysis results pending.</p>
+                        </div>
+                      `}
+                    </div>
+
+                    <!-- Footer -->
+                    <div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #1e40af; text-align: center;">
+                      <p style="color: #1e40af; font-weight: 600; font-size: 16px; margin: 0 0 10px 0;">Total Testing</p>
+                      <p style="color: #64748b; font-size: 14px; margin: 0 0 5px 0;">Report generated on ${format(new Date(), "MMMM d, yyyy")}</p>
+                      <p style="color: #64748b; font-size: 14px; margin: 0;">Inspection #${inspection.inspection_number || 'N/A'}</p>
+                    </div>
+
+                    </div>
+
+                  ` : ''}
+              </div>
+
+
+              <div class="section">
+
+
+
               </div>
 
               <div class="page-break"></div>
@@ -1560,6 +1710,35 @@ export default function AdminDashboard() {
   // Download functions
   const handleDownloadPDF = async (inspection) => {
     try {
+      console.log("🔍 DEBUG: Starting PDF download process...");
+      console.log("🔍 DEBUG: Inspection data:", {
+        id: inspection.id,
+        inspection_number: inspection.inspection_number,
+        inspection_type: inspection.inspection_type,
+        full_name: inspection.full_name,
+        email: inspection.email,
+        client_type: inspection.client_type,
+        property_type: inspection.property_type,
+        street_address: inspection.street_address,
+        unit_number: inspection.unit_number,
+        city: inspection.city,
+        state: inspection.state,
+        zip_code: inspection.zip_code,
+        square_footage: inspection.square_footage,
+        year_built: inspection.year_built,
+        background_info: inspection.background_info,
+        created_at: inspection.created_at,
+        app_id: inspection.app_id,
+        updated_date: inspection.updated_date,
+        created_by_id: inspection.created_by_id,
+        status: inspection.status,
+        location_description: inspection.location_description,
+        material_type: inspection.material_type,
+        material_condition: inspection.material_condition,
+        material_images: inspection.material_images,
+        lab_analysis_images: inspection.lab_analysis_images
+      });
+
       await downloadPDF(
         inspection,
         [], // samples will be fetched inside downloadPDF
@@ -1567,8 +1746,16 @@ export default function AdminDashboard() {
         getDisplayNumber,
         setDownloadStatus
       );
+      
+      console.log("✅ DEBUG: PDF download process initiated successfully");
     } catch (error) {
       console.error("❌ Error in handleDownloadPDF:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code
+      });
       setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
       setTimeout(() => setDownloadStatus(null), 5000);
     }

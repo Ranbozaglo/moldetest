@@ -344,6 +344,35 @@ export const MoldInspection = {
 };
 
 // Asbestos Inspection entity
+/**
+ * @typedef {Object} AsbestosInspection
+ * @property {number} id - Unique identifier
+ * @property {number} inspection_number - Inspection number
+ * @property {string} full_name - Client's full name
+ * @property {string} email - Client's email
+ * @property {string} client_type - Type of client
+ * @property {string} property_type - Type of property
+ * @property {string} street_address - Street address
+ * @property {string} unit_number - Unit number
+ * @property {string} city - City
+ * @property {string} state - State
+ * @property {string} zip_code - ZIP code
+ * @property {string} square_footage - Square footage
+ * @property {string} year_built - Year built
+ * @property {string} background_info - Background information
+ * @property {string} created_at - Creation timestamp
+ * @property {string} app_id - Application ID
+ * @property {number} inspection_number - Inspection number
+ * @property {string} updated_date - Last update timestamp
+ * @property {string} created_by_id - Creator's UUID
+ * @property {string} status - Inspection status
+ * @property {string} location_description - Location description
+ * @property {string} material_type - Material type
+ * @property {string} material_condition - Material condition
+ * @property {string[]} material_images - Material images URLs
+ * @property {string[]} lab_analysis_images - Lab analysis images URLs
+ */
+
 export const AsbestosInspection = {
   list: async (sortBy = '-created_at', limit = 50) => {
     const token = getAuthToken();
@@ -464,6 +493,7 @@ export const AsbestosInspection = {
       }
     });
     return response;
+
   }
 };
 
