@@ -106,6 +106,21 @@ export const downloadPDF = async (
       const inspectionId = inspection.id || inspection.inspection_number;
       const uploadResult = await uploadToSupabaseStorage(file, bucketName, '', inspectionId);
       console.log(`✅ Report uploaded to ${bucketName} bucket:`, uploadResult);
+
+      // Update the inspection record with the report file URL
+      try {
+        const updateData = { reportfile: uploadResult.url };
+        if (inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos') {
+          await AsbestosInspection.update(inspectionId, updateData);
+          console.log('✅ Updated asbestos inspection record with report URL:', uploadResult.url);
+        } else {
+          await MoldInspection.update(inspectionId, updateData);
+          console.log('✅ Updated mold inspection record with report URL:', uploadResult.url);
+        }
+      } catch (updateError) {
+        console.error('❌ Failed to update inspection record with report URL:', updateError);
+        // Don't throw - we still want to show the PDF even if DB update fails
+      }
     } catch (uploadError) {
       console.error('⚠️ Upload warning:', uploadError);
       // Continue with PDF display even if upload fails
