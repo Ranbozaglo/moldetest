@@ -908,15 +908,19 @@ export default function AdminDashboard() {
   const loadAsbestosInspections = async (forceRefresh = false) => {
     try {
       console.log("🔍 DEBUG: Loading asbestos inspections data from server");
+      console.log("🔍 DEBUG: AsbestosInspection object:", AsbestosInspection);
+      console.log("🔍 DEBUG: AsbestosInspection.list method:", typeof AsbestosInspection.list);
       
-      const allAsbestosInspections = await AsbestosInspection.list('-created_at', 100, false);
+      const allAsbestosInspections = await AsbestosInspection.list('-created_at', 100);
       
       console.log("🔍 DEBUG: Raw asbestos inspections data:", allAsbestosInspections);
       console.log("🔍 DEBUG: Number of asbestos inspections:", allAsbestosInspections?.length);
+      console.log("🔍 DEBUG: Type of response:", typeof allAsbestosInspections);
       
       // Check if allAsbestosInspections is an array
       if (!Array.isArray(allAsbestosInspections)) {
         console.error("❌ ERROR: allAsbestosInspections is not an array:", typeof allAsbestosInspections);
+        console.error("❌ ERROR: Response content:", allAsbestosInspections);
         setAsbestosInspections([]);
         return;
       }
@@ -927,11 +931,12 @@ export default function AdminDashboard() {
         inspectionType: 'asbestos'
       }));
       
+      console.log("🔍 DEBUG: Processed asbestos inspections:", asbestosInspectionsWithType.length);
       setAsbestosInspections(asbestosInspectionsWithType);
     } catch (error) {
-      console.error("Error loading asbestos inspections:", error);
-      console.error("Error details:", error.message);
-      console.error("Error stack:", error.stack);
+      console.error("❌ ERROR: Error loading asbestos inspections:", error);
+      console.error("❌ ERROR: Error details:", error.message);
+      console.error("❌ ERROR: Error stack:", error.stack);
       setAsbestosInspections([]);
     }
   };

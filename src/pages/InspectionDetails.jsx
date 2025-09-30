@@ -252,7 +252,7 @@ export default function InspectionDetails() {
         email: inspection.email,
         status: inspection.status,
         type: currentInspectionType,
-        year_built: year_built
+        year_built: inspection.year_built
         
       });
 

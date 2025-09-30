@@ -738,7 +738,7 @@ def get_asbestos_inspections():
         query = supabase.table('asbestosinspection').select(
             'id,created_at,updated_date,created_by_id,'
             'full_name,email,client_type,street_address,city,state,zip_code,'
-            'property_type,square_footage,status,app_id'
+            'property_type,square_footage,status,app_id,year_built'
         )
         
         # Apply sorting - handle different sort fields
@@ -787,6 +787,7 @@ def get_asbestos_inspections():
                 "zip_code": inspection.get('zip_code'),
                 "property_type": inspection.get('property_type'),
                 "square_footage": inspection.get('square_footage'),
+                "year_built": inspection.get('year_built'),
                 
                 # Status and metadata
                 "status": inspection.get('status', 'pending'),
@@ -843,6 +844,7 @@ def create_asbestos_inspection():
             'property_type': data.get('property_type'),
             'client_type': data.get('client_type'),
             'square_footage': data.get('square_footage'),
+            'year_built': data.get('year_built'),
             'status': data.get('status', 'pending'),
             'created_by_id': data.get('created_by'),
             'email': data.get('email'),
