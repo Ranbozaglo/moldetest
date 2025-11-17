@@ -1,0 +1,39 @@
+# Render.com deployment configuration for Vite React App
+services:
+  # Static Site Service for Frontend
+  - type: web
+    name: mold-testing-houston-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+
+    # Environment Variables for Build Time
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: VITE_SUPABASE_URL
+        value: https://opjgytjlebfnhjzarvyy.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wamd5dGpsZWJmbmhqemFydnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1ODMzMzYsImV4cCI6MjA2ODE1OTMzNn0.SN7VpDUtsInqW_AUmP7fNaVKTgRkIZAJcyyVXlT8gJc
+      - key: VITE_API_BASE_URL
+        value: https://moldetest-ftxv.onrender.com/api
+
+    # Routes and headers
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
