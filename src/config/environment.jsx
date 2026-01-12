@@ -103,22 +103,4 @@ export const logEnvironmentInfo = () => {
   if (typeof window === 'undefined') {
     return;
   }
-  
-  const env = getCurrentEnvironment();
-  const apiUrls = getApiUrls();
-  
-  console.log('🌍 Environment Info:', {
-    isProduction: env.isProduction,
-    isDevelopment: env.isDevelopment,
-    hostname: env.hostname,
-    baseApiUrl: apiUrls.BASE_API_URL,
-    backendUrl: apiUrls.BACKEND_URL,
-    frontendUrl: env.config.FRONTEND_URL,
-    viteEnv: {
-      PROD: import.meta.env.PROD,
-      DEV: import.meta.env.DEV,
-      VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL
-    }
-  });
 }; 

@@ -434,17 +434,17 @@ export default function InspectionDetails() {
               
               if (ocrResult && ocrResult.valid && ocrResult.extracted_text) {
                 console.log(`✅ OCR: Google Vision API successfully processed ${file.name}, extracted ${ocrResult.extracted_text.length} characters`);
-                // Apply auto-filters to remove noisy lines
-                const filteredText = applyAutoFilters(ocrResult.extracted_text);
+                // Use raw extracted text without filtering - let Backend handle filtering
+                const extractedText = ocrResult.extracted_text;
                 processedFiles.push({
                   filename: file.name,
                   file_url: uploadResult.file_url,
-                  extracted_text: filteredText,
+                  extracted_text: extractedText,
                   confidence: ocrResult.confidence
                 });
-                
+
                 // Combine all extracted text for analysis
-                allExtractedText += `\n\n=== ${file.name} ===\n${filteredText}`;
+                allExtractedText += `\n\n=== ${file.name} ===\n${extractedText}`;
                 
               } else {
                 const errorMessage = ocrResult?.message || ocrResult?.error || 'Unknown OCR error';
@@ -490,161 +490,25 @@ export default function InspectionDetails() {
       
       // Skip text analysis for asbestos inspections
       if (inspectionType !== 'asbestos') {
-        // Clean the extracted text to filter only mold-related content
-        let cleanedExtractedText = cleanExtractedText(allExtractedText);
-        console.log("🔍 DEBUG: Original extracted text length:", allExtractedText.length);
-        console.log("🔍 DEBUG: Cleaned extracted text length:", cleanedExtractedText.length);
-        console.log("🔍 DEBUG: Cleaned extracted text:", cleanedExtractedText);
-        // Remove any template/instructional lines from the cleanedExtractedText
-        const instructionKeywords = [
-          "please analyze", "conclusion", "recommendations", "return your response", "make the analysis", "- summarize", "- assess", "- evaluate", "- compare", "- consider", "- immediate actions", "- preventive measures", "- professional services", "- timeline", "- environmental controls", "- follow-up testing"
-        ];
-        cleanedExtractedText = cleanedExtractedText
-          .split('\n')
-          .filter(line => {
-            const lower = line.toLowerCase();
-            return !instructionKeywords.some(keyword => lower.includes(keyword));
-          })
-          .join('\n');
+        // Use raw extracted text without filtering - let Backend GPT prompt handle the analysis
+        console.log("🔍 DEBUG: Extracted text length:", allExtractedText.length);
+        console.log("🔍 DEBUG: Extracted text (first 500 chars):", allExtractedText.substring(0, 500));
         
-        // Step 3: Generate analysis from cleaned extracted text
-        console.log("🔍 STEP 3: Generating analysis from cleaned extracted text...");
+        // Step 3: Send raw extracted text to backend for analysis
+        console.log("🔍 STEP 3: Sending raw lab analysis text to backend...");
+
+        try {
+        // Don't build complex prompt - send only raw extracted text from Lab Analysis
+        // Backend will apply the professional prompt
+        const analysisPrompt = allExtractedText;
+
+        // All the old prompt building code has been removed - we send ONLY raw lab text now
+
+        // Send ONLY the raw extracted text to backend
+        // Backend will apply the professional prompt
+        console.log("🔍 DEBUG: Sending analysisPrompt to backend, length:", analysisPrompt.length);
+        const analysisResult = await Core.InvokeLLM(analysisPrompt, [], inspectionId);
         
-        try {
-        // Construct comprehensive prompt with all inspection data
-        const propertyDetailsSection = inspectionType === 'asbestos' 
-          ? `**Property Details and Asbestos Assessment:**
-Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
-Property Type: ${inspection.property_type || 'Not specified'}
-Square Footage: ${inspection.square_footage || 'Not specified'}
-Year Built: ${inspection.year_built || 'Not specified'}
-Material Type: ${inspection.material_type || 'Not specified'}
-Material Condition: ${inspection.material_condition || 'Not specified'}
-Location Description: ${inspection.location_description || 'Not specified'}
-
-Risk Assessment: ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? 'HIGH RISK - Property built before 1980' : 'LOWER RISK - Property built after 1980'}
-
-`
-          : `**Property Details:**
-Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
-Property Type: ${inspection.property_type || 'Not specified'}
-Square Footage: ${inspection.square_footage || 'Not specified'}
-Year Built: ${inspection.year_built || 'Not specified'}
-
-`;
-        
-        // Parse mold locations for detailed findings
-        let moldLocations = [];
-        try {
-          if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
-            moldLocations = JSON.parse(inspection.mold_locations);
-          } else if (Array.isArray(inspection.mold_locations)) {
-            moldLocations = inspection.mold_locations;
-          }
-        } catch (e) {
-          console.error("Error parsing mold_locations:", e);
-        }
-
-        // Parse water damage locations
-        let waterDamageLocations = [];
-        try {
-          if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
-            waterDamageLocations = JSON.parse(inspection.water_damage_locations);
-          } else if (Array.isArray(inspection.water_damage_locations)) {
-            waterDamageLocations = inspection.water_damage_locations;
-          }
-        } catch (e) {
-          console.error("Error parsing water_damage_locations:", e);
-        }
-
-        const clientInfoSection = `**Client Information:**
-Client Type: ${inspection.client_type || 'Not specified'}
-
-`;
-
-        const visibleMoldSection = `**Visible Mold Findings:**
-Visible Mold Present: ${inspection.has_visible_mold ? 'Yes' : 'No'}
-${inspection.has_visible_mold && moldLocations.length > 0 ? 
-  'Visible Mold Details:\n' + moldLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n' 
-  : 'No visible mold was reported during this inspection.\n'}
-`;
-
-        const waterDamageSection = `**Water Damage History:**
-Recent Water Damage: ${inspection.has_water_damage ? 'Yes' : 'No'}
-${inspection.has_water_damage && waterDamageLocations.length > 0 ? 
-  'Water Damage Details:\n' + waterDamageLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n'
-  : 'No recent water damage was reported during this inspection.\n'}
-`;
-
-        const environmentalSection = `**Environmental Conditions:**
-Temperature: ${inspection.temperature || 'Not recorded'}°F
-Humidity: ${inspection.humidity || 'Not recorded'}%
-Data Collection Method: ${inspection.environmental_data_method || 'Not specified'}
-
-`;
-
-        const samplesSection = samples && samples.length > 0 ? 
-          `**Samples Collected:**
-${samples.map((sample, i) => `Sample ${i + 1}: Location: ${sample.location || 'Not specified'}, Description: ${sample.description || 'Not specified'}`).join('\n')}
-
-` : '**Samples Collected:**\nNo samples were collected during this inspection.\n\n';
-
-        const labAnalysisSection = `**Lab Analysis Results:**
-${cleanedExtractedText || 'No lab analysis results available.'}
-
-`;
-
-        const instructions = inspectionType === 'asbestos' 
-          ? `You are an expert asbestos inspection and assessment consultant. Your task is to analyze the provided asbestos inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
-
-IMPORTANT FORMATTING REQUIREMENTS:
-- Do NOT use asterisks (*) for formatting or emphasis
-- Do NOT use numbered lists (1. 2. 3.) for recommendations
-- Use plain text without markdown formatting
-- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
-- Use clear, professional language without special characters for emphasis
-
-Based on the comprehensive inspection data above, provide a professional conclusion and specific recommendations. Consider:
-- Types of asbestos materials identified and their condition
-- Whether asbestos levels are concerning based on industry standards
-- Property context and building age
-- Health and safety implications
-- Risk assessment for renovation or demolition
-- Presence of friable vs. non-friable asbestos
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Risk Management Strategies: [details]'"
-}`
-          : `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
-
-IMPORTANT FORMATTING REQUIREMENTS:
-- Do NOT use asterisks (*) for formatting or emphasis
-- Do NOT use numbered lists (1. 2. 3.) for recommendations
-- Use plain text without markdown formatting
-- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
-- Use clear, professional language without special characters for emphasis
-
-Based on the comprehensive inspection data above, provide a professional conclusion and specific recommendations. Consider:
-- Types of mold identified and concentration levels
-- Whether levels are elevated or concerning based on industry standards
-- Property context and environmental conditions
-- Health and safety implications
-- Comparison to outdoor levels and normal ranges
-- Presence of toxigenic molds
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Environmental Controls to Implement: [details]'"
-}`;
-
-        const analysisPrompt = propertyDetailsSection + clientInfoSection + visibleMoldSection + waterDamageSection + environmentalSection + samplesSection + labAnalysisSection + instructions;
-
-        // Send the constructed prompt as the 'prompt' field to the backend
-        const analysisResult = await Core.InvokeLLM(analysisPrompt);
-
         console.log("✅ OCR ANALYSIS: Received analysis from backend!");
         console.log("🔍 DEBUG: Analysis result:", analysisResult);
       
@@ -839,283 +703,57 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
   const generateAnalysisFromImage = async (imageUrl) => {
     setGeneratingAnalysis(true);
     try {
-      console.log("🔍 DEBUG: Generating analysis for image:", imageUrl);
-    console.log("🔍 DEBUG: Inspection ID:", inspectionId);
-      
-      // Parse mold locations for detailed findings
-      let moldLocations = [];
-      try {
-        if (inspection.mold_locations && typeof inspection.mold_locations === 'string') {
-          moldLocations = JSON.parse(inspection.mold_locations);
-        } else if (Array.isArray(inspection.mold_locations)) {
-          moldLocations = inspection.mold_locations;
+      console.log('🔍 DEBUG: Analyzing lab image - Backend will use professional mold expert prompt');
+      console.log('🔍 DEBUG: Image URL:', imageUrl);
+
+      // Step 1: Extract text from image using OCR
+      const ocrResult = await Core.ValidateLabImage(imageUrl);
+
+      if (!ocrResult || !ocrResult.valid || !ocrResult.extracted_text) {
+        throw new Error('Failed to extract text from lab image');
+      }
+
+      console.log('🔍 DEBUG: OCR extracted text length:', ocrResult.extracted_text.length);
+
+      // Step 2: Send ONLY extracted text to backend
+      // Backend will apply YOUR professional prompt (no inspection findings!)
+      const analysisResult = await Core.InvokeLLM(
+        ocrResult.extracted_text,  // Only lab text!
+        [],
+        inspectionId
+      );
+
+
+      console.log('✅ Analysis completed:', analysisResult);
+
+      // Parse the response - GPT returns raw text (not JSON)
+      let conclusion = '';
+      let recommendations = '';
+
+      if (analysisResult && analysisResult.content) {
+        // Try to parse as JSON first (in case GPT returns JSON)
+        try {
+          const parsed = JSON.parse(analysisResult.content);
+          conclusion = parsed.conclusion || '';
+          recommendations = parsed.recommendations || '';
+        } catch (e) {
+          // If not JSON, use the raw content as conclusion
+          conclusion = analysisResult.content || '';
         }
-      } catch (e) {
-        console.error("Error parsing mold_locations:", e);
       }
 
-      // Parse water damage locations
-      let waterDamageLocations = [];
-      try {
-        if (inspection.water_damage_locations && typeof inspection.water_damage_locations === 'string') {
-          waterDamageLocations = JSON.parse(inspection.water_damage_locations);
-        } else if (Array.isArray(inspection.water_damage_locations)) {
-          waterDamageLocations = inspection.water_damage_locations;
-        }
-      } catch (e) {
-        console.error("Error parsing water_damage_locations:", e);
-      }
+      // Update inspection with new analysis
+      await updateInspection(inspectionId, {
+        lab_analysis_conclusion: conclusion,
+        lab_analysis_recommendations: recommendations
+      });
 
-      // Construct comprehensive prompt with inspection context
-      let comprehensivePrompt = '';
-      
-      if (inspectionType === 'asbestos') {
-        comprehensivePrompt = `You are an expert asbestos inspection and assessment consultant. Your task is to analyze the provided asbestos inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
+      // Refresh inspection data
+      await loadInspectionData();
 
-IMPORTANT FORMATTING REQUIREMENTS:
-- Do NOT use asterisks (*) for formatting or emphasis
-- Do NOT use numbered lists (1. 2. 3.) for recommendations
-- Use plain text without markdown formatting
-- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
-- Use clear, professional language without special characters for emphasis
+      alert('Analysis completed successfully!');
 
-**Property Details:**
-Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
-Property Type: ${inspection.property_type || 'Not specified'}
-Square Footage: ${inspection.square_footage || 'Not specified'}
-Year Built: ${inspection.year_built || 'Not specified'}
-
-**Client Information:**
-Client Type: ${inspection.client_type || 'Not specified'}
-
-**Building Age Assessment:**
-Year Built: ${inspection.year_built || 'Not specified'}
-${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '⚠️ HIGH RISK: Property built before 1980 has higher likelihood of containing asbestos materials.\n' : 'Property built after 1980 has lower asbestos risk.\n'}
-
-**Environmental Conditions:**
-Temperature: ${inspection.temperature || 'Not recorded'}°F
-Humidity: ${inspection.humidity || 'Not recorded'}%
-Data Collection Method: ${inspection.environmental_data_method || 'Not specified'}
-
-**Samples Collected:**
-${samples && samples.length > 0 ? 
-  samples.map((sample, i) => `Sample ${i + 1}: Location: ${sample.location || 'Not specified'}, Description: ${sample.description || 'Not specified'}`).join('\n')
-  : 'No samples were collected during this inspection.'}
-
-**Lab Analysis Results (extracted from image at ${imageUrl}):**
-Please analyze the lab analysis image provided and extract relevant information about:
-- Types of asbestos materials identified (e.g., chrysotile, amosite, crocidolite)
-- Condition of materials (friable vs. non-friable)
-- Whether levels are concerning based on industry standards
-- Risk assessment for renovation or demolition
-
-Based on this comprehensive information, provide a conclusion and specific recommendations. Consider all contextual factors including property details, building age, environmental conditions, and lab results.
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Risk Management Strategies: [details]'"
-}`;
-      } else {
-        comprehensivePrompt = `You are an expert mold inspection and remediation consultant. Your task is to analyze the provided mold inspection data and lab analysis results to generate a concise conclusion and actionable recommendations for the property owner. Structure the output as a JSON object with two keys: conclusion (string) and recommendations (string).
-
-IMPORTANT FORMATTING REQUIREMENTS:
-- Do NOT use asterisks (*) for formatting or emphasis
-- Do NOT use numbered lists (1. 2. 3.) for recommendations
-- Use plain text without markdown formatting
-- For recommendations, use section headers followed by colon (like "Immediate Actions Needed:" "Preventive Measures:" etc.)
-- Use clear, professional language without special characters for emphasis
-
-**Property Details:**
-Address: ${inspection.street_address || 'Not specified'}, ${inspection.city || 'Not specified'}, ${inspection.state || 'Not specified'} ${inspection.zip_code || 'Not specified'}
-Property Type: ${inspection.property_type || 'Not specified'}
-Square Footage: ${inspection.square_footage || 'Not specified'}
-Year Built: ${inspection.year_built || 'Not specified'}
-
-**Client Information:**
-Client Type: ${inspection.client_type || 'Not specified'}
-
-**Visible Mold Findings:**
-Visible Mold Present: ${inspection.has_visible_mold ? 'Yes' : 'No'}
-${inspection.has_visible_mold && moldLocations.length > 0 ? 
-  'Visible Mold Details:\n' + moldLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n' 
-  : 'No visible mold was reported during this inspection.\n'}
-
-**Water Damage History:**
-Recent Water Damage: ${inspection.has_water_damage ? 'Yes' : 'No'}
-${inspection.has_water_damage && waterDamageLocations.length > 0 ? 
-  'Water Damage Details:\n' + waterDamageLocations.map((location, i) => `  - Location ${i + 1}: ${location || 'N/A'}`).join('\n') + '\n'
-  : 'No recent water damage was reported during this inspection.\n'}
-
-**Environmental Conditions:**
-Temperature: ${inspection.temperature || 'Not recorded'}°F
-Humidity: ${inspection.humidity || 'Not recorded'}%
-Data Collection Method: ${inspection.environmental_data_method || 'Not specified'}
-
-**Samples Collected:**
-${samples && samples.length > 0 ? 
-  samples.map((sample, i) => `Sample ${i + 1}: Location: ${sample.location || 'Not specified'}, Description: ${sample.description || 'Not specified'}`).join('\n')
-  : 'No samples were collected during this inspection.'}
-
-**Lab Analysis Results (extracted from image at ${imageUrl}):**
-Please analyze the lab analysis image provided and extract relevant information about:
-- Types of mold identified (e.g., Stachybotrys, Aspergillus/Penicillium, Cladosporium)
-- Concentration levels (e.g., spore counts per cubic meter, colony forming units)
-- Whether levels are elevated or concerning based on industry standards
-- Presence of toxigenic molds
-
-Based on this comprehensive information, provide a conclusion and specific recommendations. Consider all contextual factors including property details, environmental conditions, visible findings, and lab results.
-
-Return your response in this exact JSON format:
-{
-  "conclusion": "Your detailed conclusion here (2-3 paragraphs summarizing findings, health implications, and overall assessment)...",
-  "recommendations": "Your detailed recommendations here with section headers like 'Immediate Actions Needed: [details]' 'Preventive Measures: [details]' 'Professional Services Recommended: [details]' 'Timeline for Required Actions: [details]' 'Environmental Controls to Implement: [details]'"
-}`;
-      }
-      
-      // Use the InvokeLLM function to analyze the image with comprehensive context
-      const analysisResult = await InvokeLLM({
-        prompt: comprehensivePrompt,
-        image_url: imageUrl
-      }, [], inspectionId);
-      
-      console.log("🔍 DEBUG: Analysis result:", analysisResult);
-      
-      if (analysisResult) {
-        // Parse AI conclusion but use standard recommendations template
-        let conclusion = "";
-        let recommendations = inspectionType === 'asbestos' 
-          ? `<strong>Immediate Actions</strong>
-1. Avoid Disturbance
-Do not disturb any suspected asbestos-containing materials. Asbestos fibers become airborne when materials are damaged or disturbed.
-
-2. Limit Access
-Restrict access to areas where asbestos materials are suspected, especially for children and individuals with respiratory conditions.
-
-<strong>Next Steps</strong>
-1. Consult an Asbestos Professional
-Hire a certified asbestos inspector to conduct a thorough assessment and testing of suspected materials.
-
-2. Professional Testing
-Schedule professional asbestos testing to confirm the presence and type of asbestos materials.
-
-<strong>Risk Management</strong>
-• Document Conditions
-Take photographs and document the current condition of suspected asbestos materials.
-
-• Monitor for Damage
-Regularly inspect for signs of deterioration, water damage, or other conditions that could release asbestos fibers.
-
-• Plan for Renovation
-If renovation or demolition is planned, asbestos abatement must be completed by licensed professionals before work begins.
-
-• Emergency Procedures
-Have a plan for handling accidental disturbance of asbestos materials, including evacuation and professional cleanup.`
-          : `<strong>Immediate Actions</strong>
-1. Fix Moisture & Humidity Issues
-Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
-
-2. Avoid Impacted Areas
-Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
-
-<strong>Next Steps</strong>
-1. Consult a Mold Professional
-To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
-
-2. Re-Testing
-After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
-
-<strong>Prevention Tips</strong>
-• Act Quickly on Leaks
-Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
-
-• Monitor Humidity
-Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
-
-• Look for Early Signs
-Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
-
-• Promote Airflow
-Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
-
-• Inspect After Water Events
-After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`;
-
-        // Parse AI conclusion but use standard recommendations
-        if (analysisResult.conclusion) {
-          conclusion = analysisResult.conclusion;
-        } else if (typeof analysisResult.content === 'string') {
-          if (analysisResult.content.trim().startsWith('{')) {
-            try {
-              const parsedResult = JSON.parse(analysisResult.content);
-              conclusion = parsedResult.conclusion || "Lab analysis completed successfully.";
-            } catch (parseError) {
-              // Extract conclusion from content
-              const contentSplit = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:|"recommendations":\s*"/i);
-              if (contentSplit.length > 1) {
-                conclusion = contentSplit[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:|"conclusion":\s*"/i, '').trim();
-              } else {
-                conclusion = analysisResult.content;
-              }
-            }
-          } else {
-            // Extract conclusion from non-JSON content
-            const split = analysisResult.content.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
-            if (split.length > 1) {
-              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
-            } else {
-              conclusion = analysisResult.content;
-            }
-          }
-        } else if (typeof analysisResult === 'string') {
-          if (analysisResult.trim().startsWith('{')) {
-            try {
-              const parsedResult = JSON.parse(analysisResult);
-              conclusion = parsedResult.conclusion || analysisResult;
-            } catch (parseError) {
-              conclusion = analysisResult;
-            }
-          } else {
-            // Extract conclusion from non-JSON content
-            const split = analysisResult.split(/\*\*RECOMMENDATIONS\*\*|Recommendations:|RECOMMENDATIONS:/i);
-            if (split.length > 1) {
-              conclusion = split[0].replace(/\*\*CONCLUSION\*\*|Conclusion:|CONCLUSION:/i, '').trim();
-            } else {
-              conclusion = analysisResult;
-            }
-          }
-        } else {
-          conclusion = "Lab analysis completed successfully.";
-        }
-
-        // Clean up conclusion formatting
-        conclusion = conclusion
-          .replace(/\*\*/g, '') // Remove bold asterisks
-          .replace(/\*/g, '') // Remove single asterisks
-          .replace(/^\s*["']*/, '') // Remove leading quotes
-          .replace(/["']*\s*$/, '') // Remove trailing quotes
-          .trim();
-
-        // Update the inspection with the standard template
-        setInspection(prev => ({
-          ...prev,
-          lab_conclusion: conclusion,
-          lab_recommendations: recommendations
-        }));
-
-        // Also save to database
-        const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
-        await updateEntity.update(inspectionId, {
-          lab_conclusion: conclusion,
-          lab_recommendations: recommendations
-        });
-        
-        console.log("🔍 DEBUG: Updated inspection with separated conclusion and recommendations");
-        console.log("🔍 DEBUG: Conclusion:", conclusion);
-        console.log("🔍 DEBUG: Recommendations:", recommendations);
-      }
     } catch (error) {
-      console.error("❌ Error generating analysis:", error);
       alert(`Failed to generate ${inspectionType === 'asbestos' ? 'asbestos' : 'lab'} analysis. Please try again.`);
     } finally {
       setGeneratingAnalysis(false);

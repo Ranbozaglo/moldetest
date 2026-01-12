@@ -64,7 +64,6 @@ export const getCurrentUser = () => {
 // Clear authentication data
 export const clearAuth = () => {
   localStorage.removeItem('mth_user');
-  console.log('🔍 AUTH UTILS: Authentication data cleared');
 };
 
 // Validate token with server
@@ -128,37 +127,31 @@ export const shouldValidateWithServer = (userData = null) => {
 
 // Enhanced authentication check with automatic cleanup
 export const requireAuth = async (redirectTo = '/SignIn') => {
-  console.log('🔍 AUTH UTILS: Checking authentication...');
-  
   const userData = getCurrentUser();
-  
+
   if (!userData) {
-    console.log('🔍 AUTH UTILS: No user data found, redirecting to login');
     if (typeof window !== 'undefined' && window.location.pathname !== redirectTo) {
       window.location.href = redirectTo;
     }
     return false;
   }
-  
+
   // Check if we should validate with server
   if (shouldValidateWithServer(userData)) {
-    console.log('🔍 AUTH UTILS: Validating token with server...');
     const isValid = await validateTokenWithServer(userData);
-    
+
     if (!isValid) {
-      console.log('🔍 AUTH UTILS: Server validation failed, clearing session');
       clearAuth();
       if (typeof window !== 'undefined' && window.location.pathname !== redirectTo) {
         window.location.href = redirectTo;
       }
       return false;
     }
-    
+
     // Update validation timestamp
     updateLastValidation(userData);
   }
-  
-  console.log('🔍 AUTH UTILS: Authentication check passed');
+
   return true;
 };
 
@@ -189,8 +182,7 @@ export const debugAuth = () => {
     } : null,
     currentUrl: typeof window !== 'undefined' ? window.location.href : 'N/A'
   };
-  
-  console.log('🔍 AUTH DEBUG:', debugInfo);
+
   return debugInfo;
 };
 
@@ -205,6 +197,4 @@ if (typeof window !== 'undefined') {
     requireAuth,
     debugAuth
   };
-  
-  console.log('🔍 AUTH UTILS: Authentication utilities attached to window.authUtils for debugging');
 } 

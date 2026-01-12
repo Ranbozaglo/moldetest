@@ -49,25 +49,19 @@ export const getUrlParam = (search, paramName, defaultValue = null) => {
 export const getInspectionIdFromUrl = (search) => {
   // Try multiple possible parameter names in order of preference
   const possibleNames = ['inspectionId', 'id', 'inspectionid', 'inspection_id', 'inspectionID'];
-  
-  console.log('🔍 DEBUG: getInspectionIdFromUrl - searching in:', search);
-  
+
   for (const paramName of possibleNames) {
     const value = getUrlParam(search, paramName);
     if (value && value.trim() !== '') {
       const trimmedValue = value.trim();
-      console.log(`🔍 DEBUG: Found inspection ID '${trimmedValue}' using parameter '${paramName}'`);
-      
+
       // Basic validation - should be alphanumeric
       if (/^[a-zA-Z0-9\-_]+$/.test(trimmedValue)) {
         return trimmedValue;
-      } else {
-        console.warn('getInspectionIdFromUrl: Invalid inspection ID format:', trimmedValue);
       }
     }
   }
-  
-  console.warn('getInspectionIdFromUrl: No valid inspection ID found in URL parameters');
+
   return null;
 };
 

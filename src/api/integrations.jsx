@@ -50,17 +50,9 @@ const convertToWebP = async (file) => {
 
 export const Core = {
   InvokeLLM: async (prompt, imageUrls = [], inspectionId = null) => {
-    console.log('🚀 CORE API: InvokeLLM called!');
-    console.log('🔍 DEBUG: Prompt length:', prompt?.length || 0);
-    console.log('🔍 DEBUG: Prompt start:', prompt?.substring(0, 200));
-    console.log('🔍 DEBUG: Prompt end:', prompt?.substring(prompt.length - 200));
-    console.log('🔍 DEBUG: Inspection ID:', inspectionId);
-  
-    
     try {
       // Check if we're in a build environment
       if (typeof window === 'undefined') {
-        console.log('🔍 DEBUG: Build environment detected, returning mock response');
         return {
           content: `Mock LLM response for prompt: "${prompt.substring(0, 100)}..."`,
           usage: {
@@ -72,23 +64,15 @@ export const Core = {
       }
 
       // Connect to the OCR-GPT backend API using dynamic configuration
-      console.log('🌐 CORE API: Getting API URL...');
       const baseApiUrl = getBaseApiUrl();
       const apiUrl = `${baseApiUrl}/api/ocr-gpt`;
-      
-      console.log('✅ CORE API: API URL determined:', apiUrl);
-      console.log('🔍 DEBUG: Base API URL:', baseApiUrl);
-      
+
       // Send the extracted text under the correct field
-      const requestData = { 
+      const requestData = {
         extracted_text: prompt,
         inspection_id: inspectionId
       };
-      console.log('📦 CORE API: Preparing JSON payload with inspection_id:', inspectionId);
-      console.log('🔍 DEBUG: extracted_text payload length:', prompt.length);
-      console.log('🔍 DEBUG: extracted_text payload end:', prompt.substring(prompt.length - 200));
-       
-      console.log('📡 CORE API: Making HTTP request...');
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -96,24 +80,15 @@ export const Core = {
         },
         body: JSON.stringify(requestData)
       });
-      
-      console.log('📨 CORE API: Received HTTP response');
-      console.log('🔍 DEBUG: Response status:', response.status);
-      console.log('🔍 DEBUG: Response status text:', response.statusText);
-      console.log('🔍 DEBUG: Response OK:', response.ok);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ CORE API: HTTP error response body:', errorText);
         throw new Error(`OCR-GPT API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
-      
-      console.log('📋 CORE API: Parsing JSON response...');
+
       const result = await response.json();
-      console.log('✅ CORE API: JSON parsed successfully');
-      console.log('🔍 DEBUG: Response keys:', Object.keys(result));
-      console.log('🔍 DEBUG: Full API response:', result);
-      
+
       return {
         content: result.analysis || result.content || result.response || 'No analysis content received',
         usage: result.usage || {
@@ -142,32 +117,16 @@ export const Core = {
   SendEmail: async (emailData) => {
     // Use backend email service
     // This is a simplified version - in practice, you'd map the emailData to the appropriate backend endpoint
-    console.log('Backend email service called:', emailData);
     return { success: true, messageId: Date.now().toString() };
   },
   
   UploadFile: async (file, bucketType = 'inspection') => {
-    console.log('🔍 DEBUG: UploadFile called with:', { 
-      fileName: file.name, 
-      fileSize: file.size, 
-      fileType: file.type,
-      bucketType 
-    });
-    
     try {
       // Check if file is an image and convert to WebP if needed
       let uploadFile = file;
       if (file.type.startsWith('image/') && !file.type.includes('webp')) {
         try {
-          console.log('🔍 DEBUG: Converting image to WebP format...');
           uploadFile = await convertToWebP(file);
-          console.log('🔍 DEBUG: WebP conversion successful:', {
-            originalName: file.name,
-            webpName: uploadFile.name,
-            originalSize: file.size,
-            webpSize: uploadFile.size,
-            compressionRatio: ((file.size - uploadFile.size) / file.size * 100).toFixed(1) + '%'
-          });
         } catch (conversionError) {
           console.warn('⚠️ WebP conversion failed, using original file:', conversionError);
           uploadFile = file; // Fallback to original file
@@ -176,7 +135,6 @@ export const Core = {
       
       // Check if we're in a build environment
       if (typeof window === 'undefined') {
-        console.log('🔍 DEBUG: Build environment detected, returning mock upload result');
         return {
           file_url: `https://storage.moldtestinghouston.com/mock/${Date.now()}_${uploadFile.name}`,
           file_path: `/mock/${uploadFile.name}`,
@@ -205,14 +163,10 @@ export const Core = {
       // Set default bucket and folder
       const bucketName = 'mold-images';
       const folderName = 'mold-inspections';
-      console.log('🔍 DEBUG: Using mold-images bucket configuration:', { bucketName, folderName });
-      
+
       // Upload to Supabase Storage
-      console.log('🔍 DEBUG: Uploading to Supabase Storage:', { bucketName, folderName, fileName: uploadFile.name });
       const result = await uploadToSupabaseStorage(uploadFile, bucketName, folderName);
-      
-      console.log('🔍 DEBUG: UploadFile result:', result);
-      
+
       // Validate the upload result
       if (!result.url && !result.file_url) {
         throw new Error('Upload failed: No public URL returned from Supabase Storage');
@@ -263,13 +217,10 @@ export const Core = {
   
   ExtractDataFromUploadedFile: async (file) => {
     // Use OCR-GPT backend for text extraction and analysis
-    console.log('🔍 DEBUG: ExtractDataFromUploadedFile called with:', { fileName: file.name, fileSize: file.size, fileType: file.type });
-    
     try {
       // First upload the file
       const uploadResult = await Core.UploadFile(file);
-      console.log('🔍 DEBUG: File uploaded:', uploadResult);
-      
+
       // Then use OCR-GPT backend to extract and analyze text
       const ocrPrompt = `
 Analyze this image and extract all text content. Provide a comprehensive analysis including:
@@ -285,8 +236,7 @@ Please provide a structured, professional analysis.
 `;
 
       const analysisResult = await Core.InvokeLLM(ocrPrompt, [uploadResult.file_url]);
-      console.log('🔍 DEBUG: OCR analysis result:', analysisResult);
-      
+
       return {
         extractedData: {
           text: analysisResult.content,
@@ -304,13 +254,10 @@ Please provide a structured, professional analysis.
   
   // New OCR-GPT specific methods
   ProcessImageWithOCR: async (file, customPrompt = null) => {
-    console.log('🔍 DEBUG: ProcessImageWithOCR called with:', { fileName: file.name, customPrompt });
-    
     try {
       // Upload file
       const uploadResult = await Core.UploadFile(file);
-      console.log('🔍 DEBUG: File uploaded for OCR processing:', uploadResult);
-      
+
       // Default prompt for OCR analysis
       const defaultPrompt = `
 Analyze this laboratory mold analysis report image and provide professional conclusions and recommendations.
@@ -345,11 +292,10 @@ Return your response in this exact JSON format:
 `;
 
       const prompt = customPrompt || defaultPrompt;
-      
+
       // Process with OCR-GPT backend
       const analysisResult = await Core.InvokeLLM(prompt, [uploadResult.file_url]);
-      console.log('🔍 DEBUG: OCR-GPT analysis result:', analysisResult);
-      
+
       return {
         success: true,
         file_url: uploadResult.file_url,
@@ -369,13 +315,10 @@ Return your response in this exact JSON format:
   },
   
   AnalyzeLabResults: async (file) => {
-    console.log('🔍 DEBUG: AnalyzeLabResults called with:', { fileName: file.name });
-    
     try {
       const result = await Core.ProcessImageWithOCR(file);
-      console.log('🔍 DEBUG: Lab results analysis completed:', result);
       return result;
-      
+
     } catch (error) {
       console.error('❌ AnalyzeLabResults error:', error);
       throw error;
@@ -383,10 +326,8 @@ Return your response in this exact JSON format:
   },
 
   ProcessLabImageWithOCR: async (file) => {
-    console.log('🔍 DEBUG: ProcessLabImageWithOCR called with file:', file.name);
-    
     try {
-      // Check if we're in a build environment  
+      // Check if we're in a build environment
       if (typeof window === 'undefined') {
         return {
           valid: false,
@@ -399,9 +340,7 @@ Return your response in this exact JSON format:
 
       const baseApiUrl = getBaseApiUrl();
       const apiUrl = `${baseApiUrl}/api/validate-lab-image-file`;
-      
-      console.log('📡 PROCESS OCR: Making OCR processing request to:', apiUrl);
-      
+
       // Create FormData to send file
       const formData = new FormData();
       formData.append('file', file);
@@ -410,20 +349,17 @@ Return your response in this exact JSON format:
         method: 'POST',
         body: formData // Don't set Content-Type header - let browser set it with boundary
       });
-      
-      console.log('📨 PROCESS OCR: Received response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ PROCESS OCR: HTTP error response:', errorText);
         throw new Error(`OCR processing API error: ${response.status} - ${errorText}`);
       }
-      
+
       const result = await response.json();
-      console.log('✅ PROCESS OCR: Processing result:', result);
-      
+
       return result;
-      
+
     } catch (error) {
       console.error('❌ ProcessLabImageWithOCR error:', error);
       
@@ -439,8 +375,6 @@ Return your response in this exact JSON format:
   },
 
   ValidateLabImageFile: async (file) => {
-    console.log('🔍 DEBUG: ValidateLabImageFile called with file:', file.name);
-    
     try {
       // Check if we're in a build environment
       if (typeof window === 'undefined') {
@@ -455,9 +389,7 @@ Return your response in this exact JSON format:
 
       const baseApiUrl = getBaseApiUrl();
       const apiUrl = `${baseApiUrl}/api/validate-lab-image-file`;
-      
-      console.log('📡 VALIDATE FILE: Making validation request to:', apiUrl);
-      
+
       // Create FormData to send file
       const formData = new FormData();
       formData.append('file', file);
@@ -466,20 +398,17 @@ Return your response in this exact JSON format:
         method: 'POST',
         body: formData // Don't set Content-Type header - let browser set it with boundary
       });
-      
-      console.log('📨 VALIDATE FILE: Received response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ VALIDATE FILE: HTTP error response:', errorText);
         throw new Error(`File validation API error: ${response.status} - ${errorText}`);
       }
-      
+
       const result = await response.json();
-      console.log('✅ VALIDATE FILE: Validation result:', result);
-      
+
       return result;
-      
+
     } catch (error) {
       console.error('❌ ValidateLabImageFile error:', error);
       
@@ -495,8 +424,6 @@ Return your response in this exact JSON format:
   },
 
   ValidateLabImage: async (imageUrl) => {
-    console.log('🔍 DEBUG: ValidateLabImage called with URL:', imageUrl);
-    
     try {
       // Check if we're in a build environment
       if (typeof window === 'undefined') {
@@ -511,9 +438,7 @@ Return your response in this exact JSON format:
 
       const baseApiUrl = getBaseApiUrl();
       const apiUrl = `${baseApiUrl}/api/validate-lab-image`;
-      
-      console.log('📡 VALIDATE: Making validation request to:', apiUrl);
-      
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -523,20 +448,17 @@ Return your response in this exact JSON format:
           image_url: imageUrl
         })
       });
-      
-      console.log('📨 VALIDATE: Received response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ VALIDATE: HTTP error response:', errorText);
         throw new Error(`Validation API error: ${response.status} - ${errorText}`);
       }
-      
+
       const result = await response.json();
-      console.log('✅ VALIDATE: Validation result:', result);
-      
+
       return result;
-      
+
     } catch (error) {
       console.error('❌ ValidateLabImage error:', error);
       

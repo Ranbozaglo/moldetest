@@ -189,71 +189,84 @@ class SimpleOCRIntegration:
             return {"error": str(e), "extracted_text": ""}
     
     def analyze_lab_results_with_gpt(self, extracted_text: str, image_urls: list, inspection_findings: dict = None):
-        """Analyze extracted lab text using GPT-4 with inspection findings context"""
+        """Analyze extracted lab text using GPT-4 with PRIMARY focus on lab results"""
         if not extracted_text.strip():
             raise Exception("No extracted text provided for analysis. Manual review required.")
-        
+
         try:
-            # Build comprehensive prompt with inspection findings
-            prompt_parts = []
-            
-            # Add inspection findings if available
-            if inspection_findings:
-                findings_text = "INSPECTION FINDINGS:\n"
-                if inspection_findings.get('has_visible_mold'):
-                    findings_text += "- Visible mold detected during inspection\n"
-                if inspection_findings.get('has_water_damage'):
-                    findings_text += "- Water damage detected during inspection\n"
-                if inspection_findings.get('temperature'):
-                    findings_text += f"- Temperature: {inspection_findings['temperature']}°F\n"
-                if inspection_findings.get('humidity'):
-                    findings_text += f"- Humidity: {inspection_findings['humidity']}%\n"
-                if inspection_findings.get('mold_locations'):
-                    findings_text += f"- Mold locations: {inspection_findings['mold_locations']}\n"
-                if inspection_findings.get('water_damage_locations'):
-                    findings_text += f"- Water damage locations: {inspection_findings['water_damage_locations']}\n"
-                
-                prompt_parts.append(findings_text)
-            
-            # Add lab analysis text
-            prompt_parts.append(f"LAB ANALYSIS RESULTS:\n{extracted_text}")
-            
-            # Add instructions for GPT
-            prompt_parts.append("""
-TASK: Based on the inspection findings and lab analysis results above, provide a professional conclusion and recommendations.
+            # CRITICAL DIAGNOSTIC LOGGING - START
+            print("=" * 80)
+            print("🚨 DIAGNOSTIC: analyze_lab_results_with_gpt() CALLED")
+            print("=" * 80)
+            print(f"🔍 DIAGNOSTIC: extracted_text length: {len(extracted_text)}")
+            print(f"🔍 DIAGNOSTIC: extracted_text preview (first 500 chars):")
+            print(extracted_text[:500])
+            print(f"🔍 DIAGNOSTIC: extracted_text end (last 200 chars):")
+            print(extracted_text[-200:])
+            print(f"🔍 DIAGNOSTIC: inspection_findings: {inspection_findings}")
+            print(f"🔍 DIAGNOSTIC: image_urls: {image_urls}")
 
-Please provide your response in the following JSON format:
-{
-  "conclusion": "According to the lab report and the details provided, [your professional conclusion based on both inspection findings and lab analysis]. Specifically reference the mold_locations and water_damage_locations from the inspection findings. For example: 'The laboratory analysis report indicates the presence of mold on the wall swab taken from [specific mold_location] at the property.' or 'The lab results correlate with the water damage observed in [specific water_damage_location].'",
-"recommendations": 
-*Immediate Actions Needed:*
-*Preventive Measures:*
-*Professional Services Recommended:*    
-*Timeline for Required Actions:* 
-*Environmental Controls to Implement:* 
-}
+            # Check if extracted_text contains "room1" or "room2" or "200" (humidity)
+            if "room1" in extracted_text.lower() or "room2" in extracted_text.lower():
+                print("🚨 WARNING: extracted_text contains 'room1' or 'room2' - THIS SHOULD NOT HAPPEN!")
+            if "200%" in extracted_text or "200.0%" in extracted_text:
+                print("🚨 WARNING: extracted_text contains '200%' humidity - THIS SHOULD NOT HAPPEN!")
+            print("=" * 80)
+            # CRITICAL DIAGNOSTIC LOGGING - END
 
-Focus on:
-1. Correlating lab results with inspection findings
-2. Specifically mentioning mold_locations and water_damage_locations in the conclusion
-3. Providing actionable recommendations
-4. Addressing any health or safety concerns
-5. Suggesting next steps for the client
-6. Always start the conclusion with "According to the lab report and the details provided,"
-7. When mold_locations or water_damage_locations are present, explicitly state them in the conclusion like: "The laboratory analysis report indicates the presence of mold on the wall swab taken from [mold_location] at the property."
-8. Use the exact location names from mold_locations and water_damage_locations arrays in your conclusion
-""")
-            
-            full_prompt = "\n\n".join(prompt_parts)
-            
-            # Pass the comprehensive prompt to GPT
+            # Build simple prompt with ONLY lab results and the exact prompt requested
+            full_prompt = f"""{extracted_text}
+
+You are a licensed mold assessment expert writing conclusions for Total Testing
+
+I am uploading lab analysis photos (air and/or surface samples).
+
+Please do the following every time:
+
+Carefully review all details in the lab report, including species, raw counts, debris levels, and sample locations.
+
+Identify which areas show mold growth and which do not.
+
+Clearly explain what the results mean, focusing on whether findings indicate:
+
+Normal background conditions
+
+Localized mold growth
+
+Water-damage indicator molds
+
+Distinguish between common environmental molds and problematic molds (e.g., Chaetomium, Stachybotrys, Fusarium).
+
+Write a professional conclusion section that:
+
+Matches the tone of a licensed mold inspector
+
+Is clear, human, and client-friendly
+
+Avoids sounding like AI
+
+Is suitable for inclusion in a formal report or client email
+
+If remediation or cleaning is recommended, explain why and keep it proportional to the findings.
+
+End with a short statement about next steps (cleaning, remediation, or clearance testing if applicable).
+"""
+
+            # DIAGNOSTIC: Log the full prompt being sent to GPT
+            print("=" * 80)
+            print("🚨 DIAGNOSTIC: FULL PROMPT BEING SENT TO GPT-4:")
+            print("=" * 80)
+            print(full_prompt)
+            print("=" * 80)
+
+            # Pass the simple prompt to GPT
             response = self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "user", "content": full_prompt}
                 ],
-                max_tokens=1500,
-                temperature=0.3
+                max_tokens=2500,
+                temperature=0.2
             )
             print(f"🔍 DEBUG: GPT-4 response: {response}")
             analysis_content = response.choices[0].message.content
@@ -1557,47 +1570,52 @@ def validate_lab_image():
 def ocr_gpt():
     """OCR-GPT endpoint for lab analysis with Google Cloud Vision integration"""
     print("🚀 BACKEND OCR: OCR-GPT endpoint called!")
-    
+
     try:
         print("📦 BACKEND OCR: Getting request data...")
         data = request.get_json()
-        
+
         if not data:
             print("❌ BACKEND OCR: No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
-        
+
         extracted_text = data.get('extracted_text', '')
-        
+        inspection_id = data.get('inspection_id', None)
+
+        # CRITICAL DIAGNOSTIC LOGGING
+        print("=" * 80)
+        print("🚨 DIAGNOSTIC: /api/ocr-gpt ENDPOINT RECEIVED REQUEST")
+        print("=" * 80)
+        print(f"🔍 DIAGNOSTIC: Request data keys: {list(data.keys())}")
+        print(f"🔍 DIAGNOSTIC: inspection_id: {inspection_id}")
+        print(f"🔍 DIAGNOSTIC: extracted_text length: {len(extracted_text) if extracted_text else 0}")
+        print(f"🔍 DIAGNOSTIC: extracted_text preview (first 500 chars):")
+        print(extracted_text[:500] if extracted_text else "EMPTY")
+        print(f"🔍 DIAGNOSTIC: extracted_text end (last 200 chars):")
+        print(extracted_text[-200:] if extracted_text and len(extracted_text) > 200 else extracted_text)
+
+        # Check if extracted_text contains inspection data
+        if "room1" in extracted_text.lower() or "room2" in extracted_text.lower():
+            print("🚨 WARNING: extracted_text contains 'room1' or 'room2' - FRONTEND IS SENDING WRONG DATA!")
+        if "200%" in extracted_text or "200.0%" in extracted_text:
+            print("🚨 WARNING: extracted_text contains '200%' humidity - FRONTEND IS SENDING WRONG DATA!")
+        print("=" * 80)
+
         print("✅ BACKEND OCR: Request data parsed successfully")
         print(f"🔍 DEBUG: Extracted text length: {len(extracted_text) if extracted_text else 0}")
         print(f"🔍 DEBUG: OCR service available: {ocr_integration.is_available}")
         print(f"🔍 DEBUG: OCR integration type: {type(ocr_integration)}")
-        
-        
+
+
         # Only use extracted_text for the GPT call. Ignore prompt and image_urls.
         if extracted_text and extracted_text.strip():
             try:
-                # Get inspection findings if inspection_id is provided
+                # Lab Analysis should be independent - don't fetch inspection findings
+                # The GPT prompt should analyze ONLY the lab report data
                 inspection_findings = None
-                if 'inspection_id' in request.get_json():
-                    inspection_id = request.get_json()['inspection_id']
-                    try:
-                        inspection_result = supabase.table('inspection').select('*').eq('id', inspection_id).execute()
-                        if inspection_result.data:
-                            inspection = inspection_result.data[0]
-                            inspection_findings = {
-                                'has_visible_mold': inspection.get('has_visible_mold'),
-                                'has_water_damage': inspection.get('has_water_damage'),
-                                'temperature': inspection.get('temperature'),
-                                'humidity': inspection.get('humidity'),
-                                'mold_locations': inspection.get('mold_locations'),
-                                'water_damage_locations': inspection.get('water_damage_locations')
-                            }
-                            print(f"🔍 DEBUG: Found inspection findings for GPT: {inspection_findings}")
-                    except Exception as e:
-                        print(f"⚠️ Could not fetch inspection findings: {e}")
-                
-                gpt_result = ocr_integration.analyze_lab_results_with_gpt(extracted_text, image_urls=None, inspection_findings=inspection_findings)
+                print(f"🔍 DEBUG: Lab Analysis mode - inspection_findings set to None for independent analysis")
+
+                gpt_result = ocr_integration.analyze_lab_results_with_gpt(extracted_text, image_urls=None, inspection_findings=None)
             except Exception as e:
                 print(f"❌ Error in analyze_lab_results_with_gpt: {str(e)}")
                 return jsonify({

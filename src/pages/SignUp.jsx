@@ -42,7 +42,6 @@ export default function SignUp() {
         // Clear any existing inspection data for new users
         localStorage.removeItem('inspection_current_step');
         localStorage.removeItem('inspection_form_data');
-        console.log('🔍 DEBUG: Cleared inspection data for new user signup');
         navigate(createPageUrl('Inspection'));
       } else {
         setError(result.error || 'Sign up failed');

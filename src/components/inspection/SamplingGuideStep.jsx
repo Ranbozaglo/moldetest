@@ -37,6 +37,7 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
         <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-3">
           <FlaskConical className="w-5 h-5 text-blue-500" />
           Sample #{index + 1}
+          {index === 0 && <span className="text-red-500 text-sm">*Required</span>}
         </h3>
         <Button
           type="button"
@@ -44,6 +45,7 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
           size="icon"
           onClick={() => removeSample(index)}
           className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+          disabled={index === 0}
         >
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -51,12 +53,20 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
       
       <div className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
-          <Input
-            placeholder="Location (e.g., Living Room Wall)"
-            value={sample.location}
-            onChange={(e) => updateSample(index, "location", e.target.value)}
-            className="h-12 rounded-xl border-slate-200"
-          />
+          <div className="relative">
+            <Input
+              placeholder="Location (e.g., Living Room Wall)"
+              value={sample.location}
+              onChange={(e) => updateSample(index, "location", e.target.value)}
+              className={`h-12 rounded-xl ${index === 0 ? 'border-red-300 focus:border-red-500' : 'border-slate-200'}`}
+              required={index === 0}
+            />
+            {index === 0 && (
+              <span className="absolute -top-2 right-2 text-xs text-red-500 bg-white px-1">
+                Required
+              </span>
+            )}
+          </div>
           <Textarea
             placeholder="Description (e.g., Surface swab from black spot near window)"
             value={sample.description}
@@ -180,13 +190,24 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
   }, []);
 
   const removeSample = useCallback((index) => {
+    // Prevent removing Sample #1 (index 0) as it's required
+    if (index === 0) {
+      alert('Sample #1 cannot be removed as it is required. You must provide at least one sample location.');
+      return;
+    }
     setSamples(prevSamples => prevSamples.filter((_, i) => i !== index));
   }, []);
 
   const handleNext = () => {
+    // Validate that Sample #1 has a location (required field)
+    if (!samples[0] || !samples[0].location || samples[0].location.trim() === '') {
+      alert('Please fill in the location for Sample #1 before continuing. This is a required field.');
+      return;
+    }
+
     // Scroll to top of the page
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
+
     // Update formData with samples before proceeding to next step
     updateFormData({ samples: samples });
     onNext();
@@ -452,9 +473,10 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
         {/* Sample Collection Form */}
         <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Sample Collection Form</h2>
-          <p className="text-slate-600 mb-4 sm:mb-6 text-sm sm:text-base">
+          <p className="text-slate-600 mb-2 text-sm sm:text-base">
             Document your sample collection details below. Add as many samples as needed for each location where you collected swab samples.
           </p>
+
           
           <div className="space-y-6">
             {samples.map((sample, index) => (

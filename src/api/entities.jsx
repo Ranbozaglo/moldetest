@@ -24,11 +24,6 @@ const apiCall = async (endpoint, options = {}) => {
   const isProduction = window.location.hostname !== 'localhost';
   const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
 
-  
-  if (options.body) {
-    console.log(`${logPrefix} Request body:`, JSON.parse(options.body));
-  }
-  
   // Add timeout for production
   const timeoutMs = isProduction ? 15000 : 30000;
   const timeoutPromise = new Promise((_, reject) => 
@@ -54,15 +49,12 @@ const apiCall = async (endpoint, options = {}) => {
       
       // Handle authentication errors specifically
       if (response.status === 401 || response.status === 403) {
-        console.log(`${logPrefix} Authentication error detected, clearing session`);
-        
         // Clear localStorage to force re-login
         localStorage.removeItem('mth_user');
-        
+
         // Reload the page to trigger authentication flow
         setTimeout(() => {
           if (window.location.pathname !== '/SignIn' && window.location.pathname !== '/Welcome') {
-            console.log(`${logPrefix} Redirecting to sign in due to auth error`);
             window.location.href = '/SignIn';
           }
         }, 1000);
@@ -101,20 +93,12 @@ const getAuthToken = () => {
 export const MoldInspection = {
   // Debug method to check if the object is properly exported
   debug: () => {
-    console.log("🔍 DEBUG: MoldInspection object is available");
-    console.log("🔍 DEBUG: MoldInspection methods:", Object.keys(MoldInspection));
     return true;
   },
 
   create: async (data) => {
     const token = getAuthToken();
-    
-    // Debug: Log the inspection data being sent to verify image data
-    console.log("🔍 DEBUG: MoldInspection.create - Full data being sent:", data);
-    console.log("🔍 DEBUG: MoldInspection.create - Visible mold details:", data.visible_mold_details);
-    console.log("🔍 DEBUG: MoldInspection.create - Water damage details:", data.water_damage_details);
-    console.log("🔍 DEBUG: MoldInspection.create - Thermostat image:", data.thermostat_image);
-    
+
     const requestBody = {
       full_name: data.full_name,
       street_address: data.street_address,
@@ -141,9 +125,7 @@ export const MoldInspection = {
       client_status_detail: data.client_status_detail,
       created_date: data.created_date
     };
-    
-    console.log("🔍 DEBUG: MoldInspection.create - Request body being sent:", requestBody);
-    
+
     const response = await apiCall('/inspection', {
       method: 'POST',
       headers: {
@@ -560,36 +542,21 @@ export const Sample = {
 
 // Backend health check (for production debugging)
 const checkBackendHealth = async () => {
-  const isProduction = window.location.hostname !== 'localhost';
-  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
-  
-  console.log(`${logPrefix} Checking backend health...`);
-  
   try {
     const healthUrl = `${API_CONFIG.BASE_API_URL}/health`;
-    console.log(`${logPrefix} Health check URL: ${healthUrl}`);
-    
+
     const response = await fetch(healthUrl, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     });
-    
-    console.log(`${logPrefix} Health check response:`, {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText
-    });
-    
+
     if (response.ok) {
       const data = await response.json();
-      console.log(`${logPrefix} Backend is healthy:`, data);
       return { healthy: true, data };
     } else {
-      console.error(`${logPrefix} Backend health check failed:`, response.status);
       return { healthy: false, status: response.status };
     }
   } catch (error) {
-    console.error(`${logPrefix} Backend health check error:`, error.message);
     return { healthy: false, error: error.message };
   }
 };
@@ -735,49 +702,31 @@ if (typeof window !== 'undefined') {
       if (!email || !password) {
         throw new Error('Email and password are required for login test');
       }
-      console.log('🔍 PROD DEBUG: Testing login endpoint...');
       try {
         const result = await User.login(email, password);
-        console.log('🔍 PROD DEBUG: Login test successful:', result);
         return result;
       } catch (error) {
-        console.error('🔍 PROD DEBUG: Login test failed:', error);
         return { error: error.message };
       }
     },
-    
+
     // Check current environment
     checkEnv: () => {
       const isProduction = window.location.hostname !== 'localhost';
-      console.log('🔍 PROD DEBUG: Environment info:', {
+      return {
         isProduction,
-        hostname: window.location.hostname,
         baseApiUrl: API_CONFIG.BASE_API_URL,
         backendUrl: API_CONFIG.BACKEND_URL,
-        fullApiUrl: API_CONFIG.BASE_URL,
-        currentUrl: window.location.href
-      });
-      return { 
-        isProduction, 
-        baseApiUrl: API_CONFIG.BASE_API_URL,
-        backendUrl: API_CONFIG.BACKEND_URL,
-        fullApiUrl: API_CONFIG.BASE_URL 
+        fullApiUrl: API_CONFIG.BASE_URL
       };
     },
-    
+
     // Check localStorage auth state
     checkAuth: () => {
       const savedUser = localStorage.getItem('mth_user');
-      console.log('🔍 PROD DEBUG: Auth state:', {
-        hasStoredUser: !!savedUser,
-        userData: savedUser ? JSON.parse(savedUser) : null
-      });
       return savedUser ? JSON.parse(savedUser) : null;
     }
   };
-  
-  console.log('🔍 PROD DEBUG: Backend debugging tools available via window.debugBackend');
-  console.log('🔍 PROD DEBUG: Try: debugBackend.testHealth(), debugBackend.testLogin(), debugBackend.checkEnv(), debugBackend.checkAuth()');
 }
 
 // Password Reset API Functions

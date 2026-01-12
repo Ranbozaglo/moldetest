@@ -14,21 +14,16 @@ const AuthContext = createContext({
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
+
   // Add debugging to help identify when this error occurs
   if (context === undefined) {
-    console.error('🔍 AUTH ERROR: useAuth called outside of AuthProvider');
-    console.error('🔍 AUTH ERROR: Current location:', window.location.href);
-    console.error('🔍 AUTH ERROR: Stack trace:', new Error().stack);
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
+
   return context;
 };
 
 export const AuthProvider = ({ children }) => {
-  console.log('🔍 AUTH DEBUG: AuthProvider initializing...');
-  
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const intervalRef = useRef(null);
@@ -50,8 +45,6 @@ export const AuthProvider = ({ children }) => {
   // Helper function to validate token with server
   const validateTokenWithServer = useCallback(async (userData) => {
     try {
-      console.log('🔍 AUTH DEBUG: Validating token with server...');
-      
       // Make a simple API call to validate the token
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api'}/auth/validate`, {
         method: 'GET',
@@ -60,16 +53,13 @@ export const AuthProvider = ({ children }) => {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (response.ok) {
-        console.log('🔍 AUTH DEBUG: Token validation successful');
         return true;
       } else {
-        console.log('🔍 AUTH DEBUG: Token validation failed:', response.status);
         return false;
       }
     } catch (error) {
-      console.error('🔍 AUTH DEBUG: Token validation error:', error);
       // Don't log out on network errors - let the user continue with their session
       // Only log out if it's a clear authentication error, not a network issue
       return true; // Allow session to continue on network errors
@@ -78,14 +68,12 @@ export const AuthProvider = ({ children }) => {
 
   // Define signOut function before using it in useEffect
   const signOut = useCallback(() => {
-    console.log('🔍 AUTH DEBUG: signOut called - clearing user state and localStorage');
     setUser(null);
     localStorage.removeItem('mth_user');
-    
+
     // Clear inspection data to prevent session mixing
     localStorage.removeItem('inspection_current_step');
     localStorage.removeItem('inspection_form_data');
-    console.log('🔍 AUTH DEBUG: Cleared inspection data on signout');
   }, []);
 
   // Initialize auth only once on mount
@@ -94,65 +82,48 @@ export const AuthProvider = ({ children }) => {
     initializationRef.current = true;
 
     const initializeAuth = async () => {
-      console.log('🔍 AUTH DEBUG: AuthProvider initializing (once only)...');
-      
       // Check for existing user session in localStorage
       const savedUser = localStorage.getItem('mth_user');
-      console.log('🔍 AUTH DEBUG: Saved user from localStorage:', savedUser ? 'exists' : 'not found');
-      
+
       if (savedUser) {
         try {
           const userData = JSON.parse(savedUser);
-          console.log('🔍 AUTH DEBUG: Parsed user data:', userData);
-          
+
           // Check if we have a valid access_token
           if (!userData.access_token) {
-            console.log('🔍 AUTH DEBUG: No access_token found, clearing session');
             localStorage.removeItem('mth_user');
             setLoading(false);
             return;
           }
-          
+
           // Check if token is expired based on timestamp
           if (isTokenExpired(userData)) {
-            console.log('🔍 AUTH DEBUG: Token expired based on timestamp, clearing session');
             localStorage.removeItem('mth_user');
             setLoading(false);
             return;
           }
-          
+
           // For page refreshes, immediately restore the user session
           // and validate in the background to avoid blocking the UI
-          console.log('🔍 AUTH DEBUG: Restoring user session immediately for better UX');
           setUser(userData);
           setLoading(false);
-          
+
           // Validate token with server in the background (non-blocking)
-          console.log('🔍 AUTH DEBUG: Starting background token validation...');
           const isValid = await validateTokenWithServer(userData);
-          
+
           if (!isValid) {
-            console.log('🔍 AUTH DEBUG: Background token validation failed, but keeping session for now');
             // Don't immediately log out - let the user continue their work
             // The periodic validation will handle this later
           } else {
-            console.log('🔍 AUTH DEBUG: Background token validation successful');
             // Update last validation timestamp
             userData.lastValidated = new Date().toISOString();
             localStorage.setItem('mth_user', JSON.stringify(userData));
           }
-          
-          // Admin role is now determined only by Supabase database values
-          console.log('🔍 AUTH DEBUG: Using admin role from database only');
-          
-          console.log('🔍 AUTH DEBUG: User session restored successfully');
         } catch (error) {
-          console.error('🔍 AUTH DEBUG: Error parsing saved user:', error);
           localStorage.removeItem('mth_user');
           setLoading(false);
         }
       } else {
-        console.log('🔍 AUTH DEBUG: No saved user found, auth initialization complete');
         setLoading(false);
       }
     };
@@ -170,29 +141,23 @@ export const AuthProvider = ({ children }) => {
     // Only set up interval if user is logged in
     if (!user) return;
 
-    console.log('🔍 AUTH DEBUG: Setting up periodic token validation for user:', user.email);
-    
     // Set up periodic token validation (every 2 hours)
     intervalRef.current = setInterval(async () => {
       const savedUser = localStorage.getItem('mth_user');
       if (savedUser) {
         try {
           const userData = JSON.parse(savedUser);
-          
+
           // Validate token with server
-          console.log('🔍 AUTH DEBUG: Periodic token validation...');
           const isValid = await validateTokenWithServer(userData);
           if (!isValid) {
-            console.log('🔍 AUTH DEBUG: Token validation failed during periodic check, logging out');
             signOut();
           } else {
             // Update last validation timestamp
             userData.lastValidated = new Date().toISOString();
             localStorage.setItem('mth_user', JSON.stringify(userData));
-            console.log('🔍 AUTH DEBUG: Periodic token validation successful');
           }
         } catch (error) {
-          console.error('🔍 AUTH DEBUG: Error during periodic token check:', error);
           signOut();
         }
       }
@@ -208,32 +173,21 @@ export const AuthProvider = ({ children }) => {
   }, [user?.id, validateTokenWithServer, signOut]); // Add signOut to dependencies
 
   const signIn = useCallback(async (email, password) => {
-    const isProduction = window.location.hostname !== 'localhost';
-    const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
     try {
-      console.log(`${logPrefix} AuthContext signIn called with:`, { 
-        email, 
-        environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT',
-        hostname: window.location.hostname,
-        currentUrl: window.location.href
-      });
-      
       // Call backend API for authentication
       const response = await User.login(email, password);
-      console.log(`${logPrefix} Backend login response:`, response);
-      
+
       // Ensure we have the required response structure
       if (!response || !response.user || !response.access_token) {
-        console.error(`${logPrefix} Invalid server response:`, response);
         throw new Error(`Invalid response from server - missing ${!response ? 'response' : !response.user ? 'user' : 'access_token'}`);
       }
-      
+
       // Create user object with token from Flask backend
       // Admin role is determined only by Supabase database values
       const isAdminUser = response.user.is_admin || response.user.role === 'admin';
-      
+
       const userRole = isAdminUser ? 'admin' : (response.user.role || 'user');
-      
+
       const user = {
         id: response.user.id,
         email: response.user.email,
@@ -244,24 +198,14 @@ export const AuthProvider = ({ children }) => {
         createdAt: new Date().toISOString(),
         lastValidated: new Date().toISOString()
       };
-      
-      console.log(`${logPrefix} Created user object:`, user);
-      
+
       setUser(user);
       localStorage.setItem('mth_user', JSON.stringify(user));
-      
-      console.log(`${logPrefix} User state updated and saved to localStorage`);
-      
+
       return { success: true, user: user };
     } catch (error) {
-      console.error(`${logPrefix} Sign in error:`, {
-        message: error.message,
-        stack: error.stack,
-        environment: isProduction ? 'PRODUCTION' : 'DEVELOPMENT'
-      });
-      
       // No hardcoded admin fallbacks - use Supabase database only
-      
+
       return { success: false, error: error.message || 'Sign in failed' };
     }
   }, []);
@@ -292,34 +236,30 @@ export const AuthProvider = ({ children }) => {
 
   // Function to refresh the user session
   const refreshSession = useCallback(async () => {
-    console.log('🔍 AUTH DEBUG: Refreshing user session...');
     const savedUser = localStorage.getItem('mth_user');
-    
+
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
-        
+
         // Check if we need to refresh
         if (isTokenExpired(userData)) {
-          console.log('🔍 AUTH DEBUG: Token expired, need to re-login');
           signOut();
           return false;
         }
-        
+
         // Update last validated timestamp
         userData.lastValidated = new Date().toISOString();
         localStorage.setItem('mth_user', JSON.stringify(userData));
         setUser(userData);
-        
-        console.log('🔍 AUTH DEBUG: Session refreshed successfully');
+
         return true;
       } catch (error) {
-        console.error('🔍 AUTH DEBUG: Error refreshing session:', error);
         signOut();
         return false;
       }
     }
-    
+
     return false;
   }, [signOut]);
 
@@ -327,7 +267,7 @@ export const AuthProvider = ({ children }) => {
   const debugAuthState = () => {
     const savedUser = localStorage.getItem('mth_user');
     let tokenStatus = 'No token';
-    
+
     if (savedUser) {
       try {
         const userData = JSON.parse(savedUser);
@@ -337,14 +277,7 @@ export const AuthProvider = ({ children }) => {
         tokenStatus = 'Invalid JSON';
       }
     }
-    
-    console.log('🔍 AUTH DEBUG: === AUTH STATE DEBUG ===');
-    console.log('🔍 AUTH DEBUG: React state user:', user);
-    console.log('🔍 AUTH DEBUG: Loading state:', loading);
-    console.log('🔍 AUTH DEBUG: localStorage mth_user:', savedUser ? 'exists' : 'none');
-    console.log('🔍 AUTH DEBUG: Token status:', tokenStatus);
-    console.log('🔍 AUTH DEBUG: Current URL:', window.location.href);
-    console.log('🔍 AUTH DEBUG: ========================');
+
     return { user, loading, savedUser, tokenStatus, currentUrl: window.location.href };
   };
 
@@ -366,12 +299,8 @@ export const AuthProvider = ({ children }) => {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      console.log('🔍 AUTH DEBUG: AuthProvider unmounting, cleaned up intervals');
     };
   }, []);
-
-  // Debug log when auth state changes (reduced frequency)
-  console.log('🔍 AUTH DEBUG: AuthContext value update - user:', user ? `${user.email} (${user.role})` : 'null', 'loading:', loading);
 
   return (
     <AuthContext.Provider value={contextValue}>
