@@ -438,84 +438,6 @@ export default function MyInspections() {
           </div>`;
       }
       
-      // Always use standard template for recommendations
-      const getRecommendationsHtml = () => {
-          console.log("🔍 DEBUG: Using standard template recommendations for report");
-          
-          // Standard template recommendations
-          const standardRecommendations = `<strong>Immediate Actions</strong>
-1. Fix Moisture & Humidity Issues
-Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
-
-2. Avoid Impacted Areas
-Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
-
-<strong>Next Steps</strong>
-1. Consult a Mold Professional
-To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
-
-2. Re-Testing
-After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
-
-<strong>Prevention Tips</strong>
-• Act Quickly on Leaks
-Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
-
-• Monitor Humidity
-Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
-
-• Look for Early Signs
-Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
-
-• Promote Airflow
-Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
-
-• Inspect After Water Events
-After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`;
-
-          // Format the standard recommendations as HTML
-          const lines = standardRecommendations.split('\n');
-          const formattedRecommendations = lines
-              .filter(line => line.trim().length > 0)
-              .map((line, index) => {
-                  const trimmedLine = line.trim();
-                  // Check if line is a main header (no numbers but followed by content)
-                  if ((trimmedLine === '<strong>Immediate Actions</strong>' || trimmedLine === '<strong>Next Steps</strong>' || trimmedLine === '<strong>Prevention Tips</strong>')) {
-                      const extraSpacing = index > 0 ? '<div style="height: 15px;"></div>' : '';
-                      // Extract the text from between strong tags for display
-                      const headerText = trimmedLine.replace(/<\/?strong>/g, '');
-                      return `${extraSpacing}<h4 style="margin: 10px 0 8px 0; font-weight: bold; color: #1e40af; font-size: 16px;">${headerText}</h4>`;
-                  }
-                  // Check if line starts with number (1. 2.)
-                  if (/^\d+\./.test(trimmedLine)) {
-                      return `<h5 style="margin: 12px 0 6px 0; font-weight: bold; color: #374151; font-size: 14px;">${trimmedLine}</h5>`;
-                  }
-                  // Check if line starts with bullet point
-                  if (trimmedLine.startsWith('•')) {
-                      return `<p style="margin: 6px 0 6px 20px; line-height: 1.5; color: #374151;"><strong>${trimmedLine.substring(1).trim().split(' ')[0]}</strong> ${trimmedLine.substring(1).trim().split(' ').slice(1).join(' ')}</p>`;
-                  }
-                  // Regular paragraph
-                  return `<p style="margin: 6px 0; line-height: 1.5; color: #374151;">${trimmedLine}</p>`;
-              })
-              .join('');
-          
-          return `<div style="background: #f8f9fa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px;">
-            <h4 style="color: #1e40af; margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-              📋 Standard Recommendations
-            </h4>
-            ${formattedRecommendations}
-          </div>`;
-        // Standard template already returned above, no need for fallback logic
-      };
-      
-      const recommendationsHtml = getRecommendationsHtml();
-      
-      const recommendationsSection = `<div style="margin-bottom: 20px;">
-        <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-          📋 Recommendations
-        </h3>
-        ${recommendationsHtml}
-      </div>`;
 
       const samplesHtml = samples.length > 0
         ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location}</h4><p>${s.description || 'No description provided.'}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
@@ -602,15 +524,19 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
 
               <div class="page-break"></div>
 
+              ${inspection.conclusion ? `
               <div class="section">
                   <h2>Conclusion</h2>
-                  <p>${inspection.conclusion || 'Pending conclusion.'}</p>
+                  <p>${inspection.conclusion}</p>
               </div>
+              ` : ''}
 
+              ${(inspection.recommendations || inspection.lab_recommendations) ? `
               <div class="section">
                   <h2>Recommendations</h2>
-                  ${recommendationsSection}
+                  <p>${inspection.recommendations || inspection.lab_recommendations}</p>
               </div>
+              ` : ''}
 
               <div class="page-break"></div>
 

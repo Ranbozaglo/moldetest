@@ -666,72 +666,42 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 ${labAnalysisHtml}
             </div>
 
+            ${(inspection.lab_conclusion || inspection.conclusion) ? `
             <div class="section">
                 <h2>Conclusion</h2>
                 <div>
-                  ${
-                    (inspection.lab_conclusion || inspection.conclusion)
-                      ? formatRecommendationsText(inspection.lab_conclusion || inspection.conclusion)
-                          .split('\n')
-                          .filter(line => line.trim().length > 0)
-                          .map(line => {
-                            // Check if line is a section header (words ending with colon)
-                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
-                            }
-                            // Regular line
-                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
-                          })
-                          .join('')
-                      : '<p>Pending conclusion.</p>'
+                  ${formatRecommendationsText(inspection.lab_conclusion || inspection.conclusion)
+                      .split('\n')
+                      .filter(line => line.trim().length > 0)
+                      .map(line => {
+                        // Check if line is a section header (words ending with colon)
+                        if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                          return \`<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">\${line.trim()}</p>\`;
+                        }
+                        // Regular line
+                        return \`<p style="margin: 8px 0; line-height: 1.5; color: #374151;">\${line.trim()}</p>\`;
+                      })
+                      .join('')
                   }
             </div>
+            ` : ''}
 
+                ${(inspection.recommendations || inspection.lab_recommendations) ? `
                 <h2>Recommendations</h2>
                 <div>
-                  ${
-                                `<strong>Immediate Actions</strong>
-1. Fix Moisture & Humidity Issues
-Address any leaks, water intrusion, or ventilation problems as soon as possible. Mold thrives in damp conditions, eliminating the source is the first step toward resolution.
-
-2. Avoid Impacted Areas
-Until the issue is resolved, limit access to areas where mold may be present, especially for individuals with allergies, asthma, or weakened immune systems.
-
-<strong>Next Steps</strong>
-1. Consult a Mold Professional
-To fully understand the extent of the issue, we recommend hiring a certified mold professional. They can perform an on-site inspection, identify hidden growth, and provide a detailed remediation plan tailored to your situation.
-
-2. Re-Testing
-After resolving moisture issues and completing cleanup or remediation, re-testing can verify that mold levels are back to normal and your environment is safe.
-
-<strong>Prevention Tips</strong>
-• Act Quickly on Leaks
-Whether from pipes, AC units, or roofing, repair leaks immediately to prevent moisture buildup.
-
-• Monitor Humidity
-Aim to keep indoor humidity below 50%. Use dehumidifiers or exhaust fans as needed, especially in bathrooms, kitchens, and basements.
-
-• Look for Early Signs
-Watch for discoloration, musty odors, or spots on ceilings and walls, these may indicate hidden issues.
-
-• Promote Airflow
-Open windows when weather allows, use ceiling fans, and keep vents unobstructed to maintain proper circulation.
-
-• Inspect After Water Events
-After flooding or water damage, inspect and dry affected areas promptly, and consider testing again if you're unsure.`
-                          .split('\n')
-                          .filter(line => line.trim().length > 0)
-                          .map(line => {
-                            // Check if line is a section header (words ending with colon)
-                            if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                              return `<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">${line.trim()}</p>`;
-                            }
-                            // Regular line
-                            return `<p style="margin: 8px 0; line-height: 1.5; color: #374151;">${line.trim()}</p>`;
-                          })
-                          .join('')
+                  ${formatRecommendationsText(inspection.recommendations || inspection.lab_recommendations)
+                      .split('\n')
+                      .filter(line => line.trim().length > 0)
+                      .map(line => {
+                        if (line.trim().match(/^[A-Z][^:]*:$/)) {
+                          return \`<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">\${line.trim()}</p>\`;
+                        }
+                        return \`<p style="margin: 8px 0; line-height: 1.5; color: #374151;">\${line.trim()}</p>\`;
+                      })
+                      .join('')
                   }
                 </div>
+            ` : ''}
             </div>
             
             <div class="page-break"></div>
