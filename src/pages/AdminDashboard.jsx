@@ -674,12 +674,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       .split('\n')
                       .filter(line => line.trim().length > 0)
                       .map(line => {
-                        // Check if line is a section header (words ending with colon)
                         if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                          return \`<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">\${line.trim()}</p>\`;
+                          return '<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">' + line.trim() + '</p>';
                         }
-                        // Regular line
-                        return \`<p style="margin: 8px 0; line-height: 1.5; color: #374151;">\${line.trim()}</p>\`;
+                        return '<p style="margin: 8px 0; line-height: 1.5; color: #374151;">' + line.trim() + '</p>';
                       })
                       .join('')
                   }
@@ -694,9 +692,9 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       .filter(line => line.trim().length > 0)
                       .map(line => {
                         if (line.trim().match(/^[A-Z][^:]*:$/)) {
-                          return \`<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">\${line.trim()}</p>\`;
+                          return '<p style="margin: 12px 0 8px 0; line-height: 1.5; color: #1f2937; font-weight: bold; font-size: 14px;">' + line.trim() + '</p>';
                         }
-                        return \`<p style="margin: 8px 0; line-height: 1.5; color: #374151;">\${line.trim()}</p>\`;
+                        return '<p style="margin: 8px 0; line-height: 1.5; color: #374151;">' + line.trim() + '</p>';
                       })
                       .join('')
                   }
