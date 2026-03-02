@@ -377,12 +377,25 @@ export const downloadPDF = async (
             font-weight: 500;
           }
           
-          img { 
-            max-width: 100%; 
-            height: auto; 
-            border-radius: 8px; 
-            border: 1px solid #e2e8f0; 
-            margin: 10px 0; 
+          img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            margin: 10px 0;
+          }
+
+          .lab-analysis-section img {
+            max-width: 100%;
+            max-height: none;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            margin: 0;
+          }
+
+          .lab-analysis-page {
+            padding: 0;
+            margin: 0;
           }
           
           p {

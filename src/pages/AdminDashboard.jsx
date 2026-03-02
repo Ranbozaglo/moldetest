@@ -67,6 +67,8 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .client-info-value { margin-top: 5px; font-size: 16px; }
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
         img { max-width: 350px; max-height: 350px ; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
+        .lab-analysis-section img { max-width: 100%; max-height: none; border: 2px solid #ddd; border-radius: 12px; margin: 0; }
+        .lab-analysis-page { padding: 0; margin: 0; }
         
         /* Mobile-specific improvements */
         @media (max-width: 768px) {
@@ -662,7 +664,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
 
             <div class="page-break"></div>
 
-            <div class="section">
+            <div class="section lab-analysis-page">
                 ${labAnalysisHtml}
             </div>
 
