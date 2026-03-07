@@ -68,7 +68,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
         img { max-width: 350px; max-height: 350px ; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
         .lab-analysis-section img { max-width: 100%; max-height: none; border: 2px solid #ddd; border-radius: 12px; margin: 0; }
-        .lab-analysis-page { padding: 0; margin: 0; }
+        .lab-analysis-page { max-width: 100%; padding: 20px; margin: 0 auto; }
         
         /* Mobile-specific improvements */
         @media (max-width: 768px) {
@@ -94,6 +94,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             .cover-details { padding: 35px; max-width: 85%; }
             .cover-detail-item { font-size: 18px; }
             .report-container { max-width: 800px; padding: 40px; }
+            .lab-analysis-page { max-width: 800px; padding: 40px; }
             .section h2 { font-size: 22px; }
             .disclaimer-box, .limitations-section { padding: 15px; margin: 10px 0; }
             .disclaimer-title, .limitations-title { font-size: 20px; }
@@ -662,12 +663,15 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 ${samplesHtml}
             </div>
 
+        </div>
+
             <div class="page-break"></div>
 
-            <div class="section lab-analysis-page">
+            <div class="lab-analysis-page">
                 ${labAnalysisHtml}
             </div>
 
+        <div class="report-container">
             ${(inspection.lab_conclusion || inspection.conclusion) ? `
             <div class="section">
                 <h2>Conclusion</h2>

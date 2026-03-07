@@ -394,8 +394,9 @@ export const downloadPDF = async (
           }
 
           .lab-analysis-page {
-            padding: 0;
-            margin: 0;
+            max-width: 800px;
+            padding: 20px 40px;
+            margin: 0 auto;
           }
           
           p {
