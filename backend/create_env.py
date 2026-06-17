@@ -11,6 +11,9 @@ def create_env_file():
 # Replace these with your actual Supabase credentials
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key_here
+# Service role key — trusted server-side access that bypasses RLS.
+# Keep this secret: backend ONLY, never expose it to the frontend.
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
 
 # Backend Configuration
 SECRET_KEY=your_secret_key_here

@@ -13,7 +13,7 @@ class FileService:
         try:
             self.supabase: Client = create_client(
                 settings.SUPABASE_URL,
-                settings.SUPABASE_ANON_KEY
+                settings.SUPABASE_DB_KEY
             )
             logger.info("FileService initialized with Supabase client")
         except Exception as e:

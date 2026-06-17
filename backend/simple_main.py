@@ -6,7 +6,7 @@ from datetime import datetime
 import hashlib
 import secrets
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_ANON_KEY, validate_config, validate_ocr_config, GOOGLE_APPLICATION_CREDENTIALS, OPENAI_API_KEY, OCR_SUPPORTED_LANGUAGES
+from config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_KEY, validate_config, validate_ocr_config, GOOGLE_APPLICATION_CREDENTIALS, OPENAI_API_KEY, OCR_SUPPORTED_LANGUAGES
 import uuid
 from werkzeug.utils import secure_filename
 import mimetypes
@@ -370,9 +370,13 @@ else:
 
 # Initialize Supabase client
 try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    
-    print("🔍 Using anon key for Supabase client")
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_DB_KEY)
+
+    if SUPABASE_SERVICE_ROLE_KEY:
+        print("🔐 Using service_role key for Supabase client (bypasses RLS)")
+    else:
+        print("⚠️ SUPABASE_SERVICE_ROLE_KEY not set — falling back to anon key. "
+              "RLS-protected tables will be inaccessible to the backend.")
     
     # Test connection to public schema
     print("🔍 Testing connection to public schema...")

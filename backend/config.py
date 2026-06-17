@@ -17,6 +17,12 @@ else:
 # Supabase Configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL', 'your_supabase_url_here')
 SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY', 'your_supabase_anon_key_here')
+# Service role key for trusted server-side access. This key bypasses RLS, so it
+# must ONLY ever live in the backend environment and never be sent to the frontend.
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
+# Key the backend uses for its Supabase client: prefer service_role (bypasses RLS
+# so the app keeps working once RLS is enabled), fall back to anon for local dev.
+SUPABASE_DB_KEY = SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY
 
 # Backend Configuration
 SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key_here')

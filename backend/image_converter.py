@@ -17,10 +17,12 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Initialize Supabase client
+# Initialize Supabase client.
+# Prefer the service_role key (bypasses RLS so this maintenance script keeps
+# working after RLS is enabled); fall back to the anon key for local use.
 SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_ANON_KEY = os.getenv('SUPABASE_ANON_KEY')
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+SUPABASE_DB_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_ANON_KEY')
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_DB_KEY)
 
 class ImageConverter:
     def __init__(self):
