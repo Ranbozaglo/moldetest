@@ -3,8 +3,13 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // Strip all console.* calls and debugger statements from production builds
+  // only. Logs stay intact during local development (`mode !== 'production'`).
+  esbuild: {
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
   server: {
     allowedHosts: true
   },
@@ -21,4 +26,4 @@ export default defineConfig({
       },
     },
   },
-}) 
+}))
