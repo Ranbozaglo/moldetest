@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MoldInspection, AsbestosInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { ProcessLabImageWithOCR, InvokeLLM } from "@/api/integrations";
-import { uploadLabImage, deleteLabImage } from '@/lib/labAnalysis.jsx';
+import { uploadLabImage, deleteLabImage, isLabPdfFile, isLabImageFile, isAllowedLabFile, isLabPdfUrl } from '@/lib/labAnalysis.jsx';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -387,25 +387,25 @@ export default function InspectionDetails() {
         setUploadedCount(i + 1);
         setUploadProgress(((i + 1) / files.length) * 100);
         
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-          console.warn(`Skipping non-image file: ${file.name}`);
-          skippedFiles.push({ file: file.name, reason: 'Not an image file' });
+        // Validate file type (PDF preferred; images still supported for older workflows)
+        if (!isAllowedLabFile(file)) {
+          console.warn(`Skipping unsupported file: ${file.name}`);
+          skippedFiles.push({ file: file.name, reason: 'Not a PDF or image file' });
           continue;
         }
 
-        // Validate file size (max 10MB)
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        // Validate file size (max 20MB)
+        const maxSize = 20 * 1024 * 1024; // 20MB
         if (file.size > maxSize) {
           console.warn(`File too large: ${file.name} (${file.size} bytes)`);
-          skippedFiles.push({ file: file.name, reason: 'File too large (max 10MB)' });
+          skippedFiles.push({ file: file.name, reason: 'File too large (max 20MB)' });
           continue;
         }
 
         console.log(`🔍 DEBUG: Uploading file ${i + 1}/${files.length}: ${file.name}`);
         
         try {
-          // Upload lab analysis image
+          // Upload lab analysis file (PDF or image)
           const uploadResult = await uploadLabImage(file, inspectionId);
         console.log("🔍 DEBUG: Upload result:", uploadResult);
         
@@ -415,19 +415,20 @@ export default function InspectionDetails() {
               filename: file.name,
               file_url: uploadResult.url,
               file_path: uploadResult.path,
-              bucket: 'mold-images'
+              bucket: 'mold-images',
+              is_pdf: isLabPdfFile(file)
             };
             uploadedFiles.push(newImage);
 
-            // Update inspection state with new image immediately
+            // Update inspection state with new file immediately
             setInspection(prev => ({
               ...prev,
               lab_analysis_images: [...(prev.lab_analysis_images || []), uploadResult.url]
             }));
             
-            // Only process with OCR and OpenAI for mold inspections
-            if (inspectionType !== 'asbestos') {
-              // Step 2: Process uploaded file with OCR
+            // OCR works on images only. PDFs are stored/displayed as-is.
+            if (inspectionType !== 'asbestos' && isLabImageFile(file)) {
+              // Step 2: Process uploaded image with OCR
               console.log(`📡 OCR: Making Google Vision API call for uploaded file: ${file.name}`);
               const ocrResult = await ProcessLabImageWithOCR(file);
               console.log("🔍 DEBUG: OCR processing result:", ocrResult);
@@ -438,7 +439,7 @@ export default function InspectionDetails() {
                 const extractedText = ocrResult.extracted_text;
                 processedFiles.push({
                   filename: file.name,
-                  file_url: uploadResult.file_url,
+                  file_url: uploadResult.url,
                   extracted_text: extractedText,
                   confidence: ocrResult.confidence
                 });
@@ -454,12 +455,14 @@ export default function InspectionDetails() {
                   reason: `Google Vision API failed: ${errorMessage}` 
                 });
               }
+            } else if (inspectionType !== 'asbestos' && isLabPdfFile(file)) {
+              console.log(`📄 PDF uploaded (${file.name}) — skipping OCR; enter conclusion/recommendations manually or use Analyze.`);
             }
           } else {
-            console.error(`❌ UPLOAD: Failed to upload ${file.name} to lab-analysis bucket`);
+            console.error(`❌ UPLOAD: Failed to upload ${file.name}`);
             skippedFiles.push({ 
               file: file.name, 
-              reason: 'Upload to lab-analysis bucket failed' 
+              reason: 'Upload failed' 
             });
           }
         } catch (error) {
@@ -478,10 +481,21 @@ export default function InspectionDetails() {
         alert(`${skippedFiles.length} file(s) were skipped:\n\n${skippedMessage}\n\n${processedFiles.length} file(s) were processed with OCR.`);
       }
       
-      // Only check processed files for mold inspections
+      // Only check processed files for mold inspections that need OCR
       if (inspectionType !== 'asbestos') {
-        if (processedFiles.length === 0) {
-          throw new Error('No files could be processed with OCR. No analysis will be generated.');
+        if (processedFiles.length === 0 && uploadedFiles.length === 0) {
+          throw new Error('No files could be uploaded. No analysis will be generated.');
+        }
+        if (processedFiles.length === 0 && uploadedFiles.length > 0) {
+          // PDF (or failed OCR) uploads still succeed — save files without auto AI analysis
+          const labImageUrls = uploadedFiles.map(file => file.file_url);
+          const updateEntity = MoldInspection;
+          await updateEntity.update(inspectionId, {
+            lab_analysis_images: labImageUrls
+          });
+          await loadInspectionData();
+          alert(`Successfully uploaded ${uploadedFiles.length} lab analysis file(s).\n\nPDF files are not OCR'd automatically — enter or edit the Conclusion and Recommendations below, then save.`);
+          return;
         }
         console.log(`✅ UPLOAD & OCR PROCESSING: ${processedFiles.length} out of ${files.length} files processed successfully`);
       } else {
@@ -666,10 +680,10 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
             // Reload inspection data to refresh UI
             await loadInspectionData();
             
-            alert(`Successfully uploaded ${totalUploaded} lab analysis image(s).`);
+            alert(`Successfully uploaded ${totalUploaded} lab analysis file(s).`);
           } catch (dbError) {
-            console.error("❌ Failed to update database with lab images:", dbError);
-            alert("Images uploaded but failed to save to database. Please try again.");
+            console.error("❌ Failed to update database with lab files:", dbError);
+            alert("Files uploaded but failed to save to database. Please try again.");
             throw dbError;
           }
         }
@@ -687,8 +701,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
       }
       
     } catch (error) {
-      console.error("❌ Error in lab image upload process:", error);
-      alert(`Failed to upload ${inspectionType === 'asbestos' ? 'asbestos lab analysis' : 'lab analysis'} images: ${error.message}`);
+      console.error("❌ Error in lab file upload process:", error);
+      alert(`Failed to upload ${inspectionType === 'asbestos' ? 'asbestos lab analysis' : 'lab analysis'} files: ${error.message}`);
     } finally {
       setUploadingImage(false);
       setProcessingImages(false);
@@ -1986,24 +2000,24 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
+                <FileText className="w-5 h-5" />
                 {inspectionType === 'asbestos' ? 'Laboratory Analysis' : 'Lab Analysis'}
               </CardTitle>
               <CardDescription>
                 {inspectionType === 'asbestos' 
-                  ? 'Upload and analyze laboratory asbestos test results'
-                  : 'Upload and analyze laboratory mold test results'
+                  ? 'Upload laboratory asbestos test results as a PDF'
+                  : 'Upload laboratory mold test results as a PDF'
                 }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               
-              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0 || (inspectionType !== 'asbestos' && (!inspection.lab_conclusion || !inspection.lab_recommendations))) ? (
+              {(!inspection.lab_analysis_images || inspection.lab_analysis_images.length === 0) ? (
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-                  {console.log("🔍 DEBUG: No lab analysis images found, showing upload section")}
+                  {console.log("🔍 DEBUG: No lab analysis files found, showing upload section")}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="application/pdf,.pdf,image/*"
                     multiple
                     onChange={handleLabImageUpload}
                     className="hidden"
@@ -2015,8 +2029,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                       {uploadingImage ? (
                         <>
                           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                          <p className="text-blue-600 font-medium text-lg">Uploading Images...</p>
-                          <p className="text-slate-500 text-sm mt-2">Please wait while we upload and process your images</p>
+                          <p className="text-blue-600 font-medium text-lg">Uploading Files...</p>
+                          <p className="text-slate-500 text-sm mt-2">Please wait while we upload and process your files</p>
                           <div className="mt-4 w-full max-w-xs">
                             <div className="bg-slate-200 rounded-full h-2">
                               <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: `${uploadProgress}%`}}></div>
@@ -2030,24 +2044,15 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         <>
                           <Upload className="w-12 h-12 text-slate-400 mb-4" />
                           <p className="text-slate-600 font-medium text-lg">
-                            {inspectionType === 'asbestos' ? 'Upload Asbestos Lab Analysis Images' : 'Upload Lab Analysis Images'}
+                            {inspectionType === 'asbestos' ? 'Upload Asbestos Lab Analysis PDF' : 'Upload Lab Analysis PDF'}
                           </p>
                           <p className="text-slate-500 text-sm mt-2">
-                            {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? (
-                              <span className="text-orange-600">
-                                {inspectionType === 'asbestos' 
-                                  ? 'Images uploaded successfully. You can upload more images if needed.'
-                                  : 'Images uploaded. Please click "Analyze with AI" to generate the report and view images.'
-                                }
-                              </span>
-                            ) : (
-                              inspectionType === 'asbestos'
-                              ? 'Click to select one or more images of the asbestos lab analysis results'
-                              : 'Click to select one or more images of the lab analysis results'
-                            )}
+                              {inspectionType === 'asbestos'
+                              ? 'Click to select the asbestos lab analysis PDF'
+                              : 'Click to select the lab analysis PDF (screenshots/images still accepted)'}
                           </p>
                           <p className="text-slate-400 text-xs mt-2">
-                            Supports: JPEG, PNG, GIF • Max size: 10MB per image
+                            Supports: PDF, JPEG, PNG, GIF • Max size: 20MB per file
                           </p>
                         </>
                       )}
@@ -2056,16 +2061,39 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {console.log("🔍 DEBUG: Lab analysis images found:", inspection.lab_analysis_images)}
+                  {console.log("🔍 DEBUG: Lab analysis files found:", inspection.lab_analysis_images)}
                   <div className="bg-slate-50 rounded-lg p-4">
                     <Label className="text-slate-600 font-medium">
-                      Lab Analysis Images ({inspection.lab_analysis_images.length})
+                      Lab Analysis Files ({inspection.lab_analysis_images.length})
                     </Label>
                     
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="mt-3 grid grid-cols-1 gap-4">
                       {inspection.lab_analysis_images.map((imageUrl, index) => (
                         <div key={index} className="relative group">
-                          {!labImageErrors[index] ? (
+                          {isLabPdfUrl(imageUrl) ? (
+                            <div className="relative rounded-lg border-2 border-slate-200 bg-white overflow-hidden">
+                              <div className="flex items-center justify-between gap-2 p-3 border-b border-slate-200 bg-slate-50">
+                                <div className="flex items-center gap-2 text-sm text-slate-700 min-w-0">
+                                  <FileText className="w-4 h-4 text-red-600 shrink-0" />
+                                  <span className="truncate font-medium">Lab Analysis PDF {index + 1}</span>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => window.open(imageUrl, '_blank', 'noopener,noreferrer')}
+                                  className="shrink-0"
+                                >
+                                  Open full page
+                                </Button>
+                              </div>
+                              <iframe
+                                src={`${imageUrl}#toolbar=1&navpanes=0&view=FitH`}
+                                title={`Lab Analysis PDF ${index + 1}`}
+                                className="w-full bg-white"
+                                style={{ height: '80vh', minHeight: '720px' }}
+                              />
+                            </div>
+                          ) : !labImageErrors[index] ? (
                            <div className="relative aspect-square">
                           <img
                             src={imageUrl}
@@ -2093,14 +2121,16 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                             <div className="w-full h-48 bg-slate-100 rounded-lg border-2 border-slate-200 flex items-center justify-center">
                             <div className="text-center">
                               <ImageOff className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                              <p className="text-slate-500 text-sm">Image failed to load</p>
-                                <p className="text-slate-400 text-xs mt-1">Image {index + 1}</p>
+                              <p className="text-slate-500 text-sm">File failed to load</p>
+                                <p className="text-slate-400 text-xs mt-1">File {index + 1}</p>
                             </div>
                           </div>
                           )}
                           
-                          {/* Image overlay with zoom icon */}
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center">
+                          {/* Overlay / badge only for images */}
+                          {!isLabPdfUrl(imageUrl) && (
+                            <>
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg flex items-center justify-center pointer-events-none">
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                               <div className="bg-white bg-opacity-90 rounded-full p-2">
                                 <ZoomIn className="w-5 h-5 text-slate-700" />
@@ -2108,24 +2138,30 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                             </div>
                           </div>
                           
-                          {/* Image info badge */}
                           <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                             Image {index + 1}
                           </div>
+                            </>
+                          )}
+                          {isLabPdfUrl(imageUrl) && (
+                            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                              PDF {index + 1}
+                            </div>
+                          )}
                           
-                          {/* Remove button for individual image */}
+                          {/* Remove button for individual file */}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm(`Are you sure you want to remove lab analysis image ${index + 1}?`)) {
+                              if (confirm(`Are you sure you want to remove lab analysis file ${index + 1}?`)) {
                                 const imageUrl = inspection.lab_analysis_images[index];
                                 const updatedImages = inspection.lab_analysis_images.filter((_, i) => i !== index);
-                                console.log("🔍 DEBUG: Removing image at index:", index);
-                                console.log("🔍 DEBUG: Updated images:", updatedImages);
+                                console.log("🔍 DEBUG: Removing file at index:", index);
+                                console.log("🔍 DEBUG: Updated files:", updatedImages);
                                 
-                                // If this was the last image, also clear the conclusion and recommendations
+                                // If this was the last file, also clear the conclusion and recommendations
                                 const shouldClearAnalysis = updatedImages.length === 0;
                                 
                                 const updateData = {
@@ -2135,7 +2171,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                 if (shouldClearAnalysis) {
                                   updateData.lab_conclusion = "";
                                   updateData.lab_recommendations = "";
-                                  console.log("🔍 DEBUG: Clearing analysis fields since no images remain");
+                                  console.log("🔍 DEBUG: Clearing analysis fields since no files remain");
                                 }
                                 
                                 // Update UI immediately
@@ -2153,18 +2189,18 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                 
                                 Promise.all([
                                   deleteLabImage(imageUrl).catch(error => {
-                                    console.error("❌ Failed to delete image from storage:", error);
+                                    console.error("❌ Failed to delete file from storage:", error);
                                   }),
                                   updateEntity.update(inspectionId, updateData)
                                 ]).then(() => {
                                   loadInspectionData();
                                 }).catch((error) => {
-                                  console.error("❌ Error removing image:", error);
-                                  alert("Failed to remove image. Please try again.");
+                                  console.error("❌ Error removing file:", error);
+                                  alert("Failed to remove file. Please try again.");
                                 });
                               }
                             }}
-                            className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-red-600 hover:text-red-700"
+                            className="absolute top-2 right-2 bg-white bg-opacity-90 hover:bg-opacity-100 text-red-600 hover:text-red-700 z-10"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -2172,7 +2208,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                       ))}
                     </div>
                     
-                    <div className="flex gap-2 mt-3">
+                    <div className="flex gap-2 mt-3 flex-wrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -2181,7 +2217,7 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                         className="flex items-center gap-2"
                       >
                         <Upload className="w-4 h-4" />
-                        Add More Images
+                        Add More Files
                       </Button>
                       
                       {inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 && (
@@ -2190,9 +2226,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                           size="sm"
                           onClick={async () => {
                             console.log("🔥 SIMPLE BUTTON CLICKED!");
-                            console.log("🔍 Available images:", inspection.lab_analysis_images);
+                            console.log("🔍 Available files:", inspection.lab_analysis_images);
                             
-                            if (confirm('Generate AI analysis for the lab images?')) {
+                            if (confirm('Generate AI analysis for the lab files?')) {
                               console.log("✅ User confirmed, starting simple analysis...");
                               setGeneratingAnalysis(true);
                               
@@ -2214,7 +2250,7 @@ Building Risk Factors:
 - Square Footage: ${inspection.square_footage || 'Not specified'}
 
 Professional assessment is required to confirm asbestos content and determine appropriate management or remediation strategies.`
-                                   : `Lab analysis results for ${inspection.street_address}: Based on the uploaded images, professional review required. Please examine the lab results and update this conclusion with specific findings.`;
+                                   : `Lab analysis results for ${inspection.street_address}: Based on the uploaded lab PDF/files, professional review required. Please examine the lab results and update this conclusion with specific findings.`;
                                    
                                  const newRecommendations = inspectionType === 'asbestos'
                                    ? `Immediate Actions Required:
@@ -2289,8 +2325,8 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          if (confirm('Are you sure you want to remove all lab analysis images?')) {
-                            console.log("🔍 DEBUG: Removing all lab analysis images for inspection ID:", inspectionId);
+                          if (confirm('Are you sure you want to remove all lab analysis files?')) {
+                            console.log("🔍 DEBUG: Removing all lab analysis files for inspection ID:", inspectionId);
                             const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
                             updateEntity.update(inspectionId, {
                               lab_analysis_images: [],
@@ -2299,8 +2335,8 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                             }).then(() => {
                               loadInspectionData();
                             }).catch((error) => {
-                              console.error("❌ Error removing all images:", error);
-                              alert("Failed to remove all images. Please try again.");
+                              console.error("❌ Error removing all files:", error);
+                              alert("Failed to remove all files. Please try again.");
                             });
                           }
                         }}
@@ -2314,7 +2350,7 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                   
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="application/pdf,.pdf,image/*"
                     multiple
                     onChange={handleLabImageUpload}
                     className="hidden"
@@ -2346,11 +2382,11 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                   <div className="flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-600" />
                     <span className="text-green-800 font-medium">
-                      {inspection.lab_analysis_images.length} {inspectionType === 'asbestos' ? 'asbestos lab analysis' : 'lab analysis'} image(s) uploaded successfully
+                      {inspection.lab_analysis_images.length} {inspectionType === 'asbestos' ? 'asbestos lab analysis' : 'lab analysis'} file(s) uploaded successfully
                     </span>
                   </div>
                   <p className="text-green-700 text-sm mt-1">
-                    The images have been processed and are ready for analysis. Click on any image to view it in full size.
+                    Lab files are ready. Open a PDF to view it, or review the conclusion and recommendations below.
                   </p>
                 </div>
               )}

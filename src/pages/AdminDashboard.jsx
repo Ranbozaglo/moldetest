@@ -20,6 +20,7 @@ import EmailTemplateManager from "@/components/EmailTemplateManager";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 import { usePopup } from "@/components/ui/popup";
+import { buildLabAnalysisFilesHtml, buildLabAnalysisIntroHtml } from "@/lib/labAnalysis.jsx";
 
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
@@ -341,13 +342,19 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       </h2>
                       ${inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? `
                         <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 25px;">
-                          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
-                            ${inspection.lab_analysis_images.map((image, index) => `
-                              <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                          <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                            ${inspection.lab_analysis_images.map((image, index) => {
+                              const isPdf = typeof image === 'string' && image.split('?')[0].toLowerCase().endsWith('.pdf');
+                              return isPdf
+                                ? `<div style="page-break-before: always; break-before: page; background: white; padding: 0; margin: 0;">
+                                <h3 style="color: #1e40af; font-weight: 600; margin: 0 0 12px 0;">Lab Analysis PDF ${index + 1}</h3>
+                                <iframe src="${image}#toolbar=1&navpanes=0&view=FitH" title="Lab Analysis PDF ${index + 1}" style="width: 100%; height: 100vh; min-height: 1000px; border: 1px solid #e2e8f0; border-radius: 8px;"></iframe>
+                              </div>`
+                                : `<div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
                                 <img src="${image}" alt="Lab Analysis ${index + 1}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px;" />
                                 <p style="color: #1e40af; font-weight: 600; margin: 0;">Lab Analysis Result ${index + 1}</p>
-                              </div>
-                            `).join('')}
+                              </div>`;
+                            }).join('')}
                           </div>
                         </div>
                       ` : `
@@ -597,22 +604,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location || 'N/A'}</h4><p>${s.description || ''}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
       : '<p>No samples were documented for this inspection.</p>';
       
-    const labAnalysisHtml = inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0
-        ? `<div class="lab-analysis-section">
-            <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
-            <div style="text-align: center; margin: 20px 0;">
-              ${inspection.lab_analysis_images.map((imageUrl, index) => `
-                <div style="margin-bottom: 20px;">
-                  <img src="${imageUrl}" alt="Lab Analysis Results ${index + 1}" style="max-width: 100%; height: 100%; border: 2px solid #ddd; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
-                  <p style="color: #666; font-size: 14px; margin-top: 10px; font-style: italic;">Laboratory mold analysis report ${inspection.lab_analysis_images.length > 1 ? `- Image ${index + 1}` : ''}</p>
-                </div>
-              `).join('')}
-            </div>
-          </div>`
-        : `<div class="lab-analysis-section">
-            <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
-            <p style="color: #666; font-style: italic;">Lab analysis results have not been uploaded yet.</p>
-          </div>`;
+    const labAnalysisHtml = buildLabAnalysisFilesHtml(inspection.lab_analysis_images);
+    const labAnalysisIntroHtml = buildLabAnalysisIntroHtml(
+      Array.isArray(inspection.lab_analysis_images) && inspection.lab_analysis_images.length > 0
+    );
 
     return `
     <!DOCTYPE html>
@@ -665,12 +660,6 @@ export const generateReportHtmlContent = async (inspection, samples) => {
 
         </div>
 
-            <div class="page-break"></div>
-
-            <div class="lab-analysis-page">
-                ${labAnalysisHtml}
-            </div>
-
         <div class="report-container">
             ${(inspection.lab_conclusion || inspection.conclusion) ? `
             <div class="section">
@@ -687,10 +676,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       })
                       .join('')
                   }
+                </div>
             </div>
             ` : ''}
 
-                ${(inspection.recommendations || inspection.lab_recommendations) ? `
+            ${(inspection.recommendations || inspection.lab_recommendations) ? `
+            <div class="section">
                 <h2>Recommendations</h2>
                 <div>
                   ${formatRecommendationsText(inspection.recommendations || inspection.lab_recommendations)
@@ -705,10 +696,13 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                       .join('')
                   }
                 </div>
-            ` : ''}
             </div>
-            
-            <div class="page-break"></div>
+            ` : ''}
+
+            ${labAnalysisIntroHtml}
+            <div class="lab-analysis-page">
+                ${labAnalysisHtml}
+            </div>
             
             <div class="limitations-section">
                 <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
