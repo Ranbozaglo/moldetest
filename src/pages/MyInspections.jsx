@@ -233,27 +233,48 @@ export default function MyInspections() {
       console.log("🔍 DEBUG: - Lab analysis images:", detailedInspection.lab_analysis_images);
       console.log("🔍 DEBUG: - Samples count:", samples.length);
       
-      const disclaimerText = "The Total Testing DIY Mold Test Kit is intended as a preliminary screening tool to help individuals identify the possible presence of mold in their environment. It is not a substitute for a licensed mold assessment, professional inspection, or full indoor air quality evaluation as defined by state or federal regulations. This service is designed to provide basic laboratory analysis and a summary report based on surface sampling. The results and interpretations are intended for informational purposes only and do not constitute legal, environmental, or medical advice. If elevated mold levels are detected, or if there are known health concerns, water damage, or visible mold growth, we strongly recommend a licensed mold assessment by a certified professional in accordance with your state's regulations. By purchasing and using this kit, the user acknowledges and agrees that Total Testing is not liable for decisions made based on this preliminary testing, and that the DIY kit is best used as an initial 'first-aid' tool to gain awareness and guide next steps.";
-      const limitationsText = "This report is based on a Do-It-Yourself (DIY) mold surface testing kit and is subject to certain inherent limitations. Results reflect conditions only at the specific locations and times the samples were collected. Mold presence can vary with environmental changes and may not be uniform throughout the property. This testing method does not detect airborne mold spores, mold hidden within walls or inaccessible areas, or other indoor air quality concerns. Therefore, this report should be considered a preliminary screening tool, not a substitute for a licensed mold assessment or comprehensive indoor environmental inspection. If health concerns persist, or if visible mold, water damage, or elevated moisture is suspected, we strongly recommend consulting a licensed mold professional.";
+      const disclaimerHtml = [
+        'The Total Testing DIY Mold Test Kit is intended solely as a preliminary screening tool to help identify the possible presence of mold on sampled surfaces. It is designed to provide an initial understanding of potential mold contamination and should not be considered a substitute for a comprehensive mold assessment performed by a licensed mold professional.',
+        'This service includes laboratory analysis of user-collected surface samples and a summary report based solely on the samples submitted. Results are limited to the specific areas tested and should not be interpreted as an evaluation of the entire property, indoor air quality, or the absence of mold in untested areas.',
+        'The information provided is for educational and informational purposes only and does not constitute medical, environmental, legal, or professional advice. Laboratory findings should always be interpreted within the context of the property\'s history, moisture conditions, visible observations, and other relevant factors.',
+        'If the results indicate elevated mold growth, if visible mold, water damage, musty odors, or ongoing moisture issues are present, or if occupants are experiencing health concerns that may be related to indoor environmental conditions, Total Testing strongly recommends obtaining a comprehensive inspection from a licensed mold assessment professional in accordance with applicable state and local regulations.',
+        'By purchasing and using this kit, you acknowledge that the Total Testing DIY Mold Test Kit is intended as a first-step screening tool only. Total Testing makes no representation that this kit will identify all mold conditions or hidden contamination within a property. Users are solely responsible for any decisions or actions taken based on the results, and Total Testing shall not be liable for any direct, indirect, incidental, or consequential damages arising from the use of this kit, the interpretation of its results, or any actions taken in reliance upon the information provided.'
+      ].map((paragraph) => `<p class="disclaimer-text">${paragraph}</p>`).join('');
+      const limitationsHtml = [
+        'This report is based on laboratory analysis of user-collected surface samples submitted through the Total Testing DIY Mold Test Kit. The findings represent only the specific surfaces sampled and the conditions present at the time the samples were collected.',
+        'Because sample collection is performed by the user, the accuracy and reliability of the results depend on proper sample collection, handling, labeling, and submission. Areas that were not sampled have not been evaluated and may contain mold growth or other environmental conditions that are not reflected in this report.',
+        'Surface sampling is intended to identify mold present on the sampled material only. It does not evaluate airborne mold spore concentrations, concealed mold growth within walls, ceilings, flooring, HVAC systems, or other inaccessible building components. In addition, this testing does not assess the source of moisture, determine the extent of contamination, evaluate indoor air quality, or identify all conditions that may contribute to mold growth.',
+        'Mold conditions can change over time due to water intrusion, humidity, ventilation, cleaning, or remediation activities. Accordingly, the results of this report are valid only for the conditions that existed at the time the samples were collected.',
+        'This report should be considered a preliminary screening tool and not a substitute for a comprehensive inspection performed by a licensed mold assessment professional. If elevated mold is identified, if visible mold, musty odors, water damage, or excessive moisture are present, or if occupants are experiencing health concerns that may be associated with the indoor environment, Total Testing recommends obtaining a comprehensive mold assessment by a licensed professional in accordance with applicable state and local regulations.'
+      ].map((paragraph) => `<p class="limitations-text">${paragraph}</p>`).join('');
 
       const css = `
           body { font-family: 'Arial', sans-serif; margin: 0; padding: 0; background-color: #ffffff; color: #333; line-height: 1.6; }
           .page-break { page-break-after: always; }
-          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 30px 20px; }
-          .cover-title { font-size: 32px; font-weight: bold; color: #004aac; margin-top: 20px; margin-bottom: 30px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-          .cover-image { max-width: 100%; max-height: 600px; height: auto; border-radius: 20px; margin: 30px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.2); border: 4px solid white; object-fit: contain; }
-          .cover-details { background: rgba(255,255,255,0.95); padding: 25px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); max-width: 90%; width: 100%; }
-          .cover-detail-item { margin: 10px 0; font-size: 16px; }
+          .report-page { page-break-after: always; break-after: page; }
+          .disclaimer-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: stretch; padding: 40px 24px; }
+          .disclaimer-page .disclaimer-box { margin: 0; width: 100%; }
+          .client-info-page { page-break-after: always; break-after: page; }
+          .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 36px 24px 56px; gap: 24px; page-break-after: always; break-after: page; }
+          .cover-title { font-size: 34px; font-weight: bold; color: #004aac; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); line-height: 1.25; max-width: 720px; }
+          .cover-image { max-width: min(640px, 94vw); max-height: 520px; width: auto; height: auto; border-radius: 16px; margin: 0; box-shadow: 0 10px 28px rgba(0,0,0,0.18); border: 3px solid white; object-fit: contain; }
+          .cover-details { background: rgba(255,255,255,0.95); padding: 22px 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 520px; width: 100%; margin-top: auto; margin-bottom: 48px; }
+          .cover-detail-item { margin: 10px 0; font-size: 16px; line-height: 1.45; }
           .cover-detail-label { font-weight: bold; color: #004aac; }
           .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; } 
           .section { margin-bottom: 25px; }
-          .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; }
+          .keep-together { page-break-inside: avoid; break-inside: avoid-page; display: block; }
+          .sample-block { page-break-inside: avoid; break-inside: avoid-page; margin-bottom: 24px; }
+          .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; page-break-after: avoid; break-after: avoid-page; }
+          .section h2.report-section-title, .report-section-title { color: #004aac; font-size: 28px; font-weight: bold; margin: 0 0 16px 0; padding-bottom: 0; border-bottom: none; text-align: center; page-break-after: avoid; break-after: avoid-page; page-break-inside: avoid; break-inside: avoid-page; }
           .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
           .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
-          .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; }
+          .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
+          .disclaimer-text:last-child { margin-bottom: 0; }
           .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
           .limitations-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
-          .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; }
+          .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
+          .limitations-text:last-child { margin-bottom: 0; }
           .client-info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin: 20px 0; }
           .client-info-item { padding: 10px; background: #f8f9fa; border-radius: 5px; }
           .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
@@ -267,6 +288,25 @@ export default function MyInspections() {
               margin: 0.3in 1in 0.3in 1in;
               size: A4;
             }
+            
+            .cover-page {
+              min-height: 100vh !important;
+              height: 100vh !important;
+              page-break-after: always;
+              break-after: page;
+              padding: 28px 24px 40px !important;
+              gap: 24px !important;
+              justify-content: flex-start !important;
+            }
+            .disclaimer-page {
+              min-height: auto !important;
+              padding: 24px !important;
+            }
+            .report-page { page-break-after: always !important; break-after: page !important; }
+            .cover-title { font-size: 34px !important; margin: 0 !important; }
+            .cover-image { max-width: 620px !important; max-height: 500px !important; margin: 0 !important; }
+            .cover-details { padding: 20px 24px !important; max-width: 520px !important; margin-top: auto !important; margin-bottom: 40px !important; }
+            .cover-detail-item { font-size: 15px !important; margin: 8px 0 !important; }
             
             body {
               margin: 0 !important;
@@ -282,12 +322,13 @@ export default function MyInspections() {
           
           /* Mobile-specific improvements */
           @media (max-width: 768px) {
-              .cover-title { font-size: 26px; margin-top: 15px; margin-bottom: 25px; }
-              .cover-page { padding: 25px 15px; }
-              .cover-image { max-width: 100%; max-height: 450px; margin: 25px 0; }
-              .cover-details { padding: 20px; max-width: 95%; }
-              .cover-detail-item { font-size: 14px; }
+              .cover-title { font-size: 28px; }
+              .cover-page { padding: 28px 16px; gap: 20px; }
+              .cover-image { max-width: min(480px, 94vw); max-height: 380px; }
+              .cover-details { padding: 18px 20px; max-width: 95%; margin-top: auto; margin-bottom: 32px; }
+              .cover-detail-item { font-size: 15px; }
               .report-container { padding: 15px; }
+              .section h2.report-section-title, .report-section-title { font-size: 28px; border-bottom: none; padding-bottom: 0; text-align: center; }
               .section h2 { font-size: 18px; }
               .disclaimer-box, .limitations-section { padding: 15px; }
               .disclaimer-title, .limitations-title { font-size: 16px; }
@@ -298,12 +339,13 @@ export default function MyInspections() {
           }
           
           @media (min-width: 769px) {
-              .cover-title { font-size: 52px; margin-top: 30px; margin-bottom: 40px; }
-              .cover-page { padding: 50px; }
-              .cover-image { max-width: 100%; max-height: 700px; margin: 40px 0; }
-              .cover-details { padding: 35px; max-width: 85%; }
-              .cover-detail-item { font-size: 18px; }
+              .cover-title { font-size: 40px; }
+              .cover-page { padding: 44px 40px; gap: 28px; }
+              .cover-image { max-width: 660px; max-height: 540px; }
+              .cover-details { padding: 24px 32px; max-width: 560px; margin-top: auto; margin-bottom: 48px; }
+              .cover-detail-item { font-size: 17px; }
               .report-container { max-width: 800px; padding: 40px; }
+              .section h2.report-section-title, .report-section-title { font-size: 28px; border-bottom: none; padding-bottom: 0; text-align: center; }
               .section h2 { font-size: 22px; }
               .disclaimer-box, .limitations-section { padding: 25px; }
               .disclaimer-title, .limitations-title { font-size: 20px; }
@@ -340,7 +382,7 @@ export default function MyInspections() {
               ⚠️ Visible Mold Detected
             </h3>
             ${detailedInspection.visible_mold_details.map((d, i) => `
-              <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div class="keep-together" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
                   ${createPriorityBadge('high', 'High Priority')}
@@ -352,7 +394,7 @@ export default function MyInspections() {
               </div>
             `).join('')}
           </div>`
-        : `<div style="margin-bottom: 20px;">
+        : `<div class="keep-together" style="margin-bottom: 20px;">
             <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
               ✅ No Visible Mold Detected
             </h3>
@@ -365,7 +407,7 @@ export default function MyInspections() {
               💧 Water Damage Detected
             </h3>
             ${detailedInspection.water_damage_details.map((d, i) => `
-              <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div class="keep-together" style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
                   ${createPriorityBadge('medium', 'Medium Priority')}
@@ -377,7 +419,7 @@ export default function MyInspections() {
               </div>
             `).join('')}
           </div>`
-        : `<div style="margin-bottom: 20px;">
+        : `<div class="keep-together" style="margin-bottom: 20px;">
             <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
               ✅ No Water Damage Detected
             </h3>
@@ -441,7 +483,11 @@ export default function MyInspections() {
       
 
       const samplesHtml = samples.length > 0
-        ? samples.map((s, i) => `<h4>Sample #${i + 1}: ${s.location}</h4><p>${s.description || 'No description provided.'}</p><div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>`).join('')
+        ? samples.map((s, i) => `<div class="keep-together sample-block">
+            <h4>Sample #${i + 1}: ${s.location}</h4>
+            <p>${s.description || 'No description provided.'}</p>
+            <div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>
+          </div>`).join('')
         : '<p>No samples were documented for this inspection.</p>';
 
       const labAnalysisHtml = `${buildLabAnalysisIntroHtml(
@@ -476,14 +522,16 @@ export default function MyInspections() {
               <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
           </div>
 
-          <div class="report-container">
+          <div class="report-page disclaimer-page report-container">
               <div class="disclaimer-box">
                   <h3 class="disclaimer-title">Disclaimer</h3>
-                  <p class="disclaimer-text">${disclaimerText}</p>
+                  ${disclaimerHtml}
               </div>
+          </div>
 
+          <div class="report-page client-info-page report-container">
               <div class="section">
-                  <h2>Client Information</h2>
+                  <h2 class="report-section-title">Client Information</h2>
                   <div class="client-info-grid">
                       <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(inspection.full_name || '').toUpperCase()}</div></div>
                       <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(inspection.email || '').toUpperCase()}</div></div>
@@ -494,40 +542,46 @@ export default function MyInspections() {
                       ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.background_info}</div></div>` : ''}
                   </div>
               </div>
-              
-              <div class="section">
-                  <h2>Findings</h2>
+          </div>
+
+          <div class="report-page findings-page report-container">
+              <div class="section findings-section">
+                  <h2 class="report-section-title">Findings</h2>
                   ${visibleMoldHtml}
                   ${waterDamageHtml}
                   ${environmentalHtml}
               </div>
-              
+          </div>
+
+          <div class="report-page samples-page report-container">
               <div class="section">
-                  <h2>Samples Collected</h2>
+                  <h2 class="report-section-title">Samples Collected</h2>
                   ${samplesHtml}
               </div>
+          </div>
 
-              <div class="page-break"></div>
+          <div class="report-container">
+              ${labAnalysisHtml}
 
+              <div class="post-lab-section">
               ${inspection.conclusion ? `
-              <div class="section">
-                  <h2>Conclusion</h2>
+              <div class="section keep-together">
+                  <h2 class="report-section-title">Conclusion</h2>
                   <p>${inspection.conclusion}</p>
               </div>
               ` : ''}
 
               ${(inspection.recommendations || inspection.lab_recommendations) ? `
-              <div class="section">
-                  <h2>Recommendations</h2>
+              <div class="section keep-together">
+                  <h2 class="report-section-title">Recommendations</h2>
                   <p>${inspection.recommendations || inspection.lab_recommendations}</p>
               </div>
               ` : ''}
-
-              ${labAnalysisHtml}
+              </div>
 
               <div class="limitations-section">
-                  <h3 class="limitations-title">Limitations of DIY Total Testing</h3>
-                  <p class="limitations-text">${limitationsText}</p>
+                  <h3 class="limitations-title">Limitations of DIY Mold Testing</h3>
+                  ${limitationsHtml}
               </div>
 
               <div class="footer">

@@ -140,13 +140,13 @@ export const listLabImages = async (inspectionId) => {
 export const buildLabAnalysisIntroHtml = (hasFiles = true) => {
   if (!hasFiles) {
     return `<div class="lab-analysis-section">
-            <h3 style="color: #004aac; font-size: 18px; margin-bottom: 15px;">Laboratory Analysis Results</h3>
+            <h3 class="report-section-title" style="font-size: 28px;">Laboratory Analysis Results</h3>
             <p style="color: #666; font-style: italic;">Lab analysis results have not been uploaded yet.</p>
           </div>`;
   }
 
   return `<div class="lab-analysis-intro" style="padding: 48px 24px; text-align: center; border-top: 2px solid #004aac; margin-top: 24px;">
-            <h2 style="color: #004aac; font-size: 28px; margin: 0 0 16px 0;">Laboratory Analysis Results</h2>
+            <h2 class="report-section-title">Laboratory Analysis Results</h2>
             <p style="color: #334155; font-size: 16px; line-height: 1.6; max-width: 520px; margin: 0 auto;">
               The following pages contain the official laboratory analysis report for this inspection.
             </p>
@@ -185,6 +185,29 @@ export const buildLabAnalysisFilesHtml = (fileUrls = []) => {
           </div>`;
 };
 
+/** Normalize lab_analysis_images from API (array, JSON string, or single URL) */
+export const normalizeLabAnalysisImages = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      if (typeof parsed === 'string' && parsed.trim()) return [parsed.trim()];
+    } catch {
+      // fall through — treat as single URL
+    }
+    return [trimmed];
+  }
+  return [];
+};
+
 /** Collect lab analysis PDF URLs from an inspection */
 export const getLabAnalysisPdfUrls = (fileUrls = []) =>
-  (Array.isArray(fileUrls) ? fileUrls : []).filter(isLabPdfUrl);
+  normalizeLabAnalysisImages(fileUrls).filter(isLabPdfUrl);
+
+/** Collect lab analysis image URLs (non-PDF) from an inspection */
+export const getLabAnalysisImageUrls = (fileUrls = []) =>
+  normalizeLabAnalysisImages(fileUrls).filter((url) => !isLabPdfUrl(url));
