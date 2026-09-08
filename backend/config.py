@@ -61,6 +61,10 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 openai_configured = "✅ Configured" if OPENAI_API_KEY else "❌ Not configured"
 print(f"🔍 CONFIG: OPENAI_API_KEY = {openai_configured}")
 
+# Prefer env model; default to an inexpensive current chat model
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+print(f"🔍 CONFIG: OPENAI_MODEL = {OPENAI_MODEL}")
+
 # OCR Configuration
 OCR_SUPPORTED_LANGUAGES = ['en', 'he']  # English and Hebrew
 OCR_MAX_IMAGE_SIZE_MB = 10

@@ -138,7 +138,7 @@ export default function SamplingGuide() {
             <>
                 {!logoErrors[logoId] ? (
                     <img 
-                        src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
+                        src="/logos.png" 
                         alt="Total Testing Logo" 
                         className={`${size} object-contain`}
                         onError={(e) => {
@@ -183,7 +183,7 @@ export default function SamplingGuide() {
               }
             </p>
             <div className="flex gap-4 justify-center">
-              <Link to={createPageUrl("Welcome")}> 
+              <Link to={createPageUrl("SignIn")}> 
                   <Button variant="outline">Back to Home</Button>
               </Link>
               {!inspectionId && (
@@ -205,8 +205,8 @@ export default function SamplingGuide() {
             <div className="max-w-4xl mx-auto py-12 px-6">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                     <div className="text-center mb-8">
-                        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <LogoImage size="w-8 h-8" logoId="disclaimer-main" fallbackText="TT" />
+                        <div className="flex justify-center mx-auto mb-6">
+                            <LogoImage size="h-14 w-auto max-w-[220px]" logoId="disclaimer-main" fallbackText="TT" />
                         </div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">Important Disclaimer</h1>
                         <p className="text-lg text-slate-600">
@@ -216,7 +216,7 @@ export default function SamplingGuide() {
 
                     <div className="glass-effect p-8 rounded-2xl mb-8 border-2 border-amber-200">
                         <div className="flex items-start gap-3 mb-6">
-                            <LogoImage size="w-6 h-6" logoId="disclaimer-small" fallbackText="TT" />
+                            <LogoImage size="h-6 w-auto max-w-[120px]" logoId="disclaimer-small" fallbackText="TT" />
                             <h2 className="text-xl font-bold text-slate-900">Disclaimer</h2>
                         </div>
                         
@@ -267,8 +267,8 @@ export default function SamplingGuide() {
         <div className="max-w-4xl mx-auto py-12 px-6">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                 <div className="text-center mb-12">
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <img src="/logos.png" alt="Logo" className="w-8 h-8 object-contain" />
+                    <div className="flex justify-center mx-auto mb-6">
+                        <img src="/logos.png" alt="Logo" className="h-14 w-auto max-w-[220px] object-contain" />
                     </div>
                     <h1 className="text-3xl font-bold text-slate-900 mb-2">Guide: Collecting Swab Samples</h1>
                     <p className="text-lg text-slate-600">

@@ -93,11 +93,11 @@ export default function SignIn() {
       >
         <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-6">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-900 rounded-full flex items-center justify-center mb-4">
+            <div className="mx-auto mb-4 flex justify-center">
               <img 
-                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
+                src="/logos.png" 
                 alt="Total Testing Logo" 
-                className="w-8 h-8 object-contain"
+                className="h-14 w-auto max-w-[240px] object-contain"
               />
             </div>
             <CardTitle className="text-2xl font-bold text-slate-900">
@@ -189,14 +189,6 @@ export default function SignIn() {
               </p>
             </div>
             
-            <div className="text-center">
-              <Link
-                to={createPageUrl('Welcome')}
-                className="text-slate-500 hover:text-slate-700 text-sm transition-colors"
-              >
-                ← Back to Home
-              </Link>
-            </div>
           </CardContent>
         </Card>
       </motion.div>

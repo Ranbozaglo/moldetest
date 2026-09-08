@@ -54,7 +54,7 @@ const apiCall = async (endpoint, options = {}) => {
 
         // Reload the page to trigger authentication flow
         setTimeout(() => {
-          if (window.location.pathname !== '/SignIn' && window.location.pathname !== '/Welcome') {
+          if (window.location.pathname !== '/SignIn' && window.location.pathname !== '/SignUp') {
             window.location.href = '/SignIn';
           }
         }, 1000);

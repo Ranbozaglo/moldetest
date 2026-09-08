@@ -8,7 +8,7 @@ export function createPageUrl(pageName: string, params?: Record<string, any>): s
     // Validate input
     if (!pageName || typeof pageName !== 'string') {
         console.warn('createPageUrl: Invalid pageName provided:', pageName);
-        return '/Welcome'; // Default fallback
+        return '/SignIn'; // Default fallback
     }
     
     // Keep the original case to match route definitions, but handle spaces
@@ -45,7 +45,7 @@ export function createPageUrl(pageName: string, params?: Record<string, any>): s
  */
 export function isValidPage(pageName: string): boolean {
     const validPages = [
-        'Welcome', 'Inspection', 'Sampling', 'AdminDashboard', 
+        'Inspection', 'Sampling', 'AdminDashboard', 
         'InspectionDetails', 'SamplingGuide', 'ThankYou', 
         'MyInspections', 'SignIn', 'SignUp'
     ];
@@ -59,12 +59,12 @@ export function isValidPage(pageName: string): boolean {
  * @returns The page name or default
  */
 export function getPageFromPath(pathname: string): string {
-    if (!pathname) return 'Welcome';
+    if (!pathname) return 'SignIn';
     
     // Remove leading slash and get the first segment
     const segments = pathname.replace(/^\/+/, '').split('/');
-    const pageName = segments[0] || 'Welcome';
+    const pageName = segments[0] || 'SignIn';
     
     // Return the page name if valid, otherwise default
-    return isValidPage(pageName) ? pageName : 'Welcome';
+    return isValidPage(pageName) ? pageName : 'SignIn';
 }

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection, AsbestosInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
-import { ProcessLabImageWithOCR, InvokeLLM } from "@/api/integrations";
+import { ProcessLabImageWithOCR, InvokeLLM, GenerateReportAssistant } from "@/api/integrations";
 import { uploadLabImage, deleteLabImage, isLabPdfFile, isLabImageFile, isAllowedLabFile, isLabPdfUrl } from '@/lib/labAnalysis.jsx';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -127,6 +128,11 @@ export default function InspectionDetails() {
   const [isEditingMaterials, setIsEditingMaterials] = useState(false);
   const [editingMaterialType, setEditingMaterialType] = useState('');
   const [editingMaterialCondition, setEditingMaterialCondition] = useState('');
+  // AI Report Assistant — findings are temporary page state only (not saved to DB)
+  const [laboratoryFindings, setLaboratoryFindings] = useState('');
+  const [reportAssistantLoading, setReportAssistantLoading] = useState(false);
+  const [reportAssistantError, setReportAssistantError] = useState(null);
+  const [reportAssistantSuccess, setReportAssistantSuccess] = useState(null);
   const [customMaterialType, setCustomMaterialType] = useState('');
   const { user: currentUser } = useAuth();
 
@@ -326,6 +332,9 @@ export default function InspectionDetails() {
       }
       
       setInspection(inspection);
+      setLaboratoryFindings('');
+      setReportAssistantError(null);
+      setReportAssistantSuccess(null);
       
       console.log("🔍 DEBUG: Loading samples for inspection ID:", inspectionId);
       const samplesData = await Sample.findMany({ inspection_id: inspectionId });
@@ -784,6 +793,59 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
 
 
 
+
+  const isReportAssistantBlocked = (() => {
+    const status = (inspection?.status || '').toString().trim().toLowerCase();
+    return status === 'completed' || status === 'report_ready';
+  })();
+
+  const handleGenerateReportAssistant = async () => {
+    setReportAssistantError(null);
+    setReportAssistantSuccess(null);
+
+    if (isReportAssistantBlocked) {
+      setReportAssistantError(
+        'AI generation is disabled for completed or report_ready inspections.'
+      );
+      return;
+    }
+
+    const findings = (laboratoryFindings || '').trim();
+    if (!findings) {
+      setReportAssistantError('Enter laboratory findings before generating.');
+      return;
+    }
+
+    if (findings.length > 8000) {
+      setReportAssistantError('Laboratory findings must be 8000 characters or fewer.');
+      return;
+    }
+
+    setReportAssistantLoading(true);
+    try {
+      const result = await GenerateReportAssistant({
+        findingsText: findings,
+        inspectionId,
+      });
+
+      setInspection((prev) =>
+        prev
+          ? {
+              ...prev,
+              lab_conclusion: result.conclusion,
+              lab_recommendations: result.recommendations,
+            }
+          : prev
+      );
+      setReportAssistantSuccess(
+        'Draft conclusion and recommendations generated. Review and edit them, then click Save Changes to store them.'
+      );
+    } catch (err) {
+      setReportAssistantError(err?.message || 'Failed to generate conclusion and recommendations.');
+    } finally {
+      setReportAssistantLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -2432,13 +2494,75 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                 ) : (
                   <>
                     <div>
+                      <Label htmlFor="laboratory-findings">Laboratory Findings</Label>
+                      <p className="text-xs text-slate-500 mt-1 mb-2">
+                        Temporary input for the AI Report Assistant only. This text is not saved and is never shown on the customer report.
+                      </p>
+                      <Textarea
+                        id="laboratory-findings"
+                        value={laboratoryFindings}
+                        onChange={(e) => {
+                          setLaboratoryFindings(e.target.value);
+                          setReportAssistantError(null);
+                          setReportAssistantSuccess(null);
+                        }}
+                        placeholder="Describe the lab findings in your own words (species, counts, sample location, debris, etc.)..."
+                        className="min-h-28 mt-2"
+                        maxLength={8000}
+                        disabled={reportAssistantLoading || isReportAssistantBlocked}
+                      />
+                      <div className="mt-1 flex justify-between text-xs text-slate-400">
+                        <span>{laboratoryFindings.length}/8000</span>
+                        {isReportAssistantBlocked && (
+                          <span className="text-amber-600">
+                            Generation disabled — inspection status is {inspection?.status}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={handleGenerateReportAssistant}
+                        disabled={
+                          reportAssistantLoading ||
+                          isReportAssistantBlocked ||
+                          !(laboratoryFindings || '').trim()
+                        }
+                        className="mt-3"
+                        variant="secondary"
+                      >
+                        {reportAssistantLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Generate Conclusion &amp; Recommendations
+                          </>
+                        )}
+                      </Button>
+                      {reportAssistantError && (
+                        <Alert variant="destructive" className="mt-3">
+                          <AlertDescription>{reportAssistantError}</AlertDescription>
+                        </Alert>
+                      )}
+                      {reportAssistantSuccess && !reportAssistantError && (
+                        <Alert className="mt-3 border-green-200 bg-green-50 text-green-800">
+                          <AlertDescription>{reportAssistantSuccess}</AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+
+                    <div>
                       <Label htmlFor="conclusion">Conclusion</Label>
                       <Textarea
                         id="conclusion"
                         value={inspection.lab_conclusion || ""}
                         onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
-                        placeholder="Professional conclusion and recommendations based on lab analysis..."
+                        placeholder="Professional conclusion based on lab analysis..."
                         className="min-h-32 mt-2"
+                        disabled={reportAssistantLoading}
                       />
                     </div>
 
@@ -2450,6 +2574,7 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                         onChange={e => setInspection({ ...inspection, lab_recommendations: e.target.value })}
                         placeholder="Detailed recommendations for the client..."
                         className="min-h-32 mt-2"
+                        disabled={reportAssistantLoading}
                       />
                     </div>
                   </>

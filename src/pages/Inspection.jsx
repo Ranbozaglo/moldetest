@@ -463,7 +463,7 @@ export default function Inspection() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
-            <Link to={createPageUrl("Welcome")} className="inline-flex items-center text-blue-600 hover:text-blue-700 group">
+            <Link to={createPageUrl("SignIn")} className="inline-flex items-center text-blue-600 hover:text-blue-700 group">
               <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-200" />
               Back to Home
             </Link>

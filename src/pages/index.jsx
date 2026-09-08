@@ -1,6 +1,5 @@
 import Layout from "./Layout.jsx";
 
-import Welcome from "./Welcome";
 import Inspection from "./Inspection";
 // import Sampling from "./Sampling";
 import AdminDashboard from "./AdminDashboard";
@@ -42,8 +41,8 @@ function ProtectedRoute({ children, requireAdmin = false, allowAdmin = true, red
   
   // If admin access is required but user is not admin
   if (requireAdmin && !isAdmin) {
-    console.log(`${logPrefix} ProtectedRoute - admin required but user is not admin, redirecting to Welcome`);
-    return <Navigate to="/Welcome" replace />;
+    console.log(`${logPrefix} ProtectedRoute - admin required but user is not admin, redirecting to SignIn`);
+    return <Navigate to="/SignIn" replace />;
   }
   
   // If admin access is not allowed and user is admin
@@ -57,34 +56,7 @@ function ProtectedRoute({ children, requireAdmin = false, allowAdmin = true, red
   return children;
 }
 
-// Public Route Component - handles public pages with admin redirect
-function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
-  const isProduction = window.location.hostname !== 'localhost';
-  const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
-  
-  console.log(`${logPrefix} PublicRoute - user:`, user, 'loading:', loading);
-  
-  // Show loading while auth is being determined
-  if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-    </div>;
-  }
-  
-  // If user is admin, redirect to AdminDashboard
-  if (user && (user.role === 'admin' || user.is_admin)) {
-    console.log(`${logPrefix} PublicRoute - admin user detected, redirecting to AdminDashboard`);
-    return <Navigate to="/AdminDashboard" replace />;
-  }
-  
-  // Show the public content
-  console.log(`${logPrefix} PublicRoute - showing public content`);
-  return children;
-}
-
 const PAGES = {
-    Welcome: Welcome,
     Inspection: Inspection,
     AdminDashboard: AdminDashboard,
     InspectionDetails: InspectionDetails,
@@ -105,7 +77,7 @@ const PAGES = {
 function _getCurrentPage(url) {
     if (!url || typeof url !== 'string') {
         console.warn('_getCurrentPage: Invalid URL provided:', url);
-        return 'Welcome';
+        return 'SignIn';
     }
 
     // Clean up the URL
@@ -124,7 +96,7 @@ function _getCurrentPage(url) {
     
     // Handle empty path (root)
     if (!urlLastPart) {
-        return 'Welcome';
+        return 'SignIn';
     }
 
     // Find matching page (case-insensitive)
@@ -138,8 +110,8 @@ function _getCurrentPage(url) {
     }
     
     // Log warning for unrecognized pages
-    console.warn('_getCurrentPage: Unrecognized page:', urlLastPart, 'defaulting to Welcome');
-    return 'Welcome';
+    console.warn('_getCurrentPage: Unrecognized page:', urlLastPart, 'defaulting to SignIn');
+    return 'SignIn';
 }
 
 // Main Routes Component
@@ -152,9 +124,9 @@ function PagesContent() {
     return (
         <Layout currentPageName={currentPage}>
             <Routes>            
-                {/* Public Routes */}
-                <Route path="/" element={<PublicRoute><Welcome /></PublicRoute>} />
-                <Route path="/Welcome" element={<PublicRoute><Welcome /></PublicRoute>} />
+                {/* Public Routes - landing redirects to Sign In */}
+                <Route path="/" element={<Navigate to="/SignIn" replace />} />
+                <Route path="/Welcome" element={<Navigate to="/SignIn" replace />} />
                 <Route path="/SignIn" element={<SignIn />} />
                 <Route path="/SignUp" element={<SignUp />} />
                 <Route path="/ForgotPassword" element={<ForgotPassword />} />
@@ -209,9 +181,9 @@ function PagesContent() {
                                 The page you're looking for doesn't exist or has been moved.
                             </p>
                             <div className="space-y-4">
-                                <Navigate to="/Welcome" replace />
+                                <Navigate to="/SignIn" replace />
                                 <p className="text-sm text-slate-500">
-                                    Redirecting you to the home page...
+                                    Redirecting you to sign in...
                                 </p>
                             </div>
                         </div>

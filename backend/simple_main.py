@@ -6,7 +6,7 @@ from datetime import datetime
 import hashlib
 import secrets
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_KEY, validate_config, validate_ocr_config, GOOGLE_APPLICATION_CREDENTIALS, OPENAI_API_KEY, OCR_SUPPORTED_LANGUAGES
+from config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_KEY, validate_config, validate_ocr_config, GOOGLE_APPLICATION_CREDENTIALS, OPENAI_API_KEY, OCR_SUPPORTED_LANGUAGES, OPENAI_MODEL
 import uuid
 from werkzeug.utils import secure_filename
 import mimetypes
@@ -72,6 +72,162 @@ def verify_jwt_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise ValueError("Invalid token")
 
+
+REPORT_ASSISTANT_MAX_FINDINGS_CHARS = 8000
+REPORT_ASSISTANT_BLOCKED_STATUSES = {'completed', 'report_ready'}
+
+REPORT_ASSISTANT_SYSTEM_PROMPT = """You are a licensed mold assessment writing assistant for Total Testing DIY mold testing reports.
+
+Write clear, professional language for homeowners.
+
+Output requirements:
+- Return ONLY valid JSON with exactly these keys: "conclusion" and "recommendations".
+- "conclusion": 1-3 short paragraphs explaining what was identified in the submitted sample only.
+- "recommendations": short, direct, finding-specific next-step bullets (plain text, one recommendation per line, optionally starting with "- ").
+
+Hard rules:
+- Explain only what was identified in the submitted findings text.
+- Explicitly state that results apply only to the sampled location(s) described in the findings.
+- Do not invent facts, locations, moisture conditions, mold types, counts, or conditions not present in the findings.
+- Do not create a mold remediation protocol.
+- Do not include containment specifications, demolition measurements, equipment requirements, or detailed remediation procedures.
+- Do not provide medical advice.
+- Do not call mold "toxic".
+- Do not claim that the entire property is mold-free.
+- Do not add recommendations unrelated to the entered findings.
+- Recommendations may include only relevant items such as: correcting moisture sources, controlling humidity, cleaning or removing affected material as appropriate, avoiding disturbance of mold-affected materials, consulting a qualified mold professional, or obtaining a full inspection when justified by the findings.
+"""
+
+
+def require_admin_from_request():
+    """Require a valid Bearer JWT for an admin user. Returns (admin_user_dict, None) or (None, (response, status))."""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None, (jsonify({"error": "Authorization header required"}), 401)
+
+    token = auth_header.split(' ', 1)[1].strip()
+    if not token:
+        return None, (jsonify({"error": "Authorization header required"}), 401)
+
+    try:
+        payload = verify_jwt_token(token)
+    except ValueError as e:
+        return None, (jsonify({"error": str(e)}), 401)
+    except Exception:
+        return None, (jsonify({"error": "Invalid token"}), 401)
+
+    email = payload.get('email')
+    if not email:
+        return None, (jsonify({"error": "Invalid token"}), 401)
+
+    try:
+        user_result = supabase.table('user_profiles').select('id, email, role, is_admin').eq('email', email).execute()
+    except Exception as e:
+        logger.error(f"Admin auth lookup failed: {e}")
+        return None, (jsonify({"error": "Unable to verify admin access"}), 500)
+
+    if not user_result.data:
+        return None, (jsonify({"error": "User not found"}), 401)
+
+    user_data = user_result.data[0]
+    is_admin = user_data.get('role') == 'admin' or bool(user_data.get('is_admin'))
+    if not is_admin:
+        return None, (jsonify({"error": "Admin access required"}), 403)
+
+    return user_data, None
+
+
+def _extract_json_object(text: str) -> dict:
+    """Parse a JSON object from model output, tolerating surrounding markdown fences."""
+    if not text or not str(text).strip():
+        raise ValueError("Empty model response")
+
+    content = str(text).strip()
+    if content.startswith('```'):
+        lines = content.split('\n')
+        # Drop opening ```json / ``` and closing ```
+        if lines and lines[0].startswith('```'):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == '```':
+            lines = lines[:-1]
+        content = '\n'.join(lines).strip()
+
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return parsed
+    except json.JSONDecodeError:
+        pass
+
+    start = content.find('{')
+    end = content.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("Model response was not valid JSON")
+    parsed = json.loads(content[start:end + 1])
+    if not isinstance(parsed, dict):
+        raise ValueError("Model response JSON must be an object")
+    return parsed
+
+
+def _call_report_assistant_openai(findings_text: str) -> dict:
+    """Call OpenAI and return validated {conclusion, recommendations}."""
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY is not configured on the server")
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise RuntimeError("OpenAI library is not installed on the server")
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    model = (OPENAI_MODEL or 'gpt-4o-mini').strip() or 'gpt-4o-mini'
+
+    user_prompt = f"""Laboratory findings entered by the admin (use ONLY this information):
+
+{findings_text}
+
+Return JSON only:
+{{
+  "conclusion": "...",
+  "recommendations": "..."
+}}"""
+
+    messages = [
+        {"role": "system", "content": REPORT_ASSISTANT_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    create_kwargs = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": 1500,
+    }
+
+    try:
+        response = client.chat.completions.create(
+            **create_kwargs,
+            response_format={"type": "json_object"},
+        )
+    except Exception as json_mode_error:
+        logger.warning(f"JSON response_format unsupported or failed ({json_mode_error}); retrying without it")
+        response = client.chat.completions.create(**create_kwargs)
+
+    raw = response.choices[0].message.content if response.choices else ""
+    parsed = _extract_json_object(raw)
+
+    conclusion = parsed.get("conclusion")
+    recommendations = parsed.get("recommendations")
+
+    if not isinstance(conclusion, str) or not conclusion.strip():
+        raise ValueError("Model response missing a non-empty conclusion")
+    if not isinstance(recommendations, str) or not recommendations.strip():
+        raise ValueError("Model response missing non-empty recommendations")
+
+    return {
+        "conclusion": conclusion.strip(),
+        "recommendations": recommendations.strip(),
+    }
 class SimpleOCRIntegration:
     """Simplified OCR integration for lab analysis"""
     
@@ -1661,6 +1817,77 @@ def ocr_gpt():
             "ocr_available": ocr_integration.is_available
         }), 500
 
+
+@app.route('/api/generate-report-assistant', methods=['POST'])
+def generate_report_assistant():
+    """
+    Admin-only AI helper: generate editable lab_conclusion / lab_recommendations
+    from temporary Laboratory Findings text. Does NOT persist, publish, email, or change status.
+    """
+    admin_user, auth_error = require_admin_from_request()
+    if auth_error:
+        return auth_error
+
+    data = request.get_json(silent=True) or {}
+    findings_text = data.get('findings_text', '')
+    if not isinstance(findings_text, str):
+        findings_text = str(findings_text or '')
+    findings_text = findings_text.strip()
+
+    if not findings_text:
+        return jsonify({"error": "Laboratory findings text is required"}), 400
+
+    if len(findings_text) > REPORT_ASSISTANT_MAX_FINDINGS_CHARS:
+        return jsonify({
+            "error": f"Laboratory findings must be {REPORT_ASSISTANT_MAX_FINDINGS_CHARS} characters or fewer"
+        }), 400
+
+    inspection_id = data.get('inspection_id')
+    if inspection_id is None or inspection_id == '':
+        return jsonify({"error": "inspection_id is required"}), 400
+
+    try:
+        inspection_id_int = int(inspection_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "inspection_id must be a valid inspection id"}), 400
+
+    try:
+        inspection_result = (
+            supabase.table('inspection')
+            .select('id, status')
+            .eq('id', inspection_id_int)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Report assistant inspection lookup failed: {e}")
+        return jsonify({"error": "Unable to load inspection"}), 500
+
+    if not inspection_result.data:
+        return jsonify({"error": f"Inspection with ID {inspection_id_int} not found"}), 404
+
+    status = (inspection_result.data[0].get('status') or '').strip().lower()
+    if status in REPORT_ASSISTANT_BLOCKED_STATUSES:
+        return jsonify({
+            "error": "AI generation is disabled for completed or report_ready inspections"
+        }), 409
+
+    try:
+        result = _call_report_assistant_openai(findings_text)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 503
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 502
+    except Exception as e:
+        logger.error(f"Report assistant OpenAI error: {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate conclusion and recommendations"}), 500
+
+    # Return draft content only — never write inspection fields or change status here.
+    return jsonify({
+        "conclusion": result["conclusion"],
+        "recommendations": result["recommendations"],
+    }), 200
+
+
 @app.route('/api/email/send', methods=['POST'])
 def send_email():
     """Email sending endpoint (mock)"""
@@ -2258,6 +2485,7 @@ if __name__ == '__main__':
     print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
     print("   - POST /api/validate-lab-image (OCR validation before database save)")
     print("   - POST /api/ocr-gpt (Google Cloud Vision integration)")
+    print("   - POST /api/generate-report-assistant (admin AI draft conclusion/recommendations)")
     print("   - POST /api/email/send-lab-received/<inspection_id>")
     print("   - POST /api/email/send-report-ready/<inspection_id>")
     print("   - POST /api/email/send-review-request/<inspection_id>")

@@ -471,7 +471,92 @@ Return your response in this exact JSON format:
         message: `Google Vision API call failed: ${error.message}. Manual review required.`
       };
     }
-  }
+  },
+
+  /**
+   * Admin AI Report Assistant — draft conclusion + recommendations from findings text.
+   * Does not persist; caller updates local form state only.
+   */
+  GenerateReportAssistant: async ({ findingsText, inspectionId }) => {
+    if (typeof window === 'undefined') {
+      throw new Error('Report assistant is not available during build');
+    }
+
+    const trimmed = (findingsText || '').trim();
+    if (!trimmed) {
+      throw new Error('Enter laboratory findings before generating.');
+    }
+
+    const MAX_FINDINGS_CHARS = 8000;
+    if (trimmed.length > MAX_FINDINGS_CHARS) {
+      throw new Error(`Laboratory findings must be ${MAX_FINDINGS_CHARS} characters or fewer.`);
+    }
+
+    if (!inspectionId) {
+      throw new Error('Missing inspection id.');
+    }
+
+    let accessToken = null;
+    try {
+      const savedUser = localStorage.getItem('mth_user');
+      if (savedUser) {
+        accessToken = JSON.parse(savedUser)?.access_token || null;
+      }
+    } catch {
+      accessToken = null;
+    }
+
+    if (!accessToken) {
+      throw new Error('Please sign in as an admin to use the AI Report Assistant.');
+    }
+
+    const baseApiUrl = getBaseApiUrl();
+    let response;
+    try {
+      response = await fetch(`${baseApiUrl}/api/generate-report-assistant`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          findings_text: trimmed,
+          inspection_id: inspectionId,
+        }),
+      });
+    } catch (networkError) {
+      console.error('❌ GenerateReportAssistant network error:', networkError);
+      throw new Error(
+        'Could not reach the AI Report Assistant API. The backend may be offline, or this endpoint has not been deployed yet. Deploy the latest backend (POST /api/generate-report-assistant), or run the API locally and point VITE_API_BASE_URL at it.'
+      );
+    }
+
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!response.ok) {
+      const message =
+        (payload && (payload.error || payload.message)) ||
+        (response.status === 404
+          ? 'AI Report Assistant endpoint not found on the server. Deploy the latest backend to enable this feature.'
+          : `AI generation failed (${response.status})`);
+      throw new Error(message);
+    }
+
+    const conclusion = typeof payload?.conclusion === 'string' ? payload.conclusion.trim() : '';
+    const recommendations =
+      typeof payload?.recommendations === 'string' ? payload.recommendations.trim() : '';
+
+    if (!conclusion || !recommendations) {
+      throw new Error('AI returned an incomplete response. Please try again.');
+    }
+
+    return { conclusion, recommendations };
+  },
 };
 
 export const InvokeLLM = Core.InvokeLLM;
@@ -486,6 +571,7 @@ export const ProcessLabImageWithOCR = Core.ProcessLabImageWithOCR;
 export const AnalyzeLabResults = Core.AnalyzeLabResults;
 export const ValidateLabImageFile = Core.ValidateLabImageFile;
 export const ValidateLabImage = Core.ValidateLabImage;
+export const GenerateReportAssistant = Core.GenerateReportAssistant;
 
 
 

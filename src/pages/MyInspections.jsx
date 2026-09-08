@@ -116,13 +116,13 @@ export default function MyInspections() {
                 }
               }
             } else {
-              console.log("🔍 SECURITY: No authenticated user found, redirecting to Welcome");
-              navigate(createPageUrl("Welcome"));
+              console.log("🔍 SECURITY: No authenticated user found, redirecting to SignIn");
+              navigate(createPageUrl("SignIn"));
             }
           } catch (err) {
             console.error("🔍 DEBUG: Error loading user:", err);
             setError("Failed to load user information. Please try logging in again.");
-            navigate(createPageUrl("Welcome"));
+            navigate(createPageUrl("SignIn"));
           } finally {
             setLoading(false);
           }
@@ -513,7 +513,7 @@ export default function MyInspections() {
       <body>
           <div class="cover-page">
               <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-                <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
+                <img src="/logos.png" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>

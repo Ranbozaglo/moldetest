@@ -236,7 +236,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       <body>
           <div class="cover-page">
               <h1 class="cover-title">Asbestos Assessment Report</h1>
-              <img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/asbestlogo.jpeg" alt="Total Testing Logo" class="cover-image" />
+              <img src="/logos.png" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
@@ -661,7 +661,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     <body>
         <div class="cover-page">
             <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-<img src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/reportlogo.jpeg" alt="TT Logo" class="cover-image" />    
+<img src="/logos.png" alt="Total Testing Logo" class="cover-image" />    
            <div class="cover-details">
                 <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                 <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
@@ -836,20 +836,20 @@ export default function AdminDashboard() {
     try {
       // Use the authenticated user from AuthContext instead of calling User.me()
       if (!authUser) {
-        navigate(createPageUrl("Welcome"));
+        navigate(createPageUrl("SignIn"));
         return;
       }
       
       // Check if user is admin
       if (authUser.role !== 'admin' && !authUser.is_admin) {
-        navigate(createPageUrl("Welcome"));
+        navigate(createPageUrl("SignIn"));
         return;
       }
       
       setUser(authUser);
       smartRefresh();
     } catch (error) {
-      navigate(createPageUrl("Welcome"));
+      navigate(createPageUrl("SignIn"));
     } finally {
       setLoading(false);
     }
@@ -1907,11 +1907,11 @@ export default function AdminDashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-                <div className="p-2  rounded-lg">
+                <div className="p-1 rounded-lg">
               <img 
-                src="https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/mold.images/uploads/logos.png" 
+                src="/logos.png" 
                   alt="Total Testing Logo" 
-                className="w-8 h-8 object-contain"
+                className="h-10 w-auto max-w-[180px] object-contain"
               />
                 </div>
               Admin Dashboard

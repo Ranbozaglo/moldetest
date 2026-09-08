@@ -64,7 +64,11 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between">
             {/* Logo/Brand - Left side */}
             <div className="flex items-center">
-              <span className="text-lg font-semibold text-slate-800">Total Testing</span>
+              <img
+                src="/logos.png"
+                alt="Total Testing"
+                className="h-9 w-auto max-w-[180px] object-contain"
+              />
             </div>
             
             {/* Desktop Navigation */}
@@ -156,13 +160,15 @@ export default function Layout({ children, currentPageName }) {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white py-12 ">
+      <footer className="border-t border-slate-200 bg-white/80 py-8">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-3 mb-4 md:mb-0">
-              <span className="text-lg font-semibold">Total Testing</span>
-            </div>
-            <p className="text-slate-400 text-sm">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <img
+              src="/logos.png"
+              alt="Total Testing"
+              className="h-10 w-auto max-w-[180px] object-contain"
+            />
+            <p className="text-slate-500 text-sm text-center md:text-right">
               Professional mold inspection and testing solutions
             </p>
           </div>
