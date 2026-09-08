@@ -475,9 +475,9 @@ Return your response in this exact JSON format:
 
   /**
    * Admin AI Report Assistant — draft conclusion + recommendations from findings text.
-   * Uses Netlify Function (avoids stuck Render GitHub deploys). Does not persist.
+   * Calls the Flask backend endpoint. Does not persist; caller updates local form state only.
    */
-  GenerateReportAssistant: async ({ findingsText, inspectionId }) => {
+  GenerateReportAssistant: async ({ findingsText, inspectionId, customerSubmitted = null }) => {
     if (typeof window === 'undefined') {
       throw new Error('Report assistant is not available during build');
     }
@@ -510,12 +510,8 @@ Return your response in this exact JSON format:
       throw new Error('Please sign in as an admin to use the AI Report Assistant.');
     }
 
-    const host = window.location.hostname;
-    const isLocal = host === 'localhost' || host === '127.0.0.1';
-    // Prefer same-origin Netlify function in production; from Vite local, call the live site.
-    const assistantUrl = isLocal
-      ? 'https://total-testing-diy.com/.netlify/functions/generate-report-assistant'
-      : `${window.location.origin}/.netlify/functions/generate-report-assistant`;
+    const baseApiUrl = import.meta.env.VITE_AI_API_BASE_URL || getBaseApiUrl();
+    const assistantUrl = `${baseApiUrl.replace(/\/$/, '')}/api/generate-report-assistant`;
 
     let response;
     try {
@@ -528,12 +524,13 @@ Return your response in this exact JSON format:
         body: JSON.stringify({
           findings_text: trimmed,
           inspection_id: inspectionId,
+          customer_submitted: customerSubmitted || undefined,
         }),
       });
     } catch (networkError) {
       console.error('❌ GenerateReportAssistant network error:', networkError);
       throw new Error(
-        'Could not reach the AI Report Assistant. Confirm the Netlify function is deployed and OPENAI_API_KEY / SUPABASE_SERVICE_ROLE_KEY are set in Netlify.'
+        'Could not reach the local/Flask AI API. Start the backend (python simple_main.py in /backend) and keep VITE_AI_API_BASE_URL=http://localhost:5000.'
       );
     }
 
@@ -548,7 +545,7 @@ Return your response in this exact JSON format:
       const message =
         (payload && (payload.error || payload.message)) ||
         (response.status === 404
-          ? 'AI Report Assistant function not found. Redeploy the Netlify site so netlify/functions/generate-report-assistant is published.'
+          ? 'AI endpoint not found on the API server. Confirm the backend with /api/generate-report-assistant is running.'
           : `AI generation failed (${response.status})`);
       throw new Error(message);
     }
@@ -556,12 +553,13 @@ Return your response in this exact JSON format:
     const conclusion = typeof payload?.conclusion === 'string' ? payload.conclusion.trim() : '';
     const recommendations =
       typeof payload?.recommendations === 'string' ? payload.recommendations.trim() : '';
+    const moldFindings = Array.isArray(payload?.mold_findings) ? payload.mold_findings : [];
 
     if (!conclusion || !recommendations) {
       throw new Error('AI returned an incomplete response. Please try again.');
     }
 
-    return { conclusion, recommendations };
+    return { conclusion, recommendations, moldFindings };
   },
 };
 

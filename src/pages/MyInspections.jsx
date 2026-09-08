@@ -11,6 +11,8 @@ import { createPageUrl } from "@/utils";
 import { format } from "date-fns";
 import { generateReportHtmlContent } from "@/pages/AdminDashboard.jsx";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
+import { resolveCoverAssets } from "@/utils/reportAssets";
+import { sanitizeReportText } from "@/utils/reportText";
 import { 
   FileText, 
   Clock, 
@@ -226,6 +228,7 @@ export default function MyInspections() {
       
       const samples = await Sample.findMany({ inspection_id: inspection.id });
       const displayNum = getDisplayNumber(inspection);
+      const { logoSrc, coverKitSrc } = await resolveCoverAssets();
       
       console.log("🔍 DEBUG: Final data for report generation:");
       console.log("🔍 DEBUG: - Lab conclusion:", detailedInspection.lab_conclusion);
@@ -261,6 +264,21 @@ export default function MyInspections() {
           .cover-details { background: rgba(255,255,255,0.95); padding: 22px 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 520px; width: 100%; margin-top: auto; margin-bottom: 48px; }
           .cover-detail-item { margin: 10px 0; font-size: 16px; line-height: 1.45; }
           .cover-detail-label { font-weight: bold; color: #004aac; }
+          .tt-mold-cover { align-items: stretch !important; text-align: left !important; padding: 36px 44px 32px !important; gap: 0 !important; justify-content: flex-start !important; box-sizing: border-box; overflow: hidden; }
+          .tt-cover-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+          .tt-cover-logo { max-width: 168px; max-height: 56px; width: auto; height: auto; object-fit: contain; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
+          .tt-cover-doc-type { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #9AA3AF; padding-top: 6px; }
+          .tt-cover-title { font-size: 32px; font-weight: 700; color: #0B2E59; margin: 0 0 6px 0; line-height: 1.2; text-align: center; text-shadow: none; max-width: none; }
+          .tt-cover-subtitle { font-size: 14px; color: #6B7280; margin: 0 0 16px 0; line-height: 1.4; text-align: center; }
+          .tt-cover-hero { width: 100%; max-width: 100% !important; max-height: 320px !important; height: auto; object-fit: contain; object-position: center bottom; border-radius: 14px !important; border: none !important; box-shadow: none !important; margin: 0 0 18px 0 !important; display: block; background: #fff; }
+          .tt-cover-meta { background: #F3F5F8; border-radius: 12px; padding: 4px 24px; width: 100%; max-width: 520px; margin: 0 auto 16px auto; box-sizing: border-box; }
+          .tt-cover-meta-row { display: flex; justify-content: flex-start; align-items: baseline; gap: 14px; padding: 12px 0; border-bottom: 1px solid #E5E7EB; }
+          .tt-cover-meta-row:last-child { border-bottom: none; }
+          .tt-cover-meta-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280; flex: 0 0 132px; width: 132px; }
+          .tt-cover-meta-value { font-size: 14px; font-weight: 600; color: #0B2E59; text-align: left; line-height: 1.35; flex: 1 1 auto; min-width: 0; }
+          .tt-cover-footer { margin-top: auto; }
+          .tt-cover-accent { width: 48px; height: 3px; background: #14B8A6; border-radius: 2px; margin-bottom: 10px; }
+          .tt-cover-tagline { font-size: 16px; font-weight: 700; color: #0B2E59; margin: 0; }
           .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; } 
           .section { margin-bottom: 25px; }
           .keep-together { page-break-inside: avoid; break-inside: avoid-page; display: block; }
@@ -378,16 +396,16 @@ export default function MyInspections() {
       
       const visibleMoldHtml = detailedInspection.has_visible_mold && detailedInspection.visible_mold_details && detailedInspection.visible_mold_details.length > 0
         ? `<div style="margin-bottom: 20px;">
-            <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              ⚠️ Visible Mold Detected
+            <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px;">
+              Visible Mold Detected
             </h3>
             ${detailedInspection.visible_mold_details.map((d, i) => `
               <div class="keep-together" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                  <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
+                  <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('high', 'High Priority')}
                 </div>
-                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">⚠️ Visible mold detected - requires immediate attention</p>
+                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
                 <div style="text-align: center; margin: 15px 0;">
                   ${createImageList(d.images)}
                 </div>
@@ -395,24 +413,24 @@ export default function MyInspections() {
             `).join('')}
           </div>`
         : `<div class="keep-together" style="margin-bottom: 20px;">
-            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              ✅ No Visible Mold Detected
+            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px;">
+              No Visible Mold Detected
             </h3>
             <p style="color: #059669; font-style: italic;">No visible mold was reported during this inspection.</p>
           </div>`;
 
       const waterDamageHtml = detailedInspection.has_water_damage && detailedInspection.water_damage_details && detailedInspection.water_damage_details.length > 0
         ? `<div style="margin-bottom: 20px;">
-            <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              💧 Water Damage Detected
+            <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px;">
+              Water Damage Detected
             </h3>
             ${detailedInspection.water_damage_details.map((d, i) => `
               <div class="keep-together" style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                  <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${d.location}</h4>
+                  <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('medium', 'Medium Priority')}
                 </div>
-                <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">💧 Water damage detected - may contribute to mold growth</p>
+                <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">Water damage detected - may contribute to mold growth</p>
                 <div style="text-align: center; margin: 15px 0;">
                   ${createImageList(d.images)}
                 </div>
@@ -420,8 +438,8 @@ export default function MyInspections() {
             `).join('')}
           </div>`
         : `<div class="keep-together" style="margin-bottom: 20px;">
-            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              ✅ No Water Damage Detected
+            <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px;">
+              No Water Damage Detected
             </h3>
             <p style="color: #059669; font-style: italic;">No recent water damage was reported during this inspection.</p>
           </div>`;
@@ -429,8 +447,8 @@ export default function MyInspections() {
       let environmentalHtml = '';
       if (detailedInspection.environmental_data_method === 'photo' && detailedInspection.thermostat_image) {
           environmentalHtml = `<div style="margin-bottom: 20px;">
-            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              🌡️ Environmental Conditions
+            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+              Environmental Conditions
             </h3>
             <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
               <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
@@ -445,14 +463,14 @@ export default function MyInspections() {
           const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
           
           environmentalHtml = `<div style="margin-bottom: 20px;">
-            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              🌡️ Environmental Conditions
+            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+              Environmental Conditions
             </h3>
             <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
                 <div>
                   <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Temperature</p>
-                  <p style="font-size: 18px; font-weight: bold;">${temperature}°F</p>
+                  <p style="font-size: 18px; font-weight: bold;">${temperature} F</p>
                 </div>
                 <div>
                   <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Humidity</p>
@@ -461,21 +479,18 @@ export default function MyInspections() {
               </div>
               ${isHighHumidity ? `
                 <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin-top: 15px;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="color: #d97706;">⚠️</span>
-                    <p style="color: #92400e; font-weight: bold; margin: 0; font-size: 14px;">
-                      HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
-                      Current humidity of ${humidity}% may contribute to mold development.
-                    </p>
-                  </div>
+                  <p style="color: #92400e; font-weight: bold; margin: 0; font-size: 14px;">
+                    HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
+                    Current humidity of ${humidity}% may contribute to mold development.
+                  </p>
                 </div>
               ` : ''}
             </div>
           </div>`;
       } else {
           environmentalHtml = `<div style="margin-bottom: 20px;">
-            <h3 style="color: #6b7280; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-              🌡️ Environmental Conditions
+            <h3 style="color: #6b7280; font-size: 18px; margin-bottom: 15px;">
+              Environmental Conditions
             </h3>
             <p style="color: #6b7280; font-style: italic;">Environmental data not provided during this inspection.</p>
           </div>`;
@@ -484,8 +499,8 @@ export default function MyInspections() {
 
       const samplesHtml = samples.length > 0
         ? samples.map((s, i) => `<div class="keep-together sample-block">
-            <h4>Sample #${i + 1}: ${s.location}</h4>
-            <p>${s.description || 'No description provided.'}</p>
+            <h4>Sample #${i + 1}: ${sanitizeReportText(s.location)}</h4>
+            <p>${sanitizeReportText(s.description) || 'No description provided.'}</p>
             <div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>
           </div>`).join('')
         : '<p>No samples were documented for this inspection.</p>';
@@ -496,7 +511,7 @@ export default function MyInspections() {
         inspection.conclusion
           ? `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #004aac;">
               <h4 style="color: #004aac; margin-bottom: 10px;">Analysis Summary</h4>
-              <p style="line-height: 1.6;">${inspection.conclusion}</p>
+              <p style="line-height: 1.6;">${sanitizeReportText(inspection.conclusion)}</p>
             </div>`
           : ''
       }`;
@@ -511,15 +526,24 @@ export default function MyInspections() {
           <style>${css}</style>
       </head>
       <body>
-          <div class="cover-page">
-              <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-                <img src="/logos.png" alt="Total Testing Logo" class="cover-image" />
-              <div class="cover-details">
-                  <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
-                  <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
-                  <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
+          <div class="cover-page tt-mold-cover">
+              <div class="tt-cover-header">
+                  <img src="${logoSrc}" alt="Total Testing" class="tt-cover-logo" />
+                  <div class="tt-cover-doc-type">Laboratory Report</div>
               </div>
-              <p style="margin-top: 50px; font-size: 16px; color: #555;">Total Testing</p>
+              <h1 class="tt-cover-title">Mold Surface Testing Report</h1>
+              <p class="tt-cover-subtitle">User-Collected Sampling &amp; Independent Laboratory Analysis</p>
+              <img src="${coverKitSrc}" alt="Total Testing sample kit" class="tt-cover-hero" />
+              <div class="tt-cover-meta">
+                  <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Report Number</span><span class="tt-cover-meta-value">${displayNum}</span></div>
+                  <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Customer</span><span class="tt-cover-meta-value">${sanitizeReportText(inspection.full_name) || 'N/A'}</span></div>
+                  <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Property</span><span class="tt-cover-meta-value">${sanitizeReportText([[inspection.street_address, inspection.unit_number].filter(Boolean).join(', '), [inspection.city, [inspection.state, inspection.zip_code].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ')) || 'N/A'}</span></div>
+                  <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Collection Date</span><span class="tt-cover-meta-value">${inspection.created_at ? format(new Date(inspection.created_at), "MMMM d, yyyy") : 'N/A'}</span></div>
+              </div>
+              <div class="tt-cover-footer">
+                  <div class="tt-cover-accent"></div>
+                  <p class="tt-cover-tagline">Test Before You Guess.</p>
+              </div>
           </div>
 
           <div class="report-page disclaimer-page report-container">

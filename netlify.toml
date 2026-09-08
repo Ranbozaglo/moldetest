@@ -10,12 +10,7 @@
     NODE_VERSION = "18"
     NPM_VERSION = "9"
 
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-
 # Redirect rules for SPA (Single Page Application)
-# Netlify serves /.netlify/functions/* before this rewrite.
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -29,7 +24,7 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://opjgytjlebfnhjzarvyy.supabase.co https://moldetest-ftxv.onrender.com https://total-testing-diy.com https://mold-testing.netlify.app;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://opjgytjlebfnhjzarvyy.supabase.co https://moldetest-ftxv.onrender.com;"
 
 # Cache static assets
 [[headers]]

@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import json
+import re
 from datetime import datetime
 import hashlib
 import secrets
@@ -78,25 +79,291 @@ REPORT_ASSISTANT_BLOCKED_STATUSES = {'completed', 'report_ready'}
 
 REPORT_ASSISTANT_SYSTEM_PROMPT = """You are a licensed mold assessment writing assistant for Total Testing DIY mold testing reports.
 
-Write clear, professional language for homeowners.
+Write clear, professional language that homeowners can understand.
 
-Output requirements:
-- Return ONLY valid JSON with exactly these keys: "conclusion" and "recommendations".
-- "conclusion": 1-3 short paragraphs explaining what was identified in the submitted sample only.
-- "recommendations": short, direct, finding-specific next-step bullets (plain text, one recommendation per line, optionally starting with "- ").
+You will receive labeled sections:
+A) Customer-submitted information (description, sample locations, reported visible mold-like growth, leaks/water damage, indoor humidity, ventilation/HVAC notes, and other relevant inspection details)
+B) Admin-entered laboratory findings
+C) Uploaded evidence inventory (photo counts/URLs only — do NOT claim you visually analyzed photos unless a vision analysis is explicitly provided)
 
-Hard rules:
-- Explain only what was identified in the submitted findings text.
-- Explicitly state that results apply only to the sampled location(s) described in the findings.
-- Do not invent facts, locations, moisture conditions, mold types, counts, or conditions not present in the findings.
-- Do not create a mold remediation protocol.
-- Do not include containment specifications, demolition measurements, equipment requirements, or detailed remediation procedures.
-- Do not provide medical advice.
-- Do not call mold "toxic".
-- Do not claim that the entire property is mold-free.
-- Do not add recommendations unrelated to the entered findings.
-- Recommendations may include only relevant items such as: correcting moisture sources, controlling humidity, cleaning or removing affected material as appropriate, avoiding disturbance of mold-affected materials, consulting a qualified mold professional, or obtaining a full inspection when justified by the findings.
+You MUST use all relevant information from A and B. Do not write a generic lab-only response.
+
+=== CONCLUSION REQUIREMENTS ===
+Write ONE concise, professional paragraph that:
+1. Identifies what the laboratory found and where it was found.
+2. Connects the laboratory findings with relevant visible conditions reported at the same locations.
+3. Mentions relevant moisture conditions, leaks, elevated humidity, or ventilation concerns when present in the provided information.
+4. Uses cautious language for possible causes, such as:
+   - "may be contributing"
+   - "may be associated with"
+   - "represents an additional moisture concern"
+5. Does not state that a suspected cause is confirmed unless the provided information confirms it.
+6. Ends by stating that the laboratory results apply only to the specific locations sampled.
+7. Does not claim that the entire property is mold-free or safe.
+8. Does not provide medical advice or use the term "toxic mold."
+
+=== RECOMMENDATION REQUIREMENTS ===
+Write short, direct, situation-specific bullet points as a JSON array of strings.
+Select ONLY recommendations supported by the provided information. Prioritize when relevant:
+1. Immediately correcting active leaks or water intrusion.
+2. Drying affected materials.
+3. Reducing indoor humidity to below 60%.
+4. Running bathroom or kitchen exhaust fans when relevant to those rooms.
+5. Improving ventilation, adjusting the HVAC system, or using a dehumidifier when relevant.
+6. Consulting a qualified mold remediation contractor when visible growth or confirmed mold is reported.
+7. Advising the customer not to disturb, scrub, sand, or remove affected materials because doing so may spread mold spores.
+8. Evaluating HVAC vents or components when mold is identified or reported around the HVAC system.
+9. Recommending further inspection when the extent or moisture source is unknown.
+
+=== IMPORTANT WRITING RULES ===
+- Do not produce the same generic recommendation list for every report.
+- Do not invent mold types, locations, leaks, humidity readings, visible conditions, or causes.
+- Do not write a formal mold remediation protocol.
+- Do not specify containment, demolition quantities, removal distances, equipment, or detailed remediation procedures.
+- Do not say "clean and remediate" without recommending evaluation by a qualified mold remediation contractor.
+- Do not use phrases such as "ensure a healthier living environment," "make the home safe," or similar health guarantees.
+- Do not recommend ventilation for a particular room unless the submitted information supports it.
+- Do not recommend a bathroom exhaust fan for bedrooms or living rooms.
+- Do not claim photographs were analyzed unless section C includes an actual vision/OCR analysis result.
+- Keep the conclusion factual and the recommendations action-oriented.
+
+=== PREFERRED STYLE EXAMPLE ===
+Conclusion:
+"The laboratory identified Cladosporium in samples collected from the master bedroom and living room. These findings correspond with the reported visible mold-like growth on the master bedroom ceiling and living room HVAC vent. The indoor humidity level of 62% may support mold growth, while the leak under the kitchen sink represents an additional moisture concern. Laboratory results apply only to the specific locations sampled."
+
+Recommendations:
+- Repair the leak under the kitchen sink immediately and dry all affected materials.
+- Reduce indoor humidity to below 60% by improving ventilation, adjusting the HVAC system, or using a dehumidifier.
+- Consult a qualified mold remediation contractor to properly address the affected master bedroom ceiling and living room HVAC vent.
+- Do not disturb, scrub, or remove the affected materials yourself, as this may spread mold spores.
+- Have the HVAC vent and surrounding area evaluated to determine whether additional cleaning or HVAC-related work is necessary.
+
+=== OUTPUT FORMAT ===
+Return valid JSON only with exactly these keys:
+{
+  "conclusion": "One concise paragraph",
+  "recommendations": [
+    "First recommendation",
+    "Second recommendation"
+  ],
+  "mold_findings": [
+    {
+      "name": "Cladosporium",
+      "quantity": "1,200 spores/m³",
+      "level": "Low"
+    }
+  ]
+}
+
+=== MOLD FINDINGS BREAKDOWN ===
+Also extract every mold/spore type mentioned in the laboratory findings (section B) into "mold_findings".
+- "name": mold/spore type exactly as identified by the lab (do not invent types)
+- "quantity": the count, concentration, or qualitative amount from the lab text (for example "240", "1,200 spores/m³", "Rare", "Low")
+- "level": one of exactly: "Not Detect", "Rare", "Low", "Medium", "High" (High is the highest). Map synonyms accordingly (e.g. not detected→Not Detect, moderate→Medium, very low/trace→Rare). If unknown, use "".
+- Include only types actually present in section B
+- If section B has no identifiable mold types, return "mold_findings": []
 """
+
+
+def _stringify_jsonish(value):
+    """Normalize JSON/text fields from Supabase into readable prompt text."""
+    if value is None:
+        return ''
+    if isinstance(value, (dict, list)):
+        try:
+            return json.dumps(value, ensure_ascii=False, indent=2)
+        except Exception:
+            return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ''
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, (dict, list)):
+                return json.dumps(parsed, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+        return text
+    return str(value)
+
+
+def _as_location_list(value):
+    """Normalize location fields into a clean list of strings."""
+    if value is None:
+        return []
+    if isinstance(value, list):
+        items = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            items = parsed if isinstance(parsed, list) else [text]
+        except Exception:
+            items = [text]
+    else:
+        items = [str(value)]
+
+    cleaned = []
+    for item in items:
+        if isinstance(item, dict):
+            loc = item.get('location') or item.get('name') or ''
+            loc = str(loc).strip()
+            if loc:
+                cleaned.append(loc)
+        else:
+            loc = str(item).strip()
+            if loc:
+                cleaned.append(loc)
+    return cleaned
+
+
+def _count_images(value):
+    if value is None:
+        return 0
+    if isinstance(value, list):
+        return len([x for x in value if x])
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return 0
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return len([x for x in parsed if x])
+        except Exception:
+            return 1 if text.startswith('http') else 0
+    return 0
+
+
+def _build_inspection_context(inspection: dict, samples: list, client_submitted: dict | None = None) -> str:
+    """Build an explicit customer-submitted summary for the AI prompt."""
+    src = dict(inspection or {})
+    # Prefer the frontend snapshot for customer-facing fields. The admin UI already
+    # loaded this inspection from the live API; local Supabase can be empty/stale.
+    prefer_client_keys = {
+        'background_info',
+        'customer_description',
+        'property_description',
+        'has_visible_mold',
+        'mold_locations',
+        'mold_images',
+        'visible_mold_details',
+        'has_water_damage',
+        'water_damage_locations',
+        'water_damage_images',
+        'water_damage_details',
+        'temperature',
+        'humidity',
+        'environmental_data_method',
+        'thermostat_image',
+        'full_name',
+        'client_type',
+        'street_address',
+        'unit_number',
+        'city',
+        'state',
+        'zip_code',
+        'property_type',
+        'square_footage',
+    }
+    if isinstance(client_submitted, dict):
+        for key, value in client_submitted.items():
+            if value is None or value == '' or value == []:
+                continue
+            if key in prefer_client_keys or key not in src or src.get(key) in (None, '', [], 'null'):
+                src[key] = value
+        if client_submitted.get('background_info') or client_submitted.get('property_description'):
+            src['background_info'] = (
+                client_submitted.get('background_info')
+                or client_submitted.get('property_description')
+            )
+
+    customer_description = (
+        _stringify_jsonish(src.get('background_info'))
+        or _stringify_jsonish(src.get('customer_description'))
+        or 'None provided'
+    )
+
+    mold_locations = _as_location_list(src.get('mold_locations')) or _as_location_list(src.get('visible_mold_details'))
+    water_locations = _as_location_list(src.get('water_damage_locations')) or _as_location_list(src.get('water_damage_details'))
+
+    # Prefer samples embedded in the frontend snapshot when present
+    if isinstance(client_submitted, dict) and isinstance(client_submitted.get('samples'), list):
+        client_sample_rows = [s for s in client_submitted.get('samples') if isinstance(s, dict)]
+        if client_sample_rows:
+            samples = client_sample_rows
+
+    lines = []
+    lines.append('=== A. CUSTOMER-SUBMITTED INFORMATION ===')
+    lines.append(f"Inspection ID: {src.get('id')}")
+    lines.append(f"Client: {src.get('full_name') or 'N/A'}")
+    lines.append(f"Client type: {src.get('client_type') or 'N/A'}")
+    address_parts = [
+        src.get('street_address') or '',
+        src.get('unit_number') or '',
+        src.get('city') or '',
+        src.get('state') or '',
+        src.get('zip_code') or '',
+    ]
+    address = ', '.join([p for p in address_parts if p])
+    lines.append(f"Property address: {address or 'N/A'}")
+    lines.append(f"Property type: {src.get('property_type') or 'N/A'}")
+    lines.append(f"Square footage: {src.get('square_footage') or 'N/A'}")
+    lines.append('')
+    lines.append('Customer description of the concern:')
+    lines.append(customer_description)
+    lines.append('')
+    lines.append(f"Visible mold reported: {src.get('has_visible_mold')}")
+    if mold_locations:
+        lines.append('Reported visible mold / affected areas:')
+        for loc in mold_locations:
+            lines.append(f"- {loc}")
+    else:
+        lines.append('Reported visible mold / affected areas: None provided')
+    lines.append('')
+    lines.append(f"Water damage / leak reported: {src.get('has_water_damage')}")
+    if water_locations:
+        lines.append('Reported water damage / leak locations:')
+        for loc in water_locations:
+            lines.append(f"- {loc}")
+    else:
+        lines.append('Reported water damage / leak locations: None provided')
+    lines.append('')
+    lines.append(
+        f"Temperature: {src.get('temperature') if src.get('temperature') is not None else 'N/A'}"
+    )
+    lines.append(
+        f"Humidity: {src.get('humidity') if src.get('humidity') is not None else 'N/A'}"
+    )
+    lines.append(f"Environmental data method: {src.get('environmental_data_method') or 'N/A'}")
+    lines.append('')
+
+    if samples:
+        lines.append('Sample locations submitted by the customer:')
+        for idx, sample in enumerate(samples, start=1):
+            loc = sample.get('location') or sample.get('sample_location') or 'N/A'
+            desc = sample.get('description') or sample.get('notes') or 'None'
+            lines.append(f"- Sample #{idx}: location={loc}; description={desc}")
+    else:
+        lines.append('Sample locations submitted by the customer: None found')
+
+    mold_photo_count = _count_images(src.get('mold_images'))
+    water_photo_count = _count_images(src.get('water_damage_images'))
+    sample_photo_count = sum(1 for s in (samples or []) if s.get('sample_image'))
+    thermostat_photo = 1 if src.get('thermostat_image') else 0
+
+    lines.append('')
+    lines.append('=== C. UPLOADED EVIDENCE (inventory only; NOT vision-analyzed) ===')
+    lines.append(f"- Mold photos uploaded: {mold_photo_count}")
+    lines.append(f"- Water-damage photos uploaded: {water_photo_count}")
+    lines.append(f"- Sample photos uploaded: {sample_photo_count}")
+    lines.append(f"- Thermostat photo uploaded: {thermostat_photo}")
+    lines.append('Do not claim these photographs were visually analyzed.')
+
+    return "\n".join(lines)
 
 
 def require_admin_from_request():
@@ -109,19 +376,37 @@ def require_admin_from_request():
     if not token:
         return None, (jsonify({"error": "Authorization header required"}), 401)
 
+    email = None
+
+    # 1) Prefer local JWT verification
     try:
         payload = verify_jwt_token(token)
-    except ValueError as e:
-        return None, (jsonify({"error": str(e)}), 401)
+        email = payload.get('email')
     except Exception:
-        return None, (jsonify({"error": "Invalid token"}), 401)
+        email = None
 
-    email = payload.get('email')
+    # 2) Fallback: validate production-issued tokens (local AI + remote login)
+    if not email:
+        prod_validate_url = os.getenv(
+            'PROD_AUTH_VALIDATE_URL',
+            'https://moldetest-ftxv.onrender.com/api/auth/validate',
+        )
+        try:
+            prod_resp = requests.get(
+                prod_validate_url,
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=15,
+            )
+            if prod_resp.ok:
+                email = (prod_resp.json() or {}).get('email')
+        except Exception as e:
+            logger.warning(f"Production token validate fallback failed: {e}")
+
     if not email:
         return None, (jsonify({"error": "Invalid token"}), 401)
 
     try:
-        user_result = supabase.table('user_profiles').select('id, email, role, is_admin').eq('email', email).execute()
+        user_result = supabase.table('user_profiles').select('id, email, role').eq('email', email).execute()
     except Exception as e:
         logger.error(f"Admin auth lookup failed: {e}")
         return None, (jsonify({"error": "Unable to verify admin access"}), 500)
@@ -169,8 +454,106 @@ def _extract_json_object(text: str) -> dict:
     return parsed
 
 
-def _call_report_assistant_openai(findings_text: str) -> dict:
-    """Call OpenAI and return validated {conclusion, recommendations}."""
+def _normalize_report_assistant_conclusion(value) -> str:
+    """Normalize model conclusion to a single paragraph string."""
+    if isinstance(value, list):
+        parts = [str(x).strip() for x in value if str(x).strip()]
+        return " ".join(parts).strip()
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _normalize_report_assistant_recommendations(value) -> str:
+    """
+    Normalize model recommendations to newline-separated bullets for the admin textarea.
+    Accepts a JSON array (preferred) or a single string with bullets/newlines.
+    """
+    items = []
+    if isinstance(value, list):
+        items = [str(x).strip() for x in value if str(x).strip()]
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return ""
+        # Prefer splitting multi-line / bullet text; fall back to whole string.
+        raw_lines = re.split(r"[\r\n]+", text)
+        for line in raw_lines:
+            cleaned = line.strip()
+            if not cleaned:
+                continue
+            cleaned = re.sub(r"^[-*•]\s*", "", cleaned).strip()
+            if cleaned:
+                items.append(cleaned)
+        if not items and text:
+            items = [re.sub(r"^[-*•]\s*", "", text).strip()]
+    else:
+        return ""
+
+    bullet_lines = []
+    for item in items:
+        text = item.strip()
+        if not text:
+            continue
+        if not text.startswith("-"):
+            text = f"- {text}"
+        bullet_lines.append(text)
+    return "\n".join(bullet_lines).strip()
+
+
+def _normalize_report_assistant_mold_findings(value) -> list:
+    """Normalize mold_findings from the model into [{name, quantity, level}]."""
+    if not isinstance(value, list):
+        return []
+
+    findings = []
+    seen = set()
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        name = str(
+            item.get('name')
+            or item.get('mold')
+            or item.get('type')
+            or item.get('spore')
+            or ''
+        ).strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        quantity = str(item.get('quantity') or item.get('count') or item.get('amount') or '').strip()
+        level = str(item.get('level') or item.get('category') or item.get('severity') or '').strip()
+        findings.append({
+            'name': name,
+            'quantity': quantity,
+            'level': _canonicalize_mold_level(level or quantity),
+        })
+    return findings
+
+
+def _canonicalize_mold_level(raw: str) -> str:
+    """Map free-text ratings onto: Not Detect, Rare, Low, Medium, High."""
+    q = str(raw or '').strip().lower()
+    if not q:
+        return ''
+    if re.search(r'\bnot\s*detect(ed)?\b', q) or q in {'nd', 'none', '0', 'absent'}:
+        return 'Not Detect'
+    if re.search(r'\brare\b', q) or re.search(r'\btrace\b', q) or re.search(r'\bvery\s*low\b', q):
+        return 'Rare'
+    if re.search(r'\bmed(ium)?\b', q) or re.search(r'\bmoderate\b', q):
+        return 'Medium'
+    if re.search(r'\bhigh\b', q) or re.search(r'\babundant\b', q) or re.search(r'\bnumerous\b', q):
+        return 'High'
+    if re.search(r'\blow\b', q):
+        return 'Low'
+    return ''
+
+
+def _call_report_assistant_openai(findings_text: str, inspection_context: str = '') -> dict:
+    """Call OpenAI and return validated {conclusion, recommendations, mold_findings}."""
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not configured on the server")
 
@@ -182,15 +565,47 @@ def _call_report_assistant_openai(findings_text: str) -> dict:
     client = OpenAI(api_key=OPENAI_API_KEY)
     model = (OPENAI_MODEL or 'gpt-4o-mini').strip() or 'gpt-4o-mini'
 
-    user_prompt = f"""Laboratory findings entered by the admin (use ONLY this information):
+    user_prompt = f"""Using the information below, write the report conclusion and recommendations.
 
+Use:
+- The customer's submitted description
+- Sample locations
+- Laboratory findings entered by the admin
+- Reported visible mold-like growth
+- Reported leaks or water damage
+- Indoor humidity readings
+- Ventilation or HVAC concerns
+- Other relevant inspection information
+
+Do not invent facts. Select only recommendations supported by this information.
+Do not produce a generic recommendation list.
+
+Also extract mold_findings from section B only (spore/mold types with quantities). Do not invent types.
+
+{inspection_context or '=== A. CUSTOMER-SUBMITTED INFORMATION ===\nNone available.'}
+
+=== B. ADMIN LABORATORY FINDINGS ===
 {findings_text}
 
-Return JSON only:
+Follow the system instructions exactly for conclusion structure, cautious wording, recommendation priorities, prohibited language, and mold_findings extraction.
+
+Return valid JSON only:
 {{
-  "conclusion": "...",
-  "recommendations": "..."
+  "conclusion": "One concise paragraph",
+  "recommendations": [
+    "First recommendation",
+    "Second recommendation"
+  ],
+  "mold_findings": [
+    {{"name": "MoldType", "quantity": "count or level from lab text", "level": "Low"}}
+  ]
 }}"""
+
+    logger.info(
+        "Report assistant prompt sizes: context_chars=%s findings_chars=%s",
+        len(inspection_context or ''),
+        len(findings_text or ''),
+    )
 
     messages = [
         {"role": "system", "content": REPORT_ASSISTANT_SYSTEM_PROMPT},
@@ -200,8 +615,8 @@ Return JSON only:
     create_kwargs = {
         "model": model,
         "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": 1500,
+        "temperature": 0.15,
+        "max_tokens": 2000,
     }
 
     try:
@@ -216,18 +631,22 @@ Return JSON only:
     raw = response.choices[0].message.content if response.choices else ""
     parsed = _extract_json_object(raw)
 
-    conclusion = parsed.get("conclusion")
-    recommendations = parsed.get("recommendations")
+    conclusion = _normalize_report_assistant_conclusion(parsed.get("conclusion"))
+    recommendations = _normalize_report_assistant_recommendations(parsed.get("recommendations"))
+    mold_findings = _normalize_report_assistant_mold_findings(parsed.get("mold_findings"))
 
-    if not isinstance(conclusion, str) or not conclusion.strip():
+    if not conclusion:
         raise ValueError("Model response missing a non-empty conclusion")
-    if not isinstance(recommendations, str) or not recommendations.strip():
+    if not recommendations:
         raise ValueError("Model response missing non-empty recommendations")
 
     return {
-        "conclusion": conclusion.strip(),
-        "recommendations": recommendations.strip(),
+        "conclusion": conclusion,
+        "recommendations": recommendations,
+        "mold_findings": mold_findings,
     }
+
+
 class SimpleOCRIntegration:
     """Simplified OCR integration for lab analysis"""
     
@@ -1854,7 +2273,7 @@ def generate_report_assistant():
     try:
         inspection_result = (
             supabase.table('inspection')
-            .select('id, status')
+            .select('*')
             .eq('id', inspection_id_int)
             .execute()
         )
@@ -1865,14 +2284,51 @@ def generate_report_assistant():
     if not inspection_result.data:
         return jsonify({"error": f"Inspection with ID {inspection_id_int} not found"}), 404
 
-    status = (inspection_result.data[0].get('status') or '').strip().lower()
+    inspection_row = inspection_result.data[0]
+    status = (inspection_row.get('status') or '').strip().lower()
     if status in REPORT_ASSISTANT_BLOCKED_STATUSES:
         return jsonify({
             "error": "AI generation is disabled for completed or report_ready inspections"
         }), 409
 
+    samples = []
     try:
-        result = _call_report_assistant_openai(findings_text)
+        samples_result = (
+            supabase.table('samples')
+            .select('*')
+            .eq('inspection_id', inspection_id_int)
+            .execute()
+        )
+        samples = samples_result.data or []
+    except Exception as e:
+        logger.warning(f"Report assistant samples lookup failed: {e}")
+        samples = []
+
+    # Optional client-side snapshot of the loaded inspection (helps if DB field shapes differ)
+    client_submitted = data.get('customer_submitted')
+    if not isinstance(client_submitted, dict):
+        client_submitted = None
+
+    # Prefer samples from the admin UI snapshot (same data the admin is viewing)
+    client_samples = []
+    if client_submitted and isinstance(client_submitted.get('samples'), list):
+        client_samples = [s for s in (client_submitted.get('samples') or []) if isinstance(s, dict)]
+    samples_for_context = client_samples if client_samples else samples
+
+    inspection_context = _build_inspection_context(
+        inspection_row,
+        samples_for_context,
+        client_submitted=client_submitted,
+    )
+    logger.info(
+        "Report assistant context built for inspection %s (%s chars, %s samples)",
+        inspection_id_int,
+        len(inspection_context),
+        len(samples_for_context),
+    )
+
+    try:
+        result = _call_report_assistant_openai(findings_text, inspection_context)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
     except ValueError as e:
@@ -1885,6 +2341,7 @@ def generate_report_assistant():
     return jsonify({
         "conclusion": result["conclusion"],
         "recommendations": result["recommendations"],
+        "mold_findings": result.get("mold_findings") or [],
     }), 200
 
 

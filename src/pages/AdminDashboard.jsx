@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import { createPageUrl } from "@/utils";
 import { getDisplayNumber } from "@/utils/inspectionUtils";
 import { downloadPDF, downloadHTML } from "@/utils/pdfDownload";
+import { resolveCoverAssets } from "@/utils/reportAssets";
+import { sanitizeReportText } from "@/utils/reportText";
 import EmailTemplateManager from "@/components/EmailTemplateManager";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
@@ -24,13 +26,14 @@ import { buildLabAnalysisFilesHtml, buildLabAnalysisIntroHtml, normalizeLabAnaly
 
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
+    const { logoSrc, coverKitSrc } = await resolveCoverAssets();
     
     // Helper function to format recommendations text (same as in analysis functions)
     const formatRecommendationsText = (text) => {
       if (!text) return text;
       
       // Remove asterisks and clean up formatting
-      return text
+      return sanitizeReportText(text)
         .replace(/\*\*/g, '') // Remove bold asterisks
         .replace(/\*/g, '') // Remove single asterisks
         .replace(/(\d+\.)\s*([^:]+:)/g, '$2') // Remove numbers from headers, keep just the header with colon
@@ -69,6 +72,123 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .cover-details { background: rgba(255,255,255,0.95); padding: 22px 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 520px; width: 100%; margin-top: auto; margin-bottom: 48px; }
         .cover-detail-item { margin: 10px 0; font-size: 16px; line-height: 1.45; }
         .cover-detail-label { font-weight: bold; color: #004aac; }
+
+        /* Mold report cover (matches approved cover layout) */
+        .tt-mold-cover {
+          align-items: stretch !important;
+          text-align: left !important;
+          padding: 36px 44px 32px !important;
+          gap: 0 !important;
+          justify-content: flex-start !important;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        .tt-cover-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 20px;
+        }
+        .tt-cover-logo {
+          max-width: 168px;
+          max-height: 56px;
+          width: auto;
+          height: auto;
+          object-fit: contain;
+          border: none !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+        }
+        .tt-cover-doc-type {
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #9AA3AF;
+          padding-top: 6px;
+        }
+        .tt-cover-title {
+          font-size: 32px;
+          font-weight: 700;
+          color: #0B2E59;
+          margin: 0 0 6px 0;
+          line-height: 1.2;
+          text-align: center;
+          text-shadow: none;
+          max-width: none;
+        }
+        .tt-cover-subtitle {
+          font-size: 14px;
+          color: #6B7280;
+          margin: 0 0 16px 0;
+          line-height: 1.4;
+          text-align: center;
+        }
+        .tt-cover-hero {
+          width: 100%;
+          max-width: 100% !important;
+          max-height: 320px !important;
+          height: auto;
+          object-fit: contain;
+          object-position: center bottom;
+          border-radius: 14px !important;
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 0 18px 0 !important;
+          display: block;
+          background: #fff;
+        }
+        .tt-cover-meta {
+          background: #F3F5F8;
+          border-radius: 12px;
+          padding: 4px 24px;
+          width: 100%;
+          max-width: 520px;
+          margin: 0 auto 16px auto;
+          box-sizing: border-box;
+        }
+        .tt-cover-meta-row {
+          display: flex;
+          justify-content: flex-start;
+          align-items: baseline;
+          gap: 14px;
+          padding: 12px 0;
+          border-bottom: 1px solid #E5E7EB;
+        }
+        .tt-cover-meta-row:last-child { border-bottom: none; }
+        .tt-cover-meta-label {
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: #6B7280;
+          flex: 0 0 132px;
+          width: 132px;
+        }
+        .tt-cover-meta-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #0B2E59;
+          text-align: left;
+          line-height: 1.35;
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+        .tt-cover-footer { margin-top: auto; }
+        .tt-cover-accent {
+          width: 48px;
+          height: 3px;
+          background: #14B8A6;
+          border-radius: 2px;
+          margin-bottom: 10px;
+        }
+        .tt-cover-tagline {
+          font-size: 16px;
+          font-weight: 700;
+          color: #0B2E59;
+          margin: 0;
+        }
         .report-container { max-width: 100%; margin: 0 auto; background-color: #fff; padding: 20px; }
         .section { margin-bottom: 25px; }
         .keep-together { page-break-inside: avoid; break-inside: avoid-page; display: block; }
@@ -236,7 +356,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       <body>
           <div class="cover-page">
               <h1 class="cover-title">Asbestos Assessment Report</h1>
-              <img src="/logos.png" alt="Total Testing Logo" class="cover-image" />
+              <img src="${logoSrc}" alt="Total Testing Logo" class="cover-image" />
               <div class="cover-details">
                   <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
                   <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
@@ -445,9 +565,9 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       ? moldLocations.map((location, i) => {
           const locationImage = inspection.mold_images[i] || null;
           return `<div class="keep-together finding-block" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-            ${i === 0 ? `<h3 style="color: #dc2626; font-size: 16px; margin: 0 0 12px 0; display: flex; align-items: center; gap: 6px;">⚠️ Visible Mold Detected</h3>` : ''}
+            ${i === 0 ? `<h3 style="color: #dc2626; font-size: 16px; margin: 0 0 12px 0;">Visible Mold Detected</h3>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-              <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${location || 'N/A'}</h4>
+              <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
               ${createPriorityBadge('medium', 'high Priority')}
             </div>
             <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
@@ -461,20 +581,20 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     const waterDamageHtml = inspection.water_damage_images && inspection.water_damage_images.length > 0 && waterDamageLocations.length > 0
       ? waterDamageLocations.map((location, i) => `
             <div class="keep-together finding-block" style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
-              ${i === 0 ? `<h3 style="color: #ea580c; font-size: 16px; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">💧 Water Damage Detected</h3>` : ''}
+              ${i === 0 ? `<h3 style="color: #ea580c; font-size: 16px; margin: 0 0 10px 0;">Water Damage Detected</h3>` : ''}
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
-                <h4 style="color: #ea580c; font-weight: bold; margin: 0; font-size: 14px;">Location #${i + 1}: ${location || 'N/A'}</h4>
+                <h4 style="color: #ea580c; font-weight: bold; margin: 0; font-size: 14px;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
                 ${createPriorityBadge('medium', 'Medium Priority')}
               </div>
-              <p style="color: #ea580c; font-size: 12px; margin: 4px 0;">💧 Water damage detected - may contribute to mold growth</p>
+              <p style="color: #ea580c; font-size: 12px; margin: 4px 0;">Water damage detected - may contribute to mold growth</p>
               <div style="text-align: center; margin: 6px 0;">
                 ${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" style="max-width: 160px; max-height: 110px; object-fit: contain; border-radius: 4px; border: 1px solid #fed7aa;" />` : ''}
               </div>
             </div>
           `).join('')
       : `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            ✅ No Water Damage Detected
+          <h3 style="color: #059669; font-size: 18px; margin-bottom: 15px;">
+            No Water Damage Detected
           </h3>
           <p style="color: #059669; font-style: italic;">No recent water damage was reported during this inspection.</p>
         </div>`;
@@ -482,8 +602,8 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     let environmentalHtml = '';
     if (inspection.environmental_data_method === 'photo' && inspection.thermostat_image) {
         environmentalHtml = `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            🌡️ Environmental Conditions
+          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+            Environmental Conditions
           </h3>
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
             <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
@@ -498,14 +618,14 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
         
         environmentalHtml = `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            🌡️ Environmental Conditions
+          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+            Environmental Conditions
           </h3>
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
               <div>
                 <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Temperature</p>
-                <p style="font-size: 18px; font-weight: bold;">${temperature}°F</p>
+                <p style="font-size: 18px; font-weight: bold;">${temperature} F</p>
               </div>
               <div>
                 <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Humidity</p>
@@ -514,8 +634,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             </div>
             ${isHighHumidity ? `
               <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 12px; margin-top: 15px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="color: #d97706;">⚠️</span>
+                <div>
                   <p style="color: #92400e; font-weight: bold; margin: 0; font-size: 14px;">
                     HUMIDITY WARNING: The EPA recommends relative humidity levels at or below 60% to prevent mold growth. 
                     Current humidity of ${humidity}% may contribute to mold development.
@@ -527,8 +646,8 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         </div>`;
     } else {
         environmentalHtml = `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #6b7280; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-            🌡️ Environmental Conditions
+          <h3 style="color: #6b7280; font-size: 18px; margin-bottom: 15px;">
+            Environmental Conditions
           </h3>
           <p style="color: #6b7280; font-style: italic;">Environmental data not provided during this inspection.</p>
         </div>`;
@@ -639,8 +758,8 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     
     const samplesHtml = samples && samples.length > 0
       ? samples.map((s, i) => `<div class="keep-together sample-block">
-          <h4>Sample #${i + 1}: ${s.location || 'N/A'}</h4>
-          ${s.description ? `<p>${s.description}</p>` : ''}
+          <h4>Sample #${i + 1}: ${sanitizeReportText(s.location) || 'N/A'}</h4>
+          ${s.description ? `<p>${sanitizeReportText(s.description)}</p>` : ''}
           <div>${s.sample_image ? `<img src="${s.sample_image}" alt="Sample Photo" />` : ''}</div>
         </div>`).join('')
       : '<p>No samples were documented for this inspection.</p>';
@@ -659,13 +778,23 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         <style>${css}</style>
     </head>
     <body>
-        <div class="cover-page">
-            <h1 class="cover-title">DIY Mold Inspection and Testing Report</h1>
-<img src="/logos.png" alt="Total Testing Logo" class="cover-image" />    
-           <div class="cover-details">
-                <div class="cover-detail-item"><span class="cover-detail-label">Report Number:</span> ${displayNum}</div>
-                <div class="cover-detail-item"><span class="cover-detail-label">Inspection Date:</span> ${format(new Date(inspection.created_at), "MMMM d, yyyy")}</div>
-                <div class="cover-detail-item"><span class="cover-detail-label">Property Address:</span> ${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div>
+        <div class="cover-page tt-mold-cover">
+            <div class="tt-cover-header">
+                <img src="${logoSrc}" alt="Total Testing" class="tt-cover-logo" />
+                <div class="tt-cover-doc-type">Laboratory Report</div>
+            </div>
+            <h1 class="tt-cover-title">Mold Surface Testing Report</h1>
+            <p class="tt-cover-subtitle">User-Collected Sampling &amp; Independent Laboratory Analysis</p>
+            <img src="${coverKitSrc}" alt="Total Testing sample kit" class="tt-cover-hero" />
+            <div class="tt-cover-meta">
+                <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Report Number</span><span class="tt-cover-meta-value">${displayNum}</span></div>
+                <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Customer</span><span class="tt-cover-meta-value">${sanitizeReportText(inspection.full_name) || 'N/A'}</span></div>
+                <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Property</span><span class="tt-cover-meta-value">${sanitizeReportText([[inspection.street_address, inspection.unit_number].filter(Boolean).join(', '), [inspection.city, [inspection.state, inspection.zip_code].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(', ')) || 'N/A'}</span></div>
+                <div class="tt-cover-meta-row"><span class="tt-cover-meta-label">Collection Date</span><span class="tt-cover-meta-value">${inspection.created_at ? format(new Date(inspection.created_at), "MMMM d, yyyy") : 'N/A'}</span></div>
+            </div>
+            <div class="tt-cover-footer">
+                <div class="tt-cover-accent"></div>
+                <p class="tt-cover-tagline">Test Before You Guess.</p>
             </div>
         </div>
         <div class="report-page disclaimer-page report-container">
@@ -678,14 +807,14 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             <div class="section">
                 <h2 class="report-section-title">Client Information</h2>
                 <div class="client-info-grid">
-                    <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(inspection.full_name || 'N/A').toUpperCase()}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(inspection.email || 'N/A').toUpperCase()}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${(inspection.client_type || 'N/A').toUpperCase()}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
-                    <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(inspection.property_type || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Customer:</div><div class="client-info-value">${(sanitizeReportText(inspection.full_name) || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Email:</div><div class="client-info-value">${(sanitizeReportText(inspection.email) || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Client Type:</div><div class="client-info-value">${(sanitizeReportText(inspection.client_type) || 'N/A').toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Address:</div><div class="client-info-value">${sanitizeReportText((inspection.street_address || '') + (inspection.unit_number ? ', ' + inspection.unit_number : '') + ', ' + (inspection.city || '') + ', ' + (inspection.state || '') + ' ' + (inspection.zip_code || '')).toUpperCase()}</div></div>
+                    <div class="client-info-item"><div class="client-info-label">Property Type:</div><div class="client-info-value">${(sanitizeReportText(inspection.property_type) || 'N/A').toUpperCase()}</div></div>
                     <div class="client-info-item"><div class="client-info-label">Square Footage:</div><div class="client-info-value">${inspection.square_footage || 'N/A'} SQ FT</div></div>
-                    ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.background_info}</div></div>` : ''}
-                    ${inspection.location_description ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Location Description:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${inspection.location_description}</div></div>` : ''}
+                    ${inspection.background_info ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Background Information:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${sanitizeReportText(inspection.background_info)}</div></div>` : ''}
+                    ${inspection.location_description ? `<div class="client-info-item" style="grid-column: 1 / -1;"><div class="client-info-label">Location Description:</div><div class="client-info-value" style="text-transform: none; white-space: pre-wrap;">${sanitizeReportText(inspection.location_description)}</div></div>` : ''}
                 </div>
             </div>
         </div>

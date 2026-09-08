@@ -3,6 +3,14 @@ import { MoldInspection, AsbestosInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { ProcessLabImageWithOCR, InvokeLLM, GenerateReportAssistant } from "@/api/integrations";
 import { uploadLabImage, deleteLabImage, isLabPdfFile, isLabImageFile, isAllowedLabFile, isLabPdfUrl } from '@/lib/labAnalysis.jsx';
+import {
+  MoldFindingsBreakdown,
+  parseMoldFindingsFromLabText,
+  normalizeMoldFindings,
+  extractMoldFindingsFromText,
+  attachMoldFindingsMarker,
+  stripMoldFindingsMarker,
+} from '@/lib/moldFindings.jsx';
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -130,6 +138,7 @@ export default function InspectionDetails() {
   const [editingMaterialCondition, setEditingMaterialCondition] = useState('');
   // AI Report Assistant — findings are temporary page state only (not saved to DB)
   const [laboratoryFindings, setLaboratoryFindings] = useState('');
+  const [moldFindings, setMoldFindings] = useState([]);
   const [reportAssistantLoading, setReportAssistantLoading] = useState(false);
   const [reportAssistantError, setReportAssistantError] = useState(null);
   const [reportAssistantSuccess, setReportAssistantSuccess] = useState(null);
@@ -328,7 +337,16 @@ export default function InspectionDetails() {
           // Update local state to reflect the cleared fields
           inspection.lab_conclusion = "";
           inspection.lab_recommendations = "";
+          setMoldFindings([]);
         }
+      }
+
+      const storedMold = extractMoldFindingsFromText(inspection.lab_conclusion || '');
+      if (storedMold.findings.length) {
+        inspection.lab_conclusion = storedMold.cleanText;
+        setMoldFindings(storedMold.findings);
+      } else {
+        setMoldFindings([]);
       }
       
       setInspection(inspection);
@@ -823,16 +841,55 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
 
     setReportAssistantLoading(true);
     try {
+      const customerSubmitted = {
+        id: inspection?.id,
+        full_name: inspection?.full_name,
+        client_type: inspection?.client_type,
+        street_address: inspection?.street_address,
+        unit_number: inspection?.unit_number,
+        city: inspection?.city,
+        state: inspection?.state,
+        zip_code: inspection?.zip_code,
+        property_type: inspection?.property_type,
+        square_footage: inspection?.square_footage,
+        background_info: inspection?.background_info || '',
+        has_visible_mold: inspection?.has_visible_mold,
+        mold_locations: inspection?.mold_locations,
+        mold_images: inspection?.mold_images,
+        visible_mold_details: inspection?.visible_mold_details,
+        has_water_damage: inspection?.has_water_damage,
+        water_damage_locations: inspection?.water_damage_locations,
+        water_damage_images: inspection?.water_damage_images,
+        water_damage_details: inspection?.water_damage_details,
+        temperature: inspection?.temperature,
+        humidity: inspection?.humidity,
+        environmental_data_method: inspection?.environmental_data_method,
+        thermostat_image: inspection?.thermostat_image,
+        samples: (samples || []).map((s) => ({
+          location: s.location,
+          description: s.description,
+          sample_image: s.sample_image,
+        })),
+      };
+
       const result = await GenerateReportAssistant({
         findingsText: findings,
         inspectionId,
+        customerSubmitted,
       });
+
+      const extractedFindings = normalizeMoldFindings(
+        result.moldFindings?.length
+          ? result.moldFindings
+          : parseMoldFindingsFromLabText(findings)
+      );
+      setMoldFindings(extractedFindings);
 
       setInspection((prev) =>
         prev
           ? {
               ...prev,
-              lab_conclusion: result.conclusion,
+              lab_conclusion: stripMoldFindingsMarker(result.conclusion),
               lab_recommendations: result.recommendations,
             }
           : prev
@@ -871,9 +928,12 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
       // Use the appropriate entity to save changes
       const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
       
-      // Save the lab analysis changes
+      // Save the lab analysis changes (mold findings persist as a hidden marker in lab_conclusion)
       await updateEntity.update(inspectionId, {
-        lab_conclusion: inspection.lab_conclusion,
+        lab_conclusion: attachMoldFindingsMarker(
+          stripMoldFindingsMarker(inspection.lab_conclusion || ''),
+          moldFindings
+        ),
         lab_recommendations: inspection.lab_recommendations
       });
 
@@ -2245,6 +2305,9 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
                                     lab_recommendations: ""
                                   } : {})
                                 }));
+                                if (shouldClearAnalysis) {
+                                  setMoldFindings([]);
+                                }
 
                                 // Delete from storage and update database
                                 const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
@@ -2496,7 +2559,8 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                     <div>
                       <Label htmlFor="laboratory-findings">Laboratory Findings</Label>
                       <p className="text-xs text-slate-500 mt-1 mb-2">
-                        Temporary input for the AI Report Assistant only. This text is not saved and is never shown on the customer report.
+                        Temporary input for the AI Report Assistant only. Not saved to the customer report.
+                        Generation also uses this inspection&apos;s submitted details (locations, moisture/water damage, humidity, samples).
                       </p>
                       <Textarea
                         id="laboratory-findings"
@@ -2505,6 +2569,10 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                           setLaboratoryFindings(e.target.value);
                           setReportAssistantError(null);
                           setReportAssistantSuccess(null);
+                          const preview = parseMoldFindingsFromLabText(e.target.value);
+                          if (preview.length) {
+                            setMoldFindings(preview);
+                          }
                         }}
                         placeholder="Describe the lab findings in your own words (species, counts, sample location, debris, etc.)..."
                         className="min-h-28 mt-2"
@@ -2519,6 +2587,9 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                           </span>
                         )}
                       </div>
+                      {moldFindings.length > 0 && (
+                        <MoldFindingsBreakdown findings={moldFindings} className="mt-4" />
+                      )}
                       <Button
                         type="button"
                         onClick={handleGenerateReportAssistant}
@@ -2558,7 +2629,7 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                       <Label htmlFor="conclusion">Conclusion</Label>
                       <Textarea
                         id="conclusion"
-                        value={inspection.lab_conclusion || ""}
+                        value={stripMoldFindingsMarker(inspection.lab_conclusion || "")}
                         onChange={e => setInspection({ ...inspection, lab_conclusion: e.target.value })}
                         placeholder="Professional conclusion based on lab analysis..."
                         className="min-h-32 mt-2"

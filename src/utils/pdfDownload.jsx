@@ -129,6 +129,21 @@ const PDF_OVERRIDE_STYLES = `
   #pdf-download-content .cover-image { max-width: 620px !important; max-height: 500px !important; width: auto !important; height: auto !important; margin: 0 !important; object-fit: contain !important; }
   #pdf-download-content .cover-details { padding: 20px 24px !important; max-width: 520px !important; width: 100% !important; margin-top: auto !important; margin-bottom: 40px !important; }
   #pdf-download-content .cover-detail-item { font-size: 15px !important; margin: 8px 0 !important; line-height: 1.45 !important; }
+  #pdf-download-content .tt-mold-cover { align-items: stretch !important; text-align: left !important; padding: 36px 40px 40px !important; gap: 0 !important; }
+  #pdf-download-content .tt-cover-header { display: flex !important; justify-content: space-between !important; align-items: flex-start !important; margin-bottom: 24px !important; width: 100% !important; }
+  #pdf-download-content .tt-cover-logo { max-width: 160px !important; max-height: 52px !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; object-fit: contain !important; }
+  #pdf-download-content .tt-cover-doc-type { font-size: 11px !important; font-weight: 600 !important; letter-spacing: 0.12em !important; text-transform: uppercase !important; color: #9AA3AF !important; padding-top: 6px !important; }
+  #pdf-download-content .tt-cover-title { font-size: 32px !important; font-weight: 700 !important; color: #0B2E59 !important; margin: 0 0 8px 0 !important; line-height: 1.2 !important; text-align: center !important; text-shadow: none !important; max-width: none !important; }
+  #pdf-download-content .tt-cover-subtitle { font-size: 13px !important; color: #6B7280 !important; margin: 0 0 18px 0 !important; text-align: center !important; }
+  #pdf-download-content .tt-cover-hero { width: 100% !important; max-width: 100% !important; max-height: 300px !important; height: auto !important; object-fit: contain !important; object-position: center bottom !important; border-radius: 12px !important; border: none !important; box-shadow: none !important; margin: 0 0 16px 0 !important; background: #fff !important; }
+  #pdf-download-content .tt-cover-meta { background: #F3F5F8 !important; border-radius: 12px !important; padding: 4px 22px !important; width: 100% !important; max-width: 520px !important; margin: 0 auto 20px auto !important; box-sizing: border-box !important; }
+  #pdf-download-content .tt-cover-meta-row { display: flex !important; justify-content: flex-start !important; align-items: baseline !important; gap: 14px !important; padding: 11px 0 !important; border-bottom: 1px solid #E5E7EB !important; }
+  #pdf-download-content .tt-cover-meta-row:last-child { border-bottom: none !important; }
+  #pdf-download-content .tt-cover-meta-label { font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.06em !important; text-transform: uppercase !important; color: #6B7280 !important; flex: 0 0 132px !important; width: 132px !important; }
+  #pdf-download-content .tt-cover-meta-value { font-size: 13px !important; font-weight: 600 !important; color: #0B2E59 !important; text-align: left !important; flex: 1 1 auto !important; min-width: 0 !important; }
+  #pdf-download-content .tt-cover-footer { margin-top: auto !important; }
+  #pdf-download-content .tt-cover-accent { width: 48px !important; height: 3px !important; background: #14B8A6 !important; border-radius: 2px !important; margin-bottom: 10px !important; }
+  #pdf-download-content .tt-cover-tagline { font-size: 15px !important; font-weight: 700 !important; color: #0B2E59 !important; margin: 0 !important; }
   #pdf-download-content .report-page { page-break-after: auto !important; break-after: auto !important; page-break-before: auto !important; break-before: auto !important; }
   #pdf-download-content .disclaimer-page { min-height: auto !important; padding: 24px !important; display: block !important; }
   #pdf-download-content .findings-page { padding-top: 8px !important; page-break-after: auto !important; }
@@ -461,7 +476,7 @@ export const downloadPDF = async (
         imgPage.className = 'report-page lab-image-page report-container';
         imgPage.innerHTML = `
           <div class="section keep-together" style="text-align:center;padding:12px 0;">
-            ${labImageUrls.length > 1 ? `<p style="color:#666;font-size:14px;margin:0 0 12px;">Lab Analysis — Image ${i + 1} of ${labImageUrls.length}</p>` : ''}
+            ${labImageUrls.length > 1 ? `<p style="color:#666;font-size:14px;margin:0 0 12px;">Lab Analysis - Image ${i + 1} of ${labImageUrls.length}</p>` : ''}
             <img src="${url}" alt="Lab Analysis ${i + 1}" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:12px;" />
           </div>`;
         try {
