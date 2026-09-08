@@ -475,7 +475,7 @@ Return your response in this exact JSON format:
 
   /**
    * Admin AI Report Assistant — draft conclusion + recommendations from findings text.
-   * Does not persist; caller updates local form state only.
+   * Uses Netlify Function (avoids stuck Render GitHub deploys). Does not persist.
    */
   GenerateReportAssistant: async ({ findingsText, inspectionId }) => {
     if (typeof window === 'undefined') {
@@ -510,10 +510,16 @@ Return your response in this exact JSON format:
       throw new Error('Please sign in as an admin to use the AI Report Assistant.');
     }
 
-    const baseApiUrl = getBaseApiUrl();
+    const host = window.location.hostname;
+    const isLocal = host === 'localhost' || host === '127.0.0.1';
+    // Prefer same-origin Netlify function in production; from Vite local, call the live site.
+    const assistantUrl = isLocal
+      ? 'https://total-testing-diy.com/.netlify/functions/generate-report-assistant'
+      : `${window.location.origin}/.netlify/functions/generate-report-assistant`;
+
     let response;
     try {
-      response = await fetch(`${baseApiUrl}/api/generate-report-assistant`, {
+      response = await fetch(assistantUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -527,7 +533,7 @@ Return your response in this exact JSON format:
     } catch (networkError) {
       console.error('❌ GenerateReportAssistant network error:', networkError);
       throw new Error(
-        'Could not reach the AI Report Assistant API. The backend may be offline, or this endpoint has not been deployed yet. Deploy the latest backend (POST /api/generate-report-assistant), or run the API locally and point VITE_API_BASE_URL at it.'
+        'Could not reach the AI Report Assistant. Confirm the Netlify function is deployed and OPENAI_API_KEY / SUPABASE_SERVICE_ROLE_KEY are set in Netlify.'
       );
     }
 
@@ -542,7 +548,7 @@ Return your response in this exact JSON format:
       const message =
         (payload && (payload.error || payload.message)) ||
         (response.status === 404
-          ? 'AI Report Assistant endpoint not found on the server. Deploy the latest backend to enable this feature.'
+          ? 'AI Report Assistant function not found. Redeploy the Netlify site so netlify/functions/generate-report-assistant is published.'
           : `AI generation failed (${response.status})`);
       throw new Error(message);
     }
