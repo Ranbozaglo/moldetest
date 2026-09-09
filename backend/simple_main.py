@@ -191,9 +191,10 @@ Return valid JSON only with exactly these keys:
 Also extract every mold/spore type mentioned in the laboratory findings (section B) into "mold_findings", grouped by sample area when possible.
 - "name": mold/spore type exactly as identified by the lab (do not invent types)
 - "quantity": the count, concentration, or qualitative amount from the lab text (for example "240", "1,200 spores/m³", "Rare", "Low")
-- "level": one of exactly: "Not Detect", "Rare", "Low", "Medium", "High" (High is the highest). Map synonyms accordingly (e.g. not detected→Not Detect, moderate→Medium, very low/trace→Rare). If unknown, use "".
+- "level": REQUIRED. One of exactly: "Rare", "Low", "Medium", or "High" (or "Not Detect" only if explicitly absent). Always fill this from the lab wording or count — never leave it blank. Map synonyms (trace/very low→Rare, moderate→Medium, abundant/numerous→High).
 - "location": the sample area/room for that result when stated (for example "Living Room", "Kitchen", "Master Bedroom"). Use customer sample locations from section A to match when the lab text refers to Sample #1, Sample #2, etc. If the area is unknown, use "".
 - Create a SEPARATE mold_findings entry for each area. The same mold type may appear more than once if found in different rooms.
+- The UI displays only the level word (Rare / Low / Medium / High), so level must always be set correctly.
 - Include only types actually present in section B
 - If section B has no identifiable mold types, return "mold_findings": []
 """
@@ -535,6 +536,30 @@ def _normalize_report_assistant_recommendations(value) -> str:
     return "\n".join(bullet_lines).strip()
 
 
+def _level_from_quantity(quantity: str) -> str:
+    """Map numeric counts onto Rare / Low / Medium / High when no word rating exists."""
+    text = str(quantity or '').strip()
+    canonical = _canonicalize_mold_level(text)
+    if canonical:
+        return canonical
+    match = re.search(r'(\d+(?:\.\d+)?)', text.replace(',', ''))
+    if not match:
+        return ''
+    try:
+        n = float(match.group(1))
+    except ValueError:
+        return ''
+    if n <= 0:
+        return 'Not Detect'
+    if n < 100:
+        return 'Rare'
+    if n < 500:
+        return 'Low'
+    if n < 2000:
+        return 'Medium'
+    return 'High'
+
+
 def _normalize_report_assistant_mold_findings(value) -> list:
     """Normalize mold_findings from the model into [{name, quantity, level, location}]."""
     if not isinstance(value, list):
@@ -568,10 +593,16 @@ def _normalize_report_assistant_mold_findings(value) -> list:
         seen.add(key)
         quantity = str(item.get('quantity') or item.get('count') or item.get('amount') or '').strip()
         level = str(item.get('level') or item.get('category') or item.get('severity') or '').strip()
+        resolved_level = (
+            _canonicalize_mold_level(level)
+            or _canonicalize_mold_level(quantity)
+            or _level_from_quantity(quantity)
+            or 'Low'
+        )
         findings.append({
             'name': name,
             'quantity': quantity,
-            'level': _canonicalize_mold_level(level or quantity),
+            'level': resolved_level,
             'location': location,
         })
     return findings

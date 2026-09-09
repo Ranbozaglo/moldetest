@@ -214,17 +214,34 @@ function percentForFinding(finding, maxNumeric = 0) {
   return LEVEL_PERCENT.low;
 }
 
-function displayLabel(finding) {
-  const level =
+function ratingFromPercent(percent) {
+  const p = Number(percent);
+  if (!Number.isFinite(p) || p <= 10) return 'Not Detect';
+  if (p <= 35) return 'Rare';
+  if (p <= 55) return 'Low';
+  if (p <= 80) return 'Medium';
+  return 'High';
+}
+
+function resolveLevel(finding) {
+  return (
     canonicalizeLevel(finding?.level) ||
     canonicalizeLevel(finding?.quantity) ||
-    '';
-  // Prefer the standard rating label on the right (High is the top of the scale)
-  if (level) return level;
+    levelFromQuantityText(finding?.quantity) ||
+    ratingFromPercent(finding?.percent) ||
+    'Low'
+  );
+}
 
-  const quantity = String(finding?.quantity || '').trim();
-  if (quantity) return quantity;
-  return 'Detected';
+function displayLabel(finding) {
+  // Always show the standard rating word (Rare / Low / Medium / High), never raw counts.
+  const level = resolveLevel(finding);
+  if (level === 'Not Detect') return 'Not Detect';
+  if (level === 'Rare') return 'Rare';
+  if (level === 'Low') return 'Low';
+  if (level === 'Medium') return 'Medium';
+  if (level === 'High') return 'High';
+  return 'Low';
 }
 
 export function normalizeMoldFindings(rawFindings) {
@@ -256,11 +273,7 @@ export function normalizeMoldFindings(rawFindings) {
   }, 0);
 
   return cleaned.map((f) => {
-    const level =
-      canonicalizeLevel(f.level) ||
-      canonicalizeLevel(f.quantity) ||
-      levelFromQuantityText(f.quantity) ||
-      '';
+    const level = resolveLevel(f);
     const normalized = { ...f, level };
     return {
       name: normalized.name,
