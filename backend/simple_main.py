@@ -951,10 +951,8 @@ ocr_integration = SimpleOCRIntegration()
 # Validate configuration before starting
 if not validate_config():
     print("\n❌ Configuration validation failed!")
-    print("📝 Please create a .env file in the backend directory with:")
-    print("   SUPABASE_URL=your_supabase_url")
-    print("   SUPABASE_ANON_KEY=your_supabase_anon_key")
-    print("   SECRET_KEY=your_secret_key")
+    print("📝 On Render → Environment, set SUPABASE_URL and SUPABASE_ANON_KEY")
+    print("   (and preferably SUPABASE_SERVICE_ROLE_KEY)")
     print("\n💡 You can get your Supabase credentials from:")
     print("   https://supabase.com/dashboard")
     exit(1)
@@ -977,21 +975,18 @@ try:
         print("⚠️ SUPABASE_SERVICE_ROLE_KEY not set — falling back to anon key. "
               "RLS-protected tables will be inaccessible to the backend.")
     
-    # Test connection to public schema
+    # Probe public schema (non-fatal — RLS/network should not kill the process)
     print("🔍 Testing connection to public schema...")
-    
-    # Try public schema
     try:
-        result = supabase.table('inspection').select('*').limit(1).execute()
+        supabase.table('inspection').select('*').limit(1).execute()
         print("✅ Supabase client initialized successfully with public schema")
     except Exception as e1:
-        print(f"⚠️ Public schema test failed: {e1}")
-        print("📝 Please create the inspection table in the public schema")
-        raise Exception("Inspection table does not exist in public schema")
+        print(f"⚠️ Public schema probe failed (app will still start): {e1}")
+        print("📝 If inspections fail at runtime, check SERVICE_ROLE key and table RLS policies")
             
 except Exception as e:
     print(f"❌ Failed to initialize Supabase client: {e}")
-    print("📝 Please check your Supabase URL and anon key in the .env file")
+    print("📝 Please check SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY on Render")
     print("📝 Make sure tables exist in the public schema")
     exit(1)
 
