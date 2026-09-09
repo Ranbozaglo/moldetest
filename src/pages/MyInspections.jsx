@@ -405,7 +405,7 @@ export default function MyInspections() {
                   <h4 style="color: #0B2E59; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('high', 'High Priority')}
                 </div>
-                <p style="color: #0B2E59; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
+                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
                 <div style="text-align: center; margin: 15px 0;">
                   ${createImageList(d.images)}
                 </div>
@@ -421,16 +421,16 @@ export default function MyInspections() {
 
       const waterDamageHtml = detailedInspection.has_water_damage && detailedInspection.water_damage_details && detailedInspection.water_damage_details.length > 0
         ? `<div style="margin-bottom: 20px;">
-            <h3 style="color: #ea580c; font-size: 18px; margin-bottom: 15px;">
+            <h3 style="color: #dc2626; font-size: 18px; margin-bottom: 15px;">
               Water Damage Detected
             </h3>
             ${detailedInspection.water_damage_details.map((d, i) => `
               <div class="keep-together" style="padding: 0 0 15px 0; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-                  <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
+                  <h4 style="color: #0B2E59; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('medium', 'Medium Priority')}
                 </div>
-                <p style="color: #ea580c; font-size: 14px; margin: 8px 0;">Water damage detected - may contribute to mold growth</p>
+                <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Water damage detected - may contribute to mold growth</p>
                 <div style="text-align: center; margin: 15px 0;">
                   ${createImageList(d.images)}
                 </div>
