@@ -24,10 +24,10 @@ const getApiUrls = () => {
   
   if (isProduction) {
     // Fallback only if VITE_API_BASE_URL was not set at build time.
-    // Live API host: moldetest.onrender.com (old moldetest-ftxv.onrender.com is deleted).
+    // Live API host: moldetest-67e6.onrender.com (moldetest.onrender.com is suspended).
     return {
-      BASE_API_URL: 'https://moldetest.onrender.com',
-      BACKEND_URL: 'https://moldetest.onrender.com/api'
+      BASE_API_URL: 'https://moldetest-67e6.onrender.com',
+      BACKEND_URL: 'https://moldetest-67e6.onrender.com/api'
     };
   } else {
     return {

@@ -414,7 +414,7 @@ def require_admin_from_request():
     if not email:
         prod_validate_url = os.getenv(
             'PROD_AUTH_VALIDATE_URL',
-            'https://moldetest.onrender.com/api/auth/validate',
+            'https://moldetest-67e6.onrender.com/api/auth/validate',
         )
         try:
             prod_resp = requests.get(
