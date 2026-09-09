@@ -19,7 +19,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.0"
+        value: "3.11.9"
       - key: FRONTEND_URL
         value: https://total-testing-diy.com
       - key: CORS_ORIGINS

@@ -589,6 +589,11 @@ def _call_report_assistant_openai(findings_text: str, inspection_context: str = 
     client = OpenAI(api_key=OPENAI_API_KEY)
     model = (OPENAI_MODEL or 'gpt-4o-mini').strip() or 'gpt-4o-mini'
 
+    # Python 3.11: backslashes (e.g. \n) are illegal inside f-string {...} expressions
+    context_block = inspection_context or (
+        "=== A. CUSTOMER-SUBMITTED INFORMATION ===\nNone available."
+    )
+
     user_prompt = f"""Using the information below, write the report conclusion and recommendations.
 
 Use:
@@ -606,7 +611,7 @@ Do not produce a generic recommendation list.
 
 Also extract mold_findings from section B only (spore/mold types with quantities). Do not invent types.
 
-{inspection_context or '=== A. CUSTOMER-SUBMITTED INFORMATION ===\nNone available.'}
+{context_block}
 
 === B. ADMIN LABORATORY FINDINGS ===
 {findings_text}
@@ -948,24 +953,24 @@ print("\n🔍 DEBUG: Now initializing OCR integration...")
 # Initialize OCR integration
 ocr_integration = SimpleOCRIntegration()
 
-# Validate configuration before starting
+# Validate configuration (do NOT exit — gunicorn import must succeed on Render)
 if not validate_config():
-    print("\n❌ Configuration validation failed!")
-    print("📝 On Render → Environment, set SUPABASE_URL and SUPABASE_ANON_KEY")
+    print("\nConfiguration validation failed!")
+    print("On Render → Environment, set SUPABASE_URL and SUPABASE_ANON_KEY")
     print("   (and preferably SUPABASE_SERVICE_ROLE_KEY)")
-    print("\n💡 You can get your Supabase credentials from:")
-    print("   https://supabase.com/dashboard")
-    exit(1)
+    print("App will still boot; DB routes will fail until credentials are set.")
 
 # Validate OCR configuration (non-blocking)
-print("\n🔍 Checking OCR Configuration...")
+print("\nChecking OCR Configuration...")
 ocr_available = validate_ocr_config()
 if ocr_available:
-    print("🎯 Real Google Cloud Vision OCR will be used for lab analysis")
+    print("Real Google Cloud Vision OCR will be used for lab analysis")
 else:
-    print("⚠️  Using mock responses for OCR - Add credentials for real OCR")
+    print("Using mock responses for OCR - Add credentials for real OCR")
 
 # Initialize Supabase client (no network I/O at import time — probes hang/fail deploys)
+# Never call exit()/sys.exit here: that kills gunicorn workers with status 1.
+supabase = None
 try:
     if not SUPABASE_URL or SUPABASE_URL.startswith('your_supabase'):
         raise ValueError('SUPABASE_URL is not configured')
@@ -984,7 +989,7 @@ try:
 except Exception as e:
     print(f"Failed to initialize Supabase client: {e}")
     print("Set SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY on Render Environment")
-    exit(1)
+    supabase = None
 
 # Register email routes for gunicorn (not only `python simple_main.py`)
 try:
@@ -1130,8 +1135,12 @@ print("Skipping init_db network probes at startup (Render-safe)")
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy", "message": "Backend is running with Supabase"})
+    """Health check endpoint — always 200 so Render deploy/health checks succeed."""
+    return jsonify({
+        "status": "healthy",
+        "supabase_configured": supabase is not None,
+        "message": "Backend is running",
+    })
 
 @app.route('/api/ocr-status', methods=['GET'])
 def ocr_status():

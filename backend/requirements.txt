@@ -1,7 +1,8 @@
 # Core backend
 sqlalchemy==1.4.53
 python-dotenv==1.0.0
-pydantic==1.10.13
+# 1.10.15+ required for Python 3.12+ (ForwardRef recursive_guard); pin 3.11 on Render too
+pydantic==1.10.22
 python-multipart==0.0.6
 PyJWT==2.8.0
 passlib[bcrypt]==1.7.4
