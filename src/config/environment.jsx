@@ -1,15 +1,21 @@
+// Normalize VITE_API_BASE_URL whether it includes `/api` or not.
+const normalizeApiUrls = (rawUrl) => {
+  const trimmed = String(rawUrl || '').trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+
+  const baseUrl = trimmed.replace(/\/api$/i, '');
+  return {
+    BASE_API_URL: baseUrl,
+    BACKEND_URL: `${baseUrl}/api`
+  };
+};
+
 // Dynamic API URL Configuration with Environment Variable Override Support
 const getApiUrls = () => {
   // Environment variable override for API base URL
-  const envBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  
-  if (envBaseUrl) {
-    // If VITE_API_BASE_URL is provided, extract base and full URLs
-    const baseUrl = envBaseUrl.replace('/api', ''); 
-    return {
-      BASE_API_URL: baseUrl,
-      BACKEND_URL: envBaseUrl.endsWith('/api') ? envBaseUrl : `${envBaseUrl}/api`
-    };
+  const fromEnv = normalizeApiUrls(import.meta.env.VITE_API_BASE_URL);
+  if (fromEnv) {
+    return fromEnv;
   }
   
   // Otherwise use environment-based defaults

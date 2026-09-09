@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { User } from '@/api/entities';
+import { getBackendUrl } from '@/config/environment.jsx';
 
 // Create context with default value to prevent undefined context errors
 const AuthContext = createContext({
@@ -46,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const validateTokenWithServer = useCallback(async (userData) => {
     try {
       // Make a simple API call to validate the token
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api'}/auth/validate`, {
+      const response = await fetch(`${getBackendUrl()}/auth/validate`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${userData.access_token}`,

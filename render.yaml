@@ -1,9 +1,44 @@
-# Render Blueprint — frontend Static Site only.
-# Backend API stays on the existing moldetest-ftxv Web Service (do not recreate here).
+# Render Blueprint
+# Frontend: Static Site (currently moldetest-F-Frontend / total-testing-diy.com)
+# Backend: Flask Web Service — must stay live. Frontend calls /api/inspection on this host.
+#
+# If moldetest-ftxv.onrender.com shows x-render-routing: no-server, recreate the backend
+# service below (or Resume a suspended Python web service), then set the frontend
+# VITE_API_BASE_URL to https://<backend-host>/api and Clear build cache + Redeploy.
 
 services:
   - type: web
-    name: mold-testing-houston-frontend
+    name: moldetest-api
+    runtime: python
+    plan: free
+    branch: main
+    rootDir: backend
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT simple_main:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+      - key: FRONTEND_URL
+        value: https://total-testing-diy.com
+      - key: CORS_ORIGINS
+        value: https://total-testing-diy.com,https://www.total-testing-diy.com
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: JWT_SECRET_KEY
+        sync: false
+
+  - type: web
+    name: moldetest-F-Frontend
     runtime: static
     plan: free
     branch: main
@@ -19,7 +54,8 @@ services:
       - key: VITE_SUPABASE_URL
         value: https://opjgytjlebfnhjzarvyy.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wamd5dGpsZWJmbmhqemFydnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI1ODMzMzYsImV4cCI6MjA2ODE1OTMzNn0.SN7VpDUtsInqW_AUmP7fNaVKTgRkIZAJcyyVXlT8gJc
+        sync: false
+      # Must include /api (or host only — code normalizes either form)
       - key: VITE_API_BASE_URL
         value: https://moldetest-ftxv.onrender.com/api
 

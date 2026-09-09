@@ -3,6 +3,8 @@
  * Helper functions for managing authentication state and preventing frequent login prompts
  */
 
+import { getBackendUrl } from '@/config/environment.jsx';
+
 // Check if user is authenticated and token is valid
 export const isAuthenticated = () => {
   const savedUser = localStorage.getItem('mth_user');
@@ -77,8 +79,7 @@ export const validateTokenWithServer = async (userData = null) => {
   }
   
   try {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://moldetest-ftxv.onrender.com/api';
-    const response = await fetch(`${apiBaseUrl}/auth/validate`, {
+    const response = await fetch(`${getBackendUrl()}/auth/validate`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${userData.access_token}`,
