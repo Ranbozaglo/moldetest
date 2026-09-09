@@ -52,6 +52,7 @@ def _cors_origins():
         'http://localhost:3000',
         'https://total-testing-diy.com',
         'https://www.total-testing-diy.com',
+        'https://moldetest-f-frontend.onrender.com',
         'https://mold-testing-houston-frontend.onrender.com',
         'https://moldetest-1.onrender.com',
     ]

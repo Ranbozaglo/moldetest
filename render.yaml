@@ -2,13 +2,16 @@
 # Frontend: Static Site (currently moldetest-F-Frontend / total-testing-diy.com)
 # Backend: Flask Web Service — must stay live. Frontend calls /api/inspection on this host.
 #
-# If moldetest-ftxv.onrender.com shows x-render-routing: no-server, recreate the backend
-# service below (or Resume a suspended Python web service), then set the frontend
-# VITE_API_BASE_URL to https://<backend-host>/api and Clear build cache + Redeploy.
+# Host status (as of restore):
+# - moldetest-ftxv.onrender.com → x-render-routing: no-server (deleted; do not use)
+# - moldetest.onrender.com → exists; if suspend-by-user, Resume in Dashboard then /health → 200
+# - After any new API hostname, set Static Site VITE_API_BASE_URL to https://<host>/api
+#   and Manual Deploy → Clear build cache & deploy (Vite bakes env at build time).
+# Never set VITE_API_BASE_URL to a literal placeholder like https://<your-api-host>.onrender.com/api.
 
 services:
   - type: web
-    name: moldetest-api
+    name: moldetest
     runtime: python
     plan: free
     branch: main
@@ -23,7 +26,7 @@ services:
       - key: FRONTEND_URL
         value: https://total-testing-diy.com
       - key: CORS_ORIGINS
-        value: https://total-testing-diy.com,https://www.total-testing-diy.com
+        value: https://total-testing-diy.com,https://www.total-testing-diy.com,https://moldetest-f-frontend.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY
@@ -57,7 +60,7 @@ services:
         sync: false
       # Must include /api (or host only — code normalizes either form)
       - key: VITE_API_BASE_URL
-        value: https://moldetest-ftxv.onrender.com/api
+        value: https://moldetest.onrender.com/api
 
     # SPA: client-side routes must fall back to index.html
     routes:
