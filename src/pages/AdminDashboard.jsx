@@ -567,10 +567,10 @@ export const generateReportHtmlContent = async (inspection, samples) => {
           return `<div class="keep-together finding-block" style="padding: 0 0 15px 0; margin-bottom: 15px;">
             ${i === 0 ? `<h3 style="color: #dc2626; font-size: 16px; margin: 0 0 12px 0;">Visible Mold Detected</h3>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
-              <h4 style="color: #004aac; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
+              <h4 style="color: #0B2E59; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
               ${createPriorityBadge('medium', 'high Priority')}
             </div>
-            <p style="color: #004aac; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
+            <p style="color: #0B2E59; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
                  <div style="text-align: center; margin: 8px 0;">
                    ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 180px; max-height: 130px; object-fit: contain; border-radius: 4px;" />` : ''}
                  </div>
