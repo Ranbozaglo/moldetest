@@ -1,40 +1,75 @@
+// Live healthy API. Prefer this whenever env points at a known-dead host.
+const HEALTHY_API_BASE = 'https://moldetest-67e6.onrender.com';
+
+// Hosts that must never be used (suspended, deleted, or placeholder).
+const DEAD_API_HOSTS = new Set([
+  'moldetest.onrender.com',
+  'moldetest-ftxv.onrender.com',
+  'your-api-host.onrender.com',
+  '<your-api-host>.onrender.com',
+]);
+
+const isDeadApiHost = (hostname) => {
+  if (!hostname) return true;
+  const h = String(hostname).toLowerCase().trim();
+  if (DEAD_API_HOSTS.has(h)) return true;
+  // Catch literal placeholder strings baked into env
+  if (h.includes('your-api-host')) return true;
+  return false;
+};
+
 // Normalize VITE_API_BASE_URL whether it includes `/api` or not.
+// Returns null for empty/invalid/dead hosts so callers can fall back.
 const normalizeApiUrls = (rawUrl) => {
   const trimmed = String(rawUrl || '').trim().replace(/\/+$/, '');
   if (!trimmed) return null;
 
-  const baseUrl = trimmed.replace(/\/api$/i, '');
+  let parsed;
+  try {
+    parsed = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`);
+  } catch {
+    return null;
+  }
+
+  if (isDeadApiHost(parsed.hostname)) {
+    return null;
+  }
+
+  const baseUrl = `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, '');
+  // Strip a trailing /api path segment if present on the env value
+  const withoutApi = baseUrl.replace(/\/api$/i, '');
   return {
-    BASE_API_URL: baseUrl,
-    BACKEND_URL: `${baseUrl}/api`
+    BASE_API_URL: withoutApi,
+    BACKEND_URL: `${withoutApi}/api`
   };
 };
 
+const productionApiUrls = () => ({
+  BASE_API_URL: HEALTHY_API_BASE,
+  BACKEND_URL: `${HEALTHY_API_BASE}/api`
+});
+
 // Dynamic API URL Configuration with Environment Variable Override Support
 const getApiUrls = () => {
-  // Environment variable override for API base URL
+  // Env override wins only when it is a valid, non-dead host (e.g. 67e6).
+  // Stale Render env pointing at moldetest.onrender.com is ignored.
   const fromEnv = normalizeApiUrls(import.meta.env.VITE_API_BASE_URL);
   if (fromEnv) {
     return fromEnv;
   }
-  
-  // Otherwise use environment-based defaults
+
   const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-  const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1';
-  
+  const isProduction =
+    import.meta.env.PROD ||
+    (hostname !== 'localhost' && hostname !== '127.0.0.1');
+
   if (isProduction) {
-    // Fallback only if VITE_API_BASE_URL was not set at build time.
-    // Live API host: moldetest-67e6.onrender.com (moldetest.onrender.com is suspended).
-    return {
-      BASE_API_URL: 'https://moldetest-67e6.onrender.com',
-      BACKEND_URL: 'https://moldetest-67e6.onrender.com/api'
-    };
-  } else {
-    return {
-      BASE_API_URL: 'http://localhost:5000',
-      BACKEND_URL: 'http://localhost:5000/api'
-    };
+    return productionApiUrls();
   }
+  return {
+    BASE_API_URL: 'http://localhost:5000',
+    BACKEND_URL: 'http://localhost:5000/api'
+  };
 };
 
 const isProductionHostname = (hostname) => {

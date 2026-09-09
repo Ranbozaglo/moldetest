@@ -9,6 +9,8 @@
 # - After any new API hostname, set Static Site VITE_API_BASE_URL to https://<host>/api
 #   and Manual Deploy → Clear build cache & deploy (Vite bakes env at build time).
 # Never set VITE_API_BASE_URL to a literal placeholder like https://<your-api-host>.onrender.com/api.
+# Frontend code rejects known-dead hosts (moldetest, moldetest-ftxv, placeholders)
+# and falls back to moldetest-67e6 even if Render still has a stale VITE_API_BASE_URL.
 
 services:
   - type: web
