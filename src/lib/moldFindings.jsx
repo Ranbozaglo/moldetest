@@ -1,6 +1,7 @@
 /**
  * Mold findings breakdown helpers — parse, persist, render.
  * Findings are persisted as a hidden marker inside lab_conclusion so no DB migration is required.
+ * Ratings are shown per area/location when available (e.g. Living Room, Kitchen).
  */
 
 export const MOLD_FINDINGS_START = '<!--TT_MOLD_FINDINGS:';
@@ -30,6 +31,34 @@ const COMMON_MOLDS = [
   'Nigrospora',
   'Bipolaris',
   'Drechslera',
+];
+
+const COMMON_AREAS = [
+  'living room',
+  'family room',
+  'dining room',
+  'kitchen',
+  'master bedroom',
+  'primary bedroom',
+  'bedroom',
+  'primary bathroom',
+  'master bathroom',
+  'bathroom',
+  'basement',
+  'attic',
+  'garage',
+  'laundry room',
+  'utility room',
+  'hallway',
+  'closet',
+  'hvac',
+  'hvac vent',
+  'air return',
+  'crawlspace',
+  'crawl space',
+  'office',
+  'nursery',
+  'guest room',
 ];
 
 /** Canonical lab rating scale (lowest → highest). High is always the fullest bar. */
@@ -105,6 +134,41 @@ function titleCaseMold(name) {
     .join(' ');
 }
 
+function titleCaseLocation(location) {
+  const raw = String(location || '').trim().replace(/\s+/g, ' ');
+  if (!raw) return '';
+  if (/^hvac(\s+vent)?$/i.test(raw)) return 'HVAC Vent';
+  return raw
+    .split(/\s+/)
+    .map((part) => {
+      if (/^(hvac|ac|hvac\/ac)$/i.test(part)) return part.toUpperCase();
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+    })
+    .join(' ');
+}
+
+function extractLocationFromText(text) {
+  const q = String(text || '').toLowerCase();
+  if (!q) return '';
+
+  // "Location: Kitchen", "Sample location: Living room", "Area - Master bedroom"
+  const labeled = q.match(
+    /(?:sample\s*(?:#?\d+\s*)?(?:location|area)?|location|area|room|zone)\s*[:\-–]\s*([a-z0-9 /&-]{2,60})/i
+  );
+  if (labeled?.[1]) {
+    return titleCaseLocation(labeled[1].replace(/[.,;].*$/, '').trim());
+  }
+
+  // Prefer longer/more specific area names first
+  const sortedAreas = [...COMMON_AREAS].sort((a, b) => b.length - a.length);
+  for (const area of sortedAreas) {
+    const re = new RegExp(`\\b${area.replace(/\s+/g, '\\s+')}\\b`, 'i');
+    if (re.test(q)) return titleCaseLocation(area);
+  }
+
+  return '';
+}
+
 function levelFromQuantityText(quantity) {
   const fromText = canonicalizeLevel(quantity);
   if (fromText) return fromText;
@@ -173,10 +237,14 @@ export function normalizeMoldFindings(rawFindings) {
     if (!name) continue;
     const quantity = String(item.quantity ?? item.count ?? item.amount ?? '').trim();
     const level = String(item.level ?? item.category ?? item.severity ?? '').trim();
+    const location = titleCaseLocation(
+      item.location || item.area || item.room || item.sample_location || item.sampleLocation || ''
+    );
     cleaned.push({
       name,
       quantity,
       level,
+      location,
       percent: item.percent,
     });
   }
@@ -198,10 +266,32 @@ export function normalizeMoldFindings(rawFindings) {
       name: normalized.name,
       quantity: normalized.quantity,
       level,
+      location: normalized.location || '',
       percent: percentForFinding(normalized, maxNumeric),
       label: displayLabel(normalized),
     };
   });
+}
+
+/** Group findings by location for per-area display. */
+export function groupMoldFindingsByLocation(findings) {
+  const rows = normalizeMoldFindings(findings);
+  const groups = new Map();
+
+  for (const row of rows) {
+    const key = row.location || 'General';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+
+  // Keep named areas first; put "General" last
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => {
+      if (a === 'General' && b !== 'General') return 1;
+      if (b === 'General' && a !== 'General') return -1;
+      return a.localeCompare(b);
+    })
+    .map(([location, items]) => ({ location, items }));
 }
 
 /** Extract persisted mold findings marker from lab_conclusion (or any stored text). */
@@ -237,10 +327,11 @@ export function attachMoldFindingsMarker(cleanText, findings) {
   const normalized = normalizeMoldFindings(findings);
   const base = stripMoldFindingsMarker(cleanText || '').trim();
   if (!normalized.length) return base;
-  const payload = normalized.map(({ name, quantity, level, percent }) => ({
+  const payload = normalized.map(({ name, quantity, level, percent, location }) => ({
     name,
     quantity,
     level,
+    location: location || '',
     percent,
   }));
   const marker = `${MOLD_FINDINGS_START}${JSON.stringify(payload)}${MOLD_FINDINGS_END}`;
@@ -254,6 +345,8 @@ export function parseMoldFindingsFromLabText(findingsText) {
 
   const findings = [];
   const seen = new Set();
+  const lines = text.split(/\n+/);
+  let currentLocation = '';
 
   const moldAlt = COMMON_MOLDS.map((m) => m.replace('/', '\\/')).join('|');
   const linePattern = new RegExp(
@@ -261,64 +354,121 @@ export function parseMoldFindingsFromLabText(findingsText) {
     'gi'
   );
 
-  let match;
-  while ((match = linePattern.exec(text)) !== null) {
-    let name = match[1].replace(/\s+/g, ' ').trim();
-    if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
-    name = titleCaseMold(name);
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    let quantity = String(match[2] || '').trim();
-    quantity = quantity
-      .replace(/^[:\-–,\s]+/, '')
-      .replace(/\s{2,}/g, ' ')
-      .replace(/[.;]+$/, '')
-      .trim();
-
-    // Stop quantity at next mold name if the capture ran long
-    for (const mold of COMMON_MOLDS) {
-      const idx = quantity.toLowerCase().indexOf(mold.toLowerCase());
-      if (idx > 0) {
-        quantity = quantity.slice(0, idx).trim();
-      }
+  for (const line of lines) {
+    const locationOnly = extractLocationFromText(line);
+    // If the line is mainly a section header for an area, remember it
+    if (locationOnly && !linePattern.test(line)) {
+      currentLocation = locationOnly;
+      linePattern.lastIndex = 0;
+      continue;
     }
+    linePattern.lastIndex = 0;
 
-    const level = levelFromQuantityText(quantity);
-    findings.push({
-      name,
-      quantity: quantity || (level ? level.replace(/\b\w/g, (c) => c.toUpperCase()) : 'Detected'),
-      level,
-    });
+    let match;
+    while ((match = linePattern.exec(line)) !== null) {
+      let name = match[1].replace(/\s+/g, ' ').trim();
+      if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
+      name = titleCaseMold(name);
+
+      let quantity = String(match[2] || '').trim();
+      quantity = quantity
+        .replace(/^[:\-–,\s]+/, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/[.;]+$/, '')
+        .trim();
+
+      for (const mold of COMMON_MOLDS) {
+        const idx = quantity.toLowerCase().indexOf(mold.toLowerCase());
+        if (idx > 0) quantity = quantity.slice(0, idx).trim();
+      }
+
+      const location =
+        extractLocationFromText(line) ||
+        extractLocationFromText(quantity) ||
+        currentLocation ||
+        '';
+
+      // Allow same mold in different rooms
+      const key = `${location.toLowerCase()}::${name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const level = levelFromQuantityText(quantity);
+      findings.push({
+        name,
+        quantity: quantity || (level ? level : 'Detected'),
+        level,
+        location,
+      });
+    }
+  }
+
+  // Fallback: whole-text scan if line parsing found nothing
+  if (!findings.length) {
+    let match;
+    const whole = new RegExp(linePattern.source, 'gi');
+    while ((match = whole.exec(text)) !== null) {
+      let name = match[1].replace(/\s+/g, ' ').trim();
+      if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
+      name = titleCaseMold(name);
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      let quantity = String(match[2] || '').trim()
+        .replace(/^[:\-–,\s]+/, '')
+        .replace(/[.;]+$/, '')
+        .trim();
+      const level = levelFromQuantityText(quantity);
+      const start = Math.max(0, match.index - 80);
+      const context = text.slice(start, match.index + match[0].length + 40);
+      findings.push({
+        name,
+        quantity: quantity || (level ? level : 'Detected'),
+        level,
+        location: extractLocationFromText(context),
+      });
+    }
   }
 
   return normalizeMoldFindings(findings);
 }
 
 export function MoldFindingsBreakdown({ findings, className = '' }) {
-  const rows = normalizeMoldFindings(findings);
-  if (!rows.length) return null;
+  const groups = groupMoldFindingsByLocation(findings);
+  if (!groups.length) return null;
 
   return (
     <div className={`rounded-xl border border-slate-200 bg-white p-5 ${className}`}>
       <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
         Mold Findings Breakdown
       </div>
-      <div className="mt-4 space-y-4">
-        {rows.map((row) => (
-          <div key={row.name} className="grid grid-cols-[minmax(7rem,9.5rem)_1fr_auto] items-center gap-3">
-            <div className="text-sm font-medium text-slate-700 truncate" title={row.name}>
-              {row.name}
+      <div className="mt-4 space-y-5">
+        {groups.map((group) => (
+          <div key={group.location}>
+            <div className="text-sm font-semibold text-slate-800 mb-3">
+              {group.location}
             </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-sky-500 transition-all"
-                style={{ width: `${row.percent}%` }}
-              />
-            </div>
-            <div className="text-sm font-medium text-teal-600 whitespace-nowrap min-w-[4.5rem] text-right">
-              {row.label}
+            <div className="space-y-3">
+              {group.items.map((row) => (
+                <div
+                  key={`${group.location}-${row.name}`}
+                  className="grid grid-cols-[minmax(7rem,9.5rem)_1fr_auto] items-center gap-3"
+                >
+                  <div className="text-sm font-medium text-slate-700 truncate" title={row.name}>
+                    {row.name}
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-sky-500 transition-all"
+                      style={{ width: `${row.percent}%` }}
+                    />
+                  </div>
+                  <div className="text-sm font-medium text-teal-600 whitespace-nowrap min-w-[4.5rem] text-right">
+                    {row.label}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ))}
@@ -328,12 +478,14 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
 }
 
 export function buildMoldFindingsBreakdownHtml(findings) {
-  const rows = normalizeMoldFindings(findings);
-  if (!rows.length) return '';
+  const groups = groupMoldFindingsByLocation(findings);
+  if (!groups.length) return '';
 
-  const items = rows
-    .map(
-      (row) => `
+  const sections = groups
+    .map((group) => {
+      const items = group.items
+        .map(
+          (row) => `
       <div class="mold-finding-row">
         <div class="mold-finding-name">${escapeHtml(row.name)}</div>
         <div class="mold-finding-bar-track">
@@ -341,15 +493,23 @@ export function buildMoldFindingsBreakdownHtml(findings) {
         </div>
         <div class="mold-finding-qty">${escapeHtml(row.label)}</div>
       </div>`
-    )
+        )
+        .join('');
+
+      return `
+      <div class="mold-finding-area">
+        <div class="mold-finding-area-title">${escapeHtml(group.location)}</div>
+        <div class="mold-findings-list">
+          ${items}
+        </div>
+      </div>`;
+    })
     .join('');
 
   return `
     <div class="section keep-together mold-findings-breakdown">
       <div class="mold-findings-label">MOLD FINDINGS BREAKDOWN</div>
-      <div class="mold-findings-list">
-        ${items}
-      </div>
+      ${sections}
     </div>`;
 }
 
@@ -368,6 +528,18 @@ export const MOLD_FINDINGS_REPORT_CSS = `
   text-transform: uppercase;
   color: #9ca3af;
   margin-bottom: 16px;
+}
+.mold-finding-area {
+  margin-bottom: 18px;
+}
+.mold-finding-area:last-child {
+  margin-bottom: 0;
+}
+.mold-finding-area-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0B2E59;
+  margin: 0 0 10px 0;
 }
 .mold-findings-list {
   display: flex;

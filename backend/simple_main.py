@@ -175,16 +175,25 @@ Return valid JSON only with exactly these keys:
     {
       "name": "Cladosporium",
       "quantity": "1,200 spores/m³",
-      "level": "Low"
+      "level": "Low",
+      "location": "Living Room"
+    },
+    {
+      "name": "Aspergillus/Penicillium",
+      "quantity": "Rare",
+      "level": "Rare",
+      "location": "Kitchen"
     }
   ]
 }
 
 === MOLD FINDINGS BREAKDOWN ===
-Also extract every mold/spore type mentioned in the laboratory findings (section B) into "mold_findings".
+Also extract every mold/spore type mentioned in the laboratory findings (section B) into "mold_findings", grouped by sample area when possible.
 - "name": mold/spore type exactly as identified by the lab (do not invent types)
 - "quantity": the count, concentration, or qualitative amount from the lab text (for example "240", "1,200 spores/m³", "Rare", "Low")
 - "level": one of exactly: "Not Detect", "Rare", "Low", "Medium", "High" (High is the highest). Map synonyms accordingly (e.g. not detected→Not Detect, moderate→Medium, very low/trace→Rare). If unknown, use "".
+- "location": the sample area/room for that result when stated (for example "Living Room", "Kitchen", "Master Bedroom"). Use customer sample locations from section A to match when the lab text refers to Sample #1, Sample #2, etc. If the area is unknown, use "".
+- Create a SEPARATE mold_findings entry for each area. The same mold type may appear more than once if found in different rooms.
 - Include only types actually present in section B
 - If section B has no identifiable mold types, return "mold_findings": []
 """
@@ -527,7 +536,7 @@ def _normalize_report_assistant_recommendations(value) -> str:
 
 
 def _normalize_report_assistant_mold_findings(value) -> list:
-    """Normalize mold_findings from the model into [{name, quantity, level}]."""
+    """Normalize mold_findings from the model into [{name, quantity, level, location}]."""
     if not isinstance(value, list):
         return []
 
@@ -545,7 +554,15 @@ def _normalize_report_assistant_mold_findings(value) -> list:
         ).strip()
         if not name:
             continue
-        key = name.lower()
+        location = str(
+            item.get('location')
+            or item.get('area')
+            or item.get('room')
+            or item.get('sample_location')
+            or ''
+        ).strip()
+        # Allow the same mold type in different rooms
+        key = f"{location.lower()}::{name.lower()}"
         if key in seen:
             continue
         seen.add(key)
@@ -555,6 +572,7 @@ def _normalize_report_assistant_mold_findings(value) -> list:
             'name': name,
             'quantity': quantity,
             'level': _canonicalize_mold_level(level or quantity),
+            'location': location,
         })
     return findings
 
@@ -610,7 +628,7 @@ Use:
 Do not invent facts. Select only recommendations supported by this information.
 Do not produce a generic recommendation list.
 
-Also extract mold_findings from section B only (spore/mold types with quantities). Do not invent types.
+Also extract mold_findings from section B only (spore/mold types with quantities and sample locations/areas). Create one entry per mold type per area. Do not invent types.
 
 {context_block}
 
@@ -627,7 +645,7 @@ Return valid JSON only:
     "Second recommendation"
   ],
   "mold_findings": [
-    {{"name": "MoldType", "quantity": "count or level from lab text", "level": "Low"}}
+    {{"name": "MoldType", "quantity": "count or level from lab text", "level": "Low", "location": "Living Room"}}
   ]
 }}"""
 
