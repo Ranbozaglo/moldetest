@@ -571,9 +571,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
               ${createPriorityBadge('high', 'high Priority')}
             </div>
             <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
-                 <div style="text-align: center; margin: 8px 0;">
-                   ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 180px; max-height: 130px; object-fit: contain; border-radius: 4px;" />` : ''}
-                 </div>
+                 <div>${locationImage ? `<img src="${locationImage}" alt="Mold Photo" />` : ''}</div>
           </div>`;
         }).join('')
       : `<div class="keep-together finding-block"><p>No visible mold was reported during this inspection.</p></div>`;
@@ -587,9 +585,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                 ${createPriorityBadge('medium', 'Medium Priority')}
               </div>
               <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Water damage detected - may contribute to mold growth</p>
-              <div style="text-align: center; margin: 8px 0;">
-                ${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" style="max-width: 180px; max-height: 130px; object-fit: contain; border-radius: 4px;" />` : ''}
-              </div>
+              <div>${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" />` : ''}</div>
             </div>
           `).join('')
       : `<div class="keep-together finding-block" style="margin-bottom: 20px;">

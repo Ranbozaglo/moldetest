@@ -377,7 +377,7 @@ export default function MyInspections() {
 
       const createImageList = (images) => {
           if (!images || images.length === 0) return '<p>No photos provided.</p>';
-          return images.map(img => `<img src="${img}" alt="Evidence" style="max-width: 100%; height: auto; object-fit: cover; margin: 5px; border-radius: 4px; border: 2px solid #ddd;" />`).join('');
+          return images.map(img => `<img src="${img}" alt="Evidence" />`).join('');
       };
 
       const createPriorityBadge = (priority, text) => {
@@ -406,9 +406,7 @@ export default function MyInspections() {
                   ${createPriorityBadge('high', 'High Priority')}
                 </div>
                 <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
-                <div style="text-align: center; margin: 15px 0;">
-                  ${createImageList(d.images)}
-                </div>
+                <div>${createImageList(d.images)}</div>
               </div>
             `).join('')}
           </div>`
@@ -431,9 +429,7 @@ export default function MyInspections() {
                   ${createPriorityBadge('medium', 'Medium Priority')}
                 </div>
                 <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Water damage detected - may contribute to mold growth</p>
-                <div style="text-align: center; margin: 15px 0;">
-                  ${createImageList(d.images)}
-                </div>
+                <div>${createImageList(d.images)}</div>
               </div>
             `).join('')}
           </div>`

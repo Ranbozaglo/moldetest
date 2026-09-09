@@ -157,9 +157,9 @@ const PDF_OVERRIDE_STYLES = `
     break-inside: avoid-page !important;
     display: block !important;
   }
-  #pdf-download-content .finding-block img { max-height: 140px !important; object-fit: contain !important; }
+  #pdf-download-content .finding-block img { max-height: 260px !important; object-fit: contain !important; display: block !important; margin-left: 0 !important; margin-right: auto !important; }
   #pdf-download-content .sample-block h4 { page-break-after: avoid !important; break-after: avoid-page !important; }
-  #pdf-download-content .sample-block img { page-break-before: avoid !important; break-before: avoid-page !important; max-height: 260px !important; object-fit: contain !important; }
+  #pdf-download-content .sample-block img { page-break-before: avoid !important; break-before: avoid-page !important; max-height: 260px !important; object-fit: contain !important; display: block !important; margin-left: 0 !important; margin-right: auto !important; }
   #pdf-download-content .page-break { display: none !important; height: 0 !important; margin: 0 !important; padding: 0 !important; }
 `;
 
