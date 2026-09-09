@@ -29,10 +29,20 @@ const getApiUrls = () => {
   }
 };
 
+const isProductionHostname = (hostname) => {
+  if (!hostname) return false;
+  const h = hostname.toLowerCase();
+  return (
+    h === 'total-testing-diy.com' ||
+    h === 'www.total-testing-diy.com' ||
+    h.endsWith('.onrender.com')
+  );
+};
+
 export const ENVIRONMENT_CONFIG = {
   // Production settings
   PRODUCTION: {
-    FRONTEND_URL: 'total-testing-diy.com/',
+    FRONTEND_URL: 'https://total-testing-diy.com/',
     ...getApiUrls(),
     SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || 'https://opjgytjlebfnhjzarvyy.supabase.co',
     SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
@@ -65,8 +75,10 @@ export const getCurrentEnvironment = () => {
   }
   
   const hostname = window.location.hostname;
-  const isProduction = hostname === 'total-testing-diy.com' || import.meta.env.PROD;
-  const isDevelopment = hostname === 'localhost' || hostname === '127.0.0.1' || import.meta.env.DEV;
+  const isDevelopment = hostname === 'localhost' || hostname === '127.0.0.1';
+  const isProduction =
+    isProductionHostname(hostname) ||
+    (!isDevelopment && !!import.meta.env.PROD);
   
   return {
     isProduction,
@@ -103,4 +115,4 @@ export const logEnvironmentInfo = () => {
   if (typeof window === 'undefined') {
     return;
   }
-}; 
+};

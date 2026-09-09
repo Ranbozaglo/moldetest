@@ -502,6 +502,13 @@ class EmailService:
                 "message": "Failed to reset email templates"
             }
     
+    def frontend_base_url(self) -> str:
+        """Public frontend origin for email links (no trailing slash)."""
+        raw = (os.getenv('FRONTEND_URL') or 'https://total-testing-diy.com').strip().rstrip('/')
+        if raw and not raw.startswith('http://') and not raw.startswith('https://'):
+            raw = f'https://{raw}'
+        return raw or 'https://total-testing-diy.com'
+
     def format_template(self, template: str, data: Dict[str, Any]) -> str:
         """
         Format template string with data variables
@@ -534,7 +541,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
+            dashboard_url = self.frontend_base_url() + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -562,7 +569,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
+            dashboard_url = self.frontend_base_url() + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -590,7 +597,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data (for future template use)
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
+            dashboard_url = self.frontend_base_url() + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             subject = self.format_template(template['subject'], inspection_data_with_url)
@@ -621,7 +628,7 @@ class EmailService:
             
             # Add dashboard URL to inspection data
             inspection_data_with_url = inspection_data.copy()
-            dashboard_url = os.getenv('FRONTEND_URL', 'total-testing-diy.com') + '/MyInspections'
+            dashboard_url = self.frontend_base_url() + '/MyInspections'
             inspection_data_with_url['dashboard_url'] = dashboard_url
             
             # Handle missing address fields gracefully

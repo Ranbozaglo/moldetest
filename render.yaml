@@ -1,16 +1,21 @@
-# Render.com deployment configuration for Vite React App
+# Render Blueprint — frontend Static Site only.
+# Backend API stays on the existing moldetest-ftxv Web Service (do not recreate here).
+
 services:
-  # Static Site Service for Frontend
   - type: web
     name: mold-testing-houston-frontend
     runtime: static
-    buildCommand: npm install && npm run build
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
 
-    # Environment Variables for Build Time
     envVars:
       - key: NODE_VERSION
-        value: 18
+        value: "18"
+      - key: VITE_APP_ENV
+        value: production
       - key: VITE_SUPABASE_URL
         value: https://opjgytjlebfnhjzarvyy.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
@@ -18,13 +23,19 @@ services:
       - key: VITE_API_BASE_URL
         value: https://moldetest-ftxv.onrender.com/api
 
-    # Routes and headers
+    # SPA: client-side routes must fall back to index.html
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
 
     headers:
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
       - path: /*
         name: X-Frame-Options
         value: DENY
@@ -34,6 +45,6 @@ services:
       - path: /*
         name: X-XSS-Protection
         value: 1; mode=block
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin

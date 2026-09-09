@@ -34,9 +34,13 @@ class Settings:
     
     # Application
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
-    CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS",
-     "http://localhost:3000,http://localhost:5173,https://mold-testing.netlify.app,https://mold-testing.netlify.app/,http://localhost:5000/api/ocr-gpt,https://total-testing-diy.com"
-     
-    ).split(",")
+    CORS_ORIGINS: List[str] = [
+        o.strip().rstrip('/')
+        for o in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:3000,http://localhost:5173,https://total-testing-diy.com,https://www.total-testing-diy.com,https://mold-testing-houston-frontend.onrender.com",
+        ).split(",")
+        if o.strip()
+    ]
 
 settings = Settings() 

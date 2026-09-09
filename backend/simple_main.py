@@ -37,12 +37,35 @@ from email_endpoints import register_email_endpoints
 
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "https://mold-testing.netlify.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://total-testing-diy.com"
-], supports_credentials=True)
+
+def _normalize_origin(url: str) -> str:
+    u = (url or '').strip().rstrip('/')
+    if not u:
+        return ''
+    if not u.startswith('http://') and not u.startswith('https://'):
+        u = f'https://{u}'
+    return u.rstrip('/')
+
+def _cors_origins():
+    defaults = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://total-testing-diy.com',
+        'https://www.total-testing-diy.com',
+        'https://mold-testing-houston-frontend.onrender.com',
+    ]
+    origins = set(defaults)
+    frontend = _normalize_origin(os.environ.get('FRONTEND_URL', ''))
+    if frontend:
+        origins.add(frontend)
+    extra = os.environ.get('CORS_ORIGINS', '')
+    for part in extra.split(','):
+        o = _normalize_origin(part)
+        if o:
+            origins.add(o)
+    return sorted(origins)
+
+CORS(app, origins=_cors_origins(), supports_credentials=True)
 
 # JWT Configuration
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
@@ -2759,7 +2782,10 @@ def request_password_reset():
             return jsonify({'error': 'Failed to create reset token'}), 500
             
         # Send reset email
-        reset_link = f"https://mold-testing.netlify.app/ResetPassword?token={reset_token}"
+        frontend_base = _normalize_origin(
+            os.environ.get('FRONTEND_URL', 'https://total-testing-diy.com')
+        ) or 'https://total-testing-diy.com'
+        reset_link = f"{frontend_base}/ResetPassword?token={reset_token}"
         
         reset_data = {
             'email': email,
