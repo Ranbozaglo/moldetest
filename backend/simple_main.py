@@ -53,6 +53,7 @@ def _cors_origins():
         'https://total-testing-diy.com',
         'https://www.total-testing-diy.com',
         'https://mold-testing-houston-frontend.onrender.com',
+        'https://moldetest-1.onrender.com',
     ]
     origins = set(defaults)
     frontend = _normalize_origin(os.environ.get('FRONTEND_URL', ''))

@@ -38,7 +38,7 @@ class Settings:
         o.strip().rstrip('/')
         for o in os.getenv(
             "CORS_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://total-testing-diy.com,https://www.total-testing-diy.com,https://mold-testing-houston-frontend.onrender.com",
+            "http://localhost:3000,http://localhost:5173,https://total-testing-diy.com,https://www.total-testing-diy.com,https://mold-testing-houston-frontend.onrender.com,https://moldetest-1.onrender.com",
         ).split(",")
         if o.strip()
     ]
