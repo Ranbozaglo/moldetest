@@ -965,30 +965,32 @@ if ocr_available:
 else:
     print("⚠️  Using mock responses for OCR - Add credentials for real OCR")
 
-# Initialize Supabase client
+# Initialize Supabase client (no network I/O at import time — probes hang/fail deploys)
 try:
+    if not SUPABASE_URL or SUPABASE_URL.startswith('your_supabase'):
+        raise ValueError('SUPABASE_URL is not configured')
+    if not SUPABASE_DB_KEY or SUPABASE_DB_KEY.startswith('your_supabase'):
+        raise ValueError('SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY is not configured')
+
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_DB_KEY)
 
     if SUPABASE_SERVICE_ROLE_KEY:
-        print("🔐 Using service_role key for Supabase client (bypasses RLS)")
+        print("Using service_role key for Supabase client (bypasses RLS)")
     else:
-        print("⚠️ SUPABASE_SERVICE_ROLE_KEY not set — falling back to anon key. "
-              "RLS-protected tables will be inaccessible to the backend.")
-    
-    # Probe public schema (non-fatal — RLS/network should not kill the process)
-    print("🔍 Testing connection to public schema...")
-    try:
-        supabase.table('inspection').select('*').limit(1).execute()
-        print("✅ Supabase client initialized successfully with public schema")
-    except Exception as e1:
-        print(f"⚠️ Public schema probe failed (app will still start): {e1}")
-        print("📝 If inspections fail at runtime, check SERVICE_ROLE key and table RLS policies")
-            
+        print("SUPABASE_SERVICE_ROLE_KEY not set — falling back to anon key.")
+
+    print("Supabase client created (connection will be verified on first request)")
+
 except Exception as e:
-    print(f"❌ Failed to initialize Supabase client: {e}")
-    print("📝 Please check SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY on Render")
-    print("📝 Make sure tables exist in the public schema")
+    print(f"Failed to initialize Supabase client: {e}")
+    print("Set SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY on Render Environment")
     exit(1)
+
+# Register email routes for gunicorn (not only `python simple_main.py`)
+try:
+    register_email_endpoints(app, supabase)
+except Exception as e:
+    print(f"Warning: email endpoints not registered: {e}")
 
 # Database setup
 def init_db():
@@ -1122,8 +1124,9 @@ def validate_supabase_credentials():
         print(f"❌ Basic Supabase connection failed: {e}")
         print("📝 Please check your credentials and network connection")
 
-# Initialize database
-init_db()
+# Skip heavy DB probes at import time (gunicorn / Render). Tables are used on first request.
+print("Skipping init_db network probes at startup (Render-safe)")
+# init_db()
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -2897,80 +2900,21 @@ if not os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
 # --- END PATCH ---
 
 if __name__ == '__main__':
-    print("🚀 Starting Mold Testing Houston Backend...")
-    print("📊 Database initialized with Supabase")
-    
-    # Register email endpoints
-    register_email_endpoints(app, supabase)
-    
-    # Show detailed OCR status after initialization
-    print(f"\n🔬 OCR INTEGRATION FINAL STATUS:")
-    print(f"   Vision Client: {'✅ Available' if ocr_integration.vision_client else '❌ Not initialized'}")
-    print(f"   OpenAI Client: {'✅ Available' if ocr_integration.openai_client else '❌ Not initialized - check OPENAI_API_KEY'}")
-    print(f"   Integration Available: {'✅ Ready' if ocr_integration.is_available else '❌ Not ready'}")
-    
-    if ocr_integration.vision_client:
-        print("   🎯 Google Vision API calls will be REAL")
-    else:
-        print("   ⚠️  Google Vision API calls will FAIL - check credentials")
-    
-    if ocr_integration.openai_client:
-        print("   🎯 OpenAI API calls will be REAL")
-    else:
-        print("   ⚠️  OpenAI API calls will FAIL - check OPENAI_API_KEY")
-        
-    # Show current environment variable status
-    creds_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    print(f"   Current GOOGLE_APPLICATION_CREDENTIALS: {creds_path}")
-    if creds_path and os.path.exists(creds_path):
-        print(f"   ✅ Credentials file exists and is accessible")
-    elif creds_path:
-        print(f"   ❌ Credentials file does not exist at specified path")
-    else:
-        print(f"   ❌ GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
-    
-    # Show OpenAI API key status
-    print(f"   Current OPENAI_API_KEY configured: {bool(OPENAI_API_KEY)}")
-    if OPENAI_API_KEY:
-        print(f"   ✅ OPENAI_API_KEY is set (length: {len(OPENAI_API_KEY)})")
-    else:
-        print(f"   ❌ OPENAI_API_KEY environment variable not set")
-    
-    # Run validation checks
+    # Local/dev only. Gunicorn imports `simple_main:app` and must not hit app.run().
+    print("Starting Mold Testing Houston Backend...")
+    print("Database client ready (Supabase)")
+
+    print(f"\nOCR INTEGRATION FINAL STATUS:")
+    print(f"   Vision Client: {'Available' if ocr_integration.vision_client else 'Not initialized'}")
+    print(f"   OpenAI Client: {'Available' if ocr_integration.openai_client else 'Not initialized - check OPENAI_API_KEY'}")
+    print(f"   Integration Available: {'Ready' if ocr_integration.is_available else 'Not ready'}")
+
     validate_supabase_credentials()
     check_supabase_storage()
-    
-    print("🔗 API available at: http://localhost:5000")
-    print("📖 Health check: http://localhost:5000/health")
-    print("📚 API endpoints:")
-    print("   - POST /api/auth/login")
-    print("   - POST /api/auth/register")
-    print("   - GET  /api/auth/validate")
-    print("   - GET  /api/inspection")
-    print("   - POST /api/inspection")
-    print("   - GET  /api/inspection/<int:inspection_id>")
-    print("   - PUT  /api/inspection/<int:inspection_id>")
-    print("   - DELETE /api/inspection/<int:inspection_id>")
-    print("   - POST /api/inspection/<int:inspection_id>/upload-lab-image")
-    print("   - DELETE /api/inspection/<int:inspection_id>/lab-image/<int:image_index>")
-    print("   - GET  /api/samples")
-    print("   - POST /api/samples")
-    print("   - GET  /api/asbestosinspection")
-    print("   - GET  /api/asbestosinspection/<int:inspection_id>")
-    print("   - POST /api/asbestosinspection")
-    print("   - PUT  /api/asbestosinspection/<int:inspection_id>")
-    print("   - DELETE /api/asbestosinspection/<int:inspection_id>")
-    print("   - POST /api/llm/summarize")
-    print("   - POST /api/validate-lab-image-file (OCR validation of files before storage upload)")
-    print("   - POST /api/validate-lab-image (OCR validation before database save)")
-    print("   - POST /api/ocr-gpt (Google Cloud Vision integration)")
-    print("   - POST /api/generate-report-assistant (admin AI draft conclusion/recommendations)")
-    print("   - POST /api/email/send-lab-received/<inspection_id>")
-    print("   - POST /api/email/send-report-ready/<inspection_id>")
-    print("   - POST /api/email/send-review-request/<inspection_id>")
-    print("   - POST /api/upload")
-    print("\n💡 Admin users are managed through Supabase database only")
-    print(f"🔬 OCR Final Status: {'✅ Real Google Cloud Vision & OpenAI READY' if ocr_integration.is_available else '❌ OCR NOT AVAILABLE - check credentials and setup above'}")
-    
-port = int(os.environ.get("PORT", 5000))  # לוקח את הפורט של Render אם קיים
-app.run(debug=True, host='0.0.0.0', port=port)
+
+    print("API available at: http://localhost:5000")
+    print("Health check: http://localhost:5000/health")
+    print(f"OCR Final Status: {'READY' if ocr_integration.is_available else 'NOT AVAILABLE'}")
+
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
