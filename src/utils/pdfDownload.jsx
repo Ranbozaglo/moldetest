@@ -151,7 +151,7 @@ const PDF_OVERRIDE_STYLES = `
   #pdf-download-content .post-lab-page { page-break-after: auto !important; break-after: auto !important; }
   #pdf-download-content .post-lab-section { page-break-after: auto !important; break-after: auto !important; }
   #pdf-download-content .section h2 { page-break-after: avoid !important; break-after: avoid-page !important; }
-  #pdf-download-content .report-section-title { color: #004aac !important; font-size: 28px !important; font-weight: bold !important; margin: 0 0 16px 0 !important; padding-bottom: 0 !important; border-bottom: none !important; text-align: center !important; line-height: 1.2 !important; page-break-inside: avoid !important; break-inside: avoid-page !important; }
+  #pdf-download-content .report-section-title { color: #0B2E59 !important; font-size: 28px !important; font-weight: bold !important; margin: 0 0 16px 0 !important; padding-bottom: 0 !important; border-bottom: none !important; text-align: center !important; line-height: 1.2 !important; page-break-inside: avoid !important; break-inside: avoid-page !important; }
   #pdf-download-content .keep-together, #pdf-download-content .sample-block, #pdf-download-content .finding-block {
     page-break-inside: avoid !important;
     break-inside: avoid-page !important;
@@ -353,7 +353,7 @@ export const downloadPDF = async (
       'align-items:center',
       'justify-content:center',
       'font:600 16px Arial,sans-serif',
-      'color:#004aac'
+      'color:#0B2E59'
     ].join(';');
     shield.textContent = 'Generating PDF…';
     document.body.appendChild(shield);

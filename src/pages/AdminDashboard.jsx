@@ -67,11 +67,11 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .disclaimer-page .disclaimer-box { margin: 0; width: 100%; }
         .client-info-page { page-break-after: always; break-after: page; }
         .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 36px 24px 56px; gap: 24px; page-break-after: always; break-after: page; }
-        .cover-title { font-size: 34px; font-weight: bold; color: #004aac; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); line-height: 1.25; max-width: 720px; }
+        .cover-title { font-size: 34px; font-weight: bold; color: #0B2E59; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); line-height: 1.25; max-width: 720px; }
         .cover-image { max-width: min(640px, 94vw); max-height: 520px; width: auto; height: auto; border-radius: 16px; margin: 0; box-shadow: 0 10px 28px rgba(0,0,0,0.18); border: 3px solid white; object-fit: contain; }
         .cover-details { background: rgba(255,255,255,0.95); padding: 22px 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 520px; width: 100%; margin-top: auto; margin-bottom: 48px; }
         .cover-detail-item { margin: 10px 0; font-size: 16px; line-height: 1.45; }
-        .cover-detail-label { font-weight: bold; color: #004aac; }
+        .cover-detail-label { font-weight: bold; color: #0B2E59; }
 
         /* Mold report cover (matches approved cover layout) */
         .tt-mold-cover {
@@ -196,19 +196,19 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .sample-block { page-break-inside: avoid; break-inside: avoid-page; display: block; margin-bottom: 24px; }
         .sample-block h4 { page-break-after: avoid; break-after: avoid-page; margin-bottom: 8px; }
         .sample-block img { page-break-before: avoid; break-before: avoid-page; }
-        .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; page-break-after: avoid; break-after: avoid-page; }
-        .section h2.report-section-title, .report-section-title { color: #004aac; font-size: 28px; font-weight: bold; margin: 0 0 16px 0; padding-bottom: 0; border-bottom: none; text-align: center; page-break-after: avoid; break-after: avoid-page; page-break-inside: avoid; break-inside: avoid-page; }
-        .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 15px; margin: 10px 0; }
-        .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+        .section h2 { font-size: 20px; color: #0B2E59; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; page-break-after: avoid; break-after: avoid-page; }
+        .section h2.report-section-title, .report-section-title { color: #0B2E59; font-size: 28px; font-weight: bold; margin: 0 0 16px 0; padding-bottom: 0; border-bottom: none; text-align: center; page-break-after: avoid; break-after: avoid-page; page-break-inside: avoid; break-inside: avoid-page; }
+        .disclaimer-box { background: #f8f9fa; border: 2px solid #0B2E59; border-radius: 10px; padding: 15px; margin: 10px 0; }
+        .disclaimer-title { color: #0B2E59; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
         .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
         .disclaimer-text:last-child { margin-bottom: 0; }
         .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
-        .limitations-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+        .limitations-title { color: #0B2E59; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
         .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
         .limitations-text:last-child { margin-bottom: 0; }
         .client-info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin: 20px 0; }
         .client-info-item { padding: 10px; background: #f8f9fa; border-radius: 5px; }
-        .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
+        .client-info-label { font-weight: bold; color: #0B2E59; font-size: 14px; }
         .client-info-value { margin-top: 5px; font-size: 16px; }
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
         img { max-width: 350px; max-height: 350px ; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
@@ -407,14 +407,14 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                     <div class="page content-page">
                       <div class="section">
                         <h2 class="report-section-title">Material Assessment</h2>
-                        <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
+                        <div style="background: #f0f9ff; border: 2px solid #0B2E59; border-radius: 12px; padding: 25px; margin-bottom: 30px;">
                           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Type</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.material_type || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Material Type</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.material_type || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Condition</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Material Condition</div>
                               <div style="font-size: 16px; ${
                                 inspection.material_condition === 'Poor' || inspection.material_condition === 'Deteriorating' || inspection.material_condition === 'Damaged'
                                   ? 'color: #dc2626; font-weight: bold; background: #fee2e2; padding: 4px 8px; border-radius: 4px; display: inline-block;'
@@ -426,42 +426,42 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                               }">${inspection.material_condition || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Location Description</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.location_description || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Location Description</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.location_description || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Surface Area</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.surface_area || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Surface Area</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.surface_area || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Accessibility</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.accessibility || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Accessibility</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.accessibility || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Damage Extent</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.damage_extent || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Damage Extent</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.damage_extent || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Disturbance Potential</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.disturbance_potential || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Disturbance Potential</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.disturbance_potential || 'Not specified'}</div>
                             </div>
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Occupant Activity</div>
-                              <div style="font-size: 16px; color: #1e3a8a;">${inspection.occupant_activity || 'Not specified'}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Occupant Activity</div>
+                              <div style="font-size: 16px; color: #0B2E59;">${inspection.occupant_activity || 'Not specified'}</div>
                             </div>
                           </div>
                           
                           ${inspection.material_notes ? `
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Material Assessment Notes</div>
-                              <div style="font-size: 16px; color: #1e3a8a; white-space: pre-wrap; line-height: 1.6;">${inspection.material_notes}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Material Assessment Notes</div>
+                              <div style="font-size: 16px; color: #0B2E59; white-space: pre-wrap; line-height: 1.6;">${inspection.material_notes}</div>
                             </div>
                           ` : ''}
                           
                           ${inspection.risk_notes ? `
                             <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
-                              <div style="font-weight: 600; color: #1e40af; margin-bottom: 8px;">Risk Assessment Notes</div>
-                              <div style="font-size: 16px; color: #1e3a8a; white-space: pre-wrap; line-height: 1.6;">${inspection.risk_notes}</div>
+                              <div style="font-weight: 600; color: #0B2E59; margin-bottom: 8px;">Risk Assessment Notes</div>
+                              <div style="font-size: 16px; color: #0B2E59; white-space: pre-wrap; line-height: 1.6;">${inspection.risk_notes}</div>
                             </div>
                           ` : ''}
                         </div>
@@ -469,12 +469,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
 
                         ${inspection.material_images && inspection.material_images.length > 0 ? `
                           <div style="margin-top: 30px;">
-                            <h3 style="color: #004aac; margin-bottom: 15px;">Material Photos</h3>
+                            <h3 style="color: #0B2E59; margin-bottom: 15px;">Material Photos</h3>
                             <div class="image-gallery">
                               ${inspection.material_images.map((image, index) => `
                                 <div style="text-align: center;">
                                   <img src="${image}" alt="Material Photo ${index + 1}" class="evidence-image" />
-                                  <p style="margin-top: 5px; color: #004aac; font-size: 12px;">Material Photo ${index + 1}</p>
+                                  <p style="margin-top: 5px; color: #0B2E59; font-size: 12px;">Material Photo ${index + 1}</p>
                                 </div>
                               `).join('')}
                             </div>
@@ -501,18 +501,18 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                     <div style="margin-top: 40px;">
                       <h2 class="report-section-title">Laboratory Analysis</h2>
                       ${inspection.lab_analysis_images && inspection.lab_analysis_images.length > 0 ? `
-                        <div style="background: #f0f9ff; border: 2px solid #bae6fd; border-radius: 12px; padding: 25px;">
+                        <div style="background: #f0f9ff; border: 2px solid #0B2E59; border-radius: 12px; padding: 25px;">
                           <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
                             ${inspection.lab_analysis_images.map((image, index) => {
                               const isPdf = typeof image === 'string' && image.split('?')[0].toLowerCase().endsWith('.pdf');
                               return isPdf
                                 ? `<div style="page-break-before: always; break-before: page; background: white; padding: 0; margin: 0;">
-                                <h3 style="color: #1e40af; font-weight: 600; margin: 0 0 12px 0;">Lab Analysis PDF ${index + 1}</h3>
+                                <h3 style="color: #0B2E59; font-weight: 600; margin: 0 0 12px 0;">Lab Analysis PDF ${index + 1}</h3>
                                 <iframe src="${image}#toolbar=1&navpanes=0&view=FitH" title="Lab Analysis PDF ${index + 1}" style="width: 100%; height: 100vh; min-height: 1000px; border: 1px solid #e2e8f0; border-radius: 8px;"></iframe>
                               </div>`
                                 : `<div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
                                 <img src="${image}" alt="Lab Analysis ${index + 1}" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 10px;" />
-                                <p style="color: #1e40af; font-weight: 600; margin: 0;">Lab Analysis Result ${index + 1}</p>
+                                <p style="color: #0B2E59; font-weight: 600; margin: 0;">Lab Analysis Result ${index + 1}</p>
                               </div>`;
                             }).join('')}
                           </div>
@@ -525,8 +525,8 @@ export const generateReportHtmlContent = async (inspection, samples) => {
                     </div>
 
                     <!-- Footer -->
-                    <div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #1e40af; text-align: center;">
-                      <p style="color: #1e40af; font-weight: 600; font-size: 16px; margin: 0 0 10px 0;">Total Testing</p>
+                    <div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #0B2E59; text-align: center;">
+                      <p style="color: #0B2E59; font-weight: 600; font-size: 16px; margin: 0 0 10px 0;">Total Testing</p>
                       <p style="color: #64748b; font-size: 14px; margin: 0 0 5px 0;">Report generated on ${format(new Date(), "MMMM d, yyyy")}</p>
                       <p style="color: #64748b; font-size: 14px; margin: 0;">Inspection #${inspection.inspection_number || 'N/A'}</p>
                     </div>
@@ -602,13 +602,13 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     let environmentalHtml = '';
     if (inspection.environmental_data_method === 'photo' && inspection.thermostat_image) {
         environmentalHtml = `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+          <h3 style="color: #0B2E59; font-size: 18px; margin-bottom: 15px;">
             Environmental Conditions
           </h3>
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
-            <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
+          <div style="background: #eff6ff; border: 1px solid #0B2E59; border-radius: 8px; padding: 15px;">
+            <h4 style="color: #0B2E59; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
             <div style="text-align: center;">
-              <img src="${inspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #bfdbfe;" />
+              <img src="${inspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #0B2E59;" />
             </div>
           </div>
         </div>`;
@@ -618,17 +618,17 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
         
         environmentalHtml = `<div class="keep-together finding-block" style="margin-bottom: 20px;">
-          <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+          <h3 style="color: #0B2E59; font-size: 18px; margin-bottom: 15px;">
             Environmental Conditions
           </h3>
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
+          <div style="background: #eff6ff; border: 1px solid #0B2E59; border-radius: 8px; padding: 15px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
               <div>
-                <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Temperature</p>
+                <p style="font-weight: bold; color: #0B2E59; margin-bottom: 5px;">Temperature</p>
                 <p style="font-size: 18px; font-weight: bold;">${temperature} F</p>
               </div>
               <div>
-                <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Humidity</p>
+                <p style="font-weight: bold; color: #0B2E59; margin-bottom: 5px;">Humidity</p>
                 <p style="font-size: 18px; font-weight: bold; ${isHighHumidity ? 'color: #dc2626;' : ''}">${humidity}%</p>
               </div>
             </div>

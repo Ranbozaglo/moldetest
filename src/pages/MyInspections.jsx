@@ -259,11 +259,11 @@ export default function MyInspections() {
           .disclaimer-page .disclaimer-box { margin: 0; width: 100%; }
           .client-info-page { page-break-after: always; break-after: page; }
           .cover-page { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; text-align: center; background: white; padding: 36px 24px 56px; gap: 24px; page-break-after: always; break-after: page; }
-          .cover-title { font-size: 34px; font-weight: bold; color: #004aac; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); line-height: 1.25; max-width: 720px; }
+          .cover-title { font-size: 34px; font-weight: bold; color: #0B2E59; margin: 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); line-height: 1.25; max-width: 720px; }
           .cover-image { max-width: min(640px, 94vw); max-height: 520px; width: auto; height: auto; border-radius: 16px; margin: 0; box-shadow: 0 10px 28px rgba(0,0,0,0.18); border: 3px solid white; object-fit: contain; }
           .cover-details { background: rgba(255,255,255,0.95); padding: 22px 28px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 520px; width: 100%; margin-top: auto; margin-bottom: 48px; }
           .cover-detail-item { margin: 10px 0; font-size: 16px; line-height: 1.45; }
-          .cover-detail-label { font-weight: bold; color: #004aac; }
+          .cover-detail-label { font-weight: bold; color: #0B2E59; }
           .tt-mold-cover { align-items: stretch !important; text-align: left !important; padding: 36px 44px 32px !important; gap: 0 !important; justify-content: flex-start !important; box-sizing: border-box; overflow: hidden; }
           .tt-cover-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
           .tt-cover-logo { max-width: 168px; max-height: 56px; width: auto; height: auto; object-fit: contain; border: none !important; border-radius: 0 !important; box-shadow: none !important; margin: 0 !important; }
@@ -283,19 +283,19 @@ export default function MyInspections() {
           .section { margin-bottom: 25px; }
           .keep-together { page-break-inside: avoid; break-inside: avoid-page; display: block; }
           .sample-block { page-break-inside: avoid; break-inside: avoid-page; margin-bottom: 24px; }
-          .section h2 { font-size: 20px; color: #004aac; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; page-break-after: avoid; break-after: avoid-page; }
-          .section h2.report-section-title, .report-section-title { color: #004aac; font-size: 28px; font-weight: bold; margin: 0 0 16px 0; padding-bottom: 0; border-bottom: none; text-align: center; page-break-after: avoid; break-after: avoid-page; page-break-inside: avoid; break-inside: avoid-page; }
-          .disclaimer-box { background: #f8f9fa; border: 2px solid #004aac; border-radius: 10px; padding: 20px; margin: 20px 0; }
-          .disclaimer-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .section h2 { font-size: 20px; color: #0B2E59; border-bottom: 2px solid #dee2e6; padding-bottom: 12px; margin-bottom: 20px; page-break-after: avoid; break-after: avoid-page; }
+          .section h2.report-section-title, .report-section-title { color: #0B2E59; font-size: 28px; font-weight: bold; margin: 0 0 16px 0; padding-bottom: 0; border-bottom: none; text-align: center; page-break-after: avoid; break-after: avoid-page; page-break-inside: avoid; break-inside: avoid-page; }
+          .disclaimer-box { background: #f8f9fa; border: 2px solid #0B2E59; border-radius: 10px; padding: 20px; margin: 20px 0; }
+          .disclaimer-title { color: #0B2E59; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
           .disclaimer-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
           .disclaimer-text:last-child { margin-bottom: 0; }
           .limitations-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 20px; margin: 20px 0; }
-          .limitations-title { color: #004aac; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
+          .limitations-title { color: #0B2E59; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-align: center; }
           .limitations-text { font-size: 14px; line-height: 1.7; text-align: justify; margin: 0 0 14px 0; }
           .limitations-text:last-child { margin-bottom: 0; }
           .client-info-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin: 20px 0; }
           .client-info-item { padding: 10px; background: #f8f9fa; border-radius: 5px; }
-          .client-info-label { font-weight: bold; color: #004aac; font-size: 14px; }
+          .client-info-label { font-weight: bold; color: #0B2E59; font-size: 14px; }
           .client-info-value { margin-top: 5px; font-size: 16px; }
           .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
           img { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
@@ -447,13 +447,13 @@ export default function MyInspections() {
       let environmentalHtml = '';
       if (detailedInspection.environmental_data_method === 'photo' && detailedInspection.thermostat_image) {
           environmentalHtml = `<div style="margin-bottom: 20px;">
-            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+            <h3 style="color: #0B2E59; font-size: 18px; margin-bottom: 15px;">
               Environmental Conditions
             </h3>
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
-              <h4 style="color: #2563eb; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
+            <div style="background: #eff6ff; border: 1px solid #0B2E59; border-radius: 8px; padding: 15px;">
+              <h4 style="color: #0B2E59; font-weight: bold; margin-bottom: 10px;">Thermostat Reading</h4>
               <div style="text-align: center;">
-                <img src="${detailedInspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #bfdbfe;" />
+                <img src="${detailedInspection.thermostat_image}" alt="Thermostat" style="max-width: 300px; height: auto; border-radius: 8px; border: 2px solid #0B2E59;" />
               </div>
             </div>
           </div>`;
@@ -463,17 +463,17 @@ export default function MyInspections() {
           const isHighHumidity = humidity !== 'N/A' && parseFloat(humidity) > 60;
           
           environmentalHtml = `<div style="margin-bottom: 20px;">
-            <h3 style="color: #2563eb; font-size: 18px; margin-bottom: 15px;">
+            <h3 style="color: #0B2E59; font-size: 18px; margin-bottom: 15px;">
               Environmental Conditions
             </h3>
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px;">
+            <div style="background: #eff6ff; border: 1px solid #0B2E59; border-radius: 8px; padding: 15px;">
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
                 <div>
-                  <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Temperature</p>
+                  <p style="font-weight: bold; color: #0B2E59; margin-bottom: 5px;">Temperature</p>
                   <p style="font-size: 18px; font-weight: bold;">${temperature} F</p>
                 </div>
                 <div>
-                  <p style="font-weight: bold; color: #2563eb; margin-bottom: 5px;">Humidity</p>
+                  <p style="font-weight: bold; color: #0B2E59; margin-bottom: 5px;">Humidity</p>
                   <p style="font-size: 18px; font-weight: bold; ${isHighHumidity ? 'color: #dc2626;' : ''}">${humidity}%</p>
                 </div>
               </div>
@@ -509,8 +509,8 @@ export default function MyInspections() {
         Array.isArray(inspection.lab_analysis_images) && inspection.lab_analysis_images.length > 0
       )}${buildLabAnalysisFilesHtml(inspection.lab_analysis_images)}${
         inspection.conclusion
-          ? `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #004aac;">
-              <h4 style="color: #004aac; margin-bottom: 10px;">Analysis Summary</h4>
+          ? `<div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #0B2E59;">
+              <h4 style="color: #0B2E59; margin-bottom: 10px;">Analysis Summary</h4>
               <p style="line-height: 1.6;">${sanitizeReportText(inspection.conclusion)}</p>
             </div>`
           : ''

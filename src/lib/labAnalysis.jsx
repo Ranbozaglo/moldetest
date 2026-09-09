@@ -145,7 +145,7 @@ export const buildLabAnalysisIntroHtml = (hasFiles = true) => {
           </div>`;
   }
 
-  return `<div class="lab-analysis-intro" style="padding: 48px 24px; text-align: center; border-top: 2px solid #004aac; margin-top: 24px;">
+  return `<div class="lab-analysis-intro" style="padding: 48px 24px; text-align: center; border-top: 2px solid #0B2E59; margin-top: 24px;">
             <h2 class="report-section-title">Laboratory Analysis Results</h2>
             <p style="color: #334155; font-size: 16px; line-height: 1.6; max-width: 520px; margin: 0 auto;">
               The following pages contain the official laboratory analysis report for this inspection.
