@@ -23,6 +23,12 @@ import EmailTemplateManager from "@/components/EmailTemplateManager";
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 import { usePopup } from "@/components/ui/popup";
 import { buildLabAnalysisFilesHtml, buildLabAnalysisIntroHtml, normalizeLabAnalysisImages } from "@/lib/labAnalysis.jsx";
+import {
+  buildMoldFindingsBreakdownHtml,
+  extractMoldFindingsFromText,
+  MOLD_FINDINGS_REPORT_CSS,
+  parseMoldFindingsFromLabText,
+} from "@/lib/moldFindings.jsx";
 
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
@@ -213,6 +219,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6; font-size: 14px; color: #6c757d; }
         img { max-width: 350px; max-height: 350px ; border-radius: 8px; border: 1px solid #ddd; margin: 8px; }
         .lab-analysis-section img { max-width: 100%; max-height: none; border: 2px solid #ddd; border-radius: 12px; margin: 0; }
+        ${MOLD_FINDINGS_REPORT_CSS}
         .lab-analysis-page { max-width: 100%; padding: 20px; margin: 0 auto; }
         
         /* Mobile-specific improvements */
@@ -761,6 +768,13 @@ export const generateReportHtmlContent = async (inspection, samples) => {
       : '<p>No samples were documented for this inspection.</p>';
       
     const labAnalysisFiles = normalizeLabAnalysisImages(inspection.lab_analysis_images);
+    const storedMoldFindings = extractMoldFindingsFromText(inspection.lab_conclusion || '');
+    const moldFindingsHtml = buildMoldFindingsBreakdownHtml(
+      storedMoldFindings.findings.length
+        ? storedMoldFindings.findings
+        : parseMoldFindingsFromLabText(inspection.lab_conclusion || inspection.conclusion || '')
+    );
+    const cleanLabConclusion = storedMoldFindings.cleanText || inspection.lab_conclusion || inspection.conclusion || '';
     const labAnalysisHtml = buildLabAnalysisFilesHtml(labAnalysisFiles);
     const labAnalysisIntroHtml = buildLabAnalysisIntroHtml(labAnalysisFiles.length > 0);
 
@@ -836,11 +850,12 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             </div>
 
             <div class="post-lab-section">
-            ${(inspection.lab_conclusion || inspection.conclusion) ? `
+            ${moldFindingsHtml}
+            ${(cleanLabConclusion || inspection.conclusion) ? `
             <div class="section keep-together">
                 <h2 class="report-section-title">Conclusion</h2>
                 <div>
-                  ${formatRecommendationsText(inspection.lab_conclusion || inspection.conclusion)
+                  ${formatRecommendationsText(cleanLabConclusion || inspection.conclusion)
                       .split('\n')
                       .filter(line => line.trim().length > 0)
                       .map(line => {
