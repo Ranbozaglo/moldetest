@@ -400,7 +400,7 @@ export default function MyInspections() {
               Visible Mold Detected
             </h3>
             ${detailedInspection.visible_mold_details.map((d, i) => `
-              <div class="keep-together" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div class="keep-together" style="padding: 0 0 15px 0; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('high', 'High Priority')}
@@ -425,7 +425,7 @@ export default function MyInspections() {
               Water Damage Detected
             </h3>
             ${detailedInspection.water_damage_details.map((d, i) => `
-              <div class="keep-together" style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+              <div class="keep-together" style="padding: 0 0 15px 0; margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                   <h4 style="color: #ea580c; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(d.location)}</h4>
                   ${createPriorityBadge('medium', 'Medium Priority')}

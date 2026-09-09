@@ -564,7 +564,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     const visibleMoldHtml = inspection.mold_images && inspection.mold_images.length > 0 && moldLocations.length > 0
       ? moldLocations.map((location, i) => {
           const locationImage = inspection.mold_images[i] || null;
-          return `<div class="keep-together finding-block" style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+          return `<div class="keep-together finding-block" style="padding: 0 0 15px 0; margin-bottom: 15px;">
             ${i === 0 ? `<h3 style="color: #dc2626; font-size: 16px; margin: 0 0 12px 0;">Visible Mold Detected</h3>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
               <h4 style="color: #dc2626; font-weight: bold; margin: 0;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
@@ -572,7 +572,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
             </div>
             <p style="color: #dc2626; font-size: 14px; margin: 8px 0;">Visible mold detected - requires immediate attention</p>
                  <div style="text-align: center; margin: 8px 0;">
-                   ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 180px; max-height: 130px; object-fit: contain; border-radius: 4px; border: 1px solid #fecaca;" />` : ''}
+                   ${locationImage ? `<img src="${locationImage}" alt="Mold Photo" style="max-width: 180px; max-height: 130px; object-fit: contain; border-radius: 4px;" />` : ''}
                  </div>
           </div>`;
         }).join('')
@@ -580,7 +580,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
 
     const waterDamageHtml = inspection.water_damage_images && inspection.water_damage_images.length > 0 && waterDamageLocations.length > 0
       ? waterDamageLocations.map((location, i) => `
-            <div class="keep-together finding-block" style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 4px; padding: 10px; margin-bottom: 10px;">
+            <div class="keep-together finding-block" style="padding: 0 0 10px 0; margin-bottom: 10px;">
               ${i === 0 ? `<h3 style="color: #ea580c; font-size: 16px; margin: 0 0 10px 0;">Water Damage Detected</h3>` : ''}
               <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
                 <h4 style="color: #ea580c; font-weight: bold; margin: 0; font-size: 14px;">Location #${i + 1}: ${sanitizeReportText(location) || 'N/A'}</h4>
@@ -588,7 +588,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
               </div>
               <p style="color: #ea580c; font-size: 12px; margin: 4px 0;">Water damage detected - may contribute to mold growth</p>
               <div style="text-align: center; margin: 6px 0;">
-                ${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" style="max-width: 160px; max-height: 110px; object-fit: contain; border-radius: 4px; border: 1px solid #fed7aa;" />` : ''}
+                ${inspection.water_damage_images[i] ? `<img src="${inspection.water_damage_images[i]}" alt="Water Damage Photo" style="max-width: 160px; max-height: 110px; object-fit: contain; border-radius: 4px;" />` : ''}
               </div>
             </div>
           `).join('')
