@@ -884,18 +884,18 @@ function ratingLabelClass(label) {
   return 'text-teal-600';
 }
 
-/** Per-finding cleanliness (100 = clean). Used to build the overall /100 score. */
-const FINDING_CLEAN_SCORE = {
-  'Not Detect': 100,
-  Rare: 88,
-  Low: 72,
-  Medium: 48,
-  High: 18,
+/** Per-finding severity (100 = heaviest mold). Used to build the overall /100 score. */
+const FINDING_SEVERITY_SCORE = {
+  'Not Detect': 0,
+  Rare: 22,
+  Low: 40,
+  Medium: 68,
+  High: 100,
 };
 
 /**
  * Overall findings score out of 100 from the severity split.
- * Higher = cleaner (more Not Detect / Rare, fewer High / Medium).
+ * Higher = more mold / higher severity (High & Medium push the score up).
  */
 export function computeMoldFindingsScore(findings) {
   const rows = normalizeMoldFindings(findings);
@@ -908,7 +908,7 @@ export function computeMoldFindingsScore(findings) {
   for (const row of rows) {
     const level = row.label || resolveLevel(row);
     if (split[level] != null) split[level] += 1;
-    sum += FINDING_CLEAN_SCORE[level] ?? 60;
+    sum += FINDING_SEVERITY_SCORE[level] ?? 40;
   }
 
   const score = Math.max(0, Math.min(100, Math.round(sum / rows.length)));
@@ -916,10 +916,11 @@ export function computeMoldFindingsScore(findings) {
 }
 
 function scoreRingColor(score) {
-  if (score >= 80) return '#2dd4bf'; // teal like the reference
-  if (score >= 60) return '#38bdf8';
-  if (score >= 40) return '#f59e0b';
-  return '#ef4444';
+  // Higher mold severity → redder ring
+  if (score >= 70) return '#ef4444';
+  if (score >= 45) return '#f97316';
+  if (score >= 25) return '#eab308';
+  return '#2dd4bf';
 }
 
 function MoldFindingsScoreRing({ score, size = 148, stroke = 16 }) {
