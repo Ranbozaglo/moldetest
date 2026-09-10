@@ -89,6 +89,17 @@ const LEVEL_PERCENT = {
 const RATING_TOKEN =
   'not\\s*detect(?:ed)?|nd|none|absent|rare|trace|very\\s*low|low|med(?:ium)?|moderate|common|high|abundant|numerous';
 
+/** True when the line says no mold was found (without naming a species). */
+function isNoMoldDetectedPhrase(text) {
+  const q = String(text || '').toLowerCase();
+  if (!q) return false;
+  if (/\bno\s+mold(?:\s+(?:detect(?:ed)?|found|present|growth))?\b/.test(q)) return true;
+  if (/\bmold\s+(?:not\s+detect(?:ed)?|none|absent|nd)\b/.test(q)) return true;
+  if (/\bnone\s+detect(?:ed)?\b/.test(q)) return true;
+  if (/\bno\s+(?:detect(?:ed)?|growth|spores?)\b/.test(q)) return true;
+  return false;
+}
+
 /** Map free-text / aliases onto the 5-level scale. Higher ratings win when several appear. */
 export function canonicalizeLevel(raw) {
   const q = String(raw || '').toLowerCase().trim();
@@ -96,6 +107,7 @@ export function canonicalizeLevel(raw) {
 
   if (
     /\bnot\s*detect(ed)?\b/.test(q) ||
+    isNoMoldDetectedPhrase(q) ||
     q === 'nd' ||
     q === 'none' ||
     q === '0' ||
@@ -178,18 +190,29 @@ function looksLikeLocationHeader(line) {
     .trim();
   if (!cleaned || cleaned.length > 50) return '';
   if (isKnownMoldName(cleaned)) return '';
+  if (isNoMoldDetectedPhrase(cleaned)) return '';
   if (findRatingInText(cleaned) && cleaned.split(/\s+/).length <= 2) return '';
   if (/^\d+(\.\d+)?%?$/.test(cleaned)) return '';
   if (/\b(spores?|count|debris|sample\s*#?\d+)\b/i.test(cleaned)) return '';
 
-  const known = extractLocationFromText(cleaned);
-  if (known) return known;
-
-  // Free-form room/area label the admin typed (e.g. "Bedroom 2", "Front Hall")
+  // Keep the admin's full wording ("Southwest Bedroom", "Hallway Bathroom") —
+  // do not shrink to a generic known-area token like "Bedroom".
   if (/^[a-z0-9][a-z0-9 /&'#.-]{1,48}$/i.test(cleaned)) {
     return titleCaseLocation(cleaned);
   }
   return '';
+}
+
+const LOCATION_STOPWORDS =
+  'the|in|at|from|of|to|and|for|a|an|with|near|inside|within|on|by|under|over|into';
+
+function stripLocationLeadIns(phrase) {
+  let out = String(phrase || '').replace(/\s+/g, ' ').trim();
+  const lead = new RegExp(`^(?:(?:${LOCATION_STOPWORDS})\\s+)+`, 'i');
+  while (lead.test(out)) {
+    out = out.replace(lead, '').trim();
+  }
+  return out;
 }
 
 function extractLocationFromText(text) {
@@ -198,10 +221,33 @@ function extractLocationFromText(text) {
 
   // Prefer known area names first so "Living Room - Cladosporium: High" → Living Room
   // (not "Cladosporium" from a false "room - ..." label match).
+  // Keep preceding modifiers: "southwest bedroom", "hallway bathroom".
   const sortedAreas = [...COMMON_AREAS].sort((a, b) => b.length - a.length);
+  const blocked = [
+    RATING_TOKEN,
+    'detect(?:ed)?',
+    'mold',
+    'spore[s]?',
+    'found',
+    'present',
+    'growth',
+    'sample[s]?',
+    'result[s]?',
+    'aspergillus\\s*\\/?\\s*penicillium',
+    ...COMMON_MOLDS.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  ].join('|');
+
   for (const area of sortedAreas) {
-    const re = new RegExp(`\\b${area.replace(/\s+/g, '\\s+')}\\b`, 'i');
-    if (re.test(q)) return titleCaseLocation(area);
+    const areaPat = area.replace(/\s+/g, '\\s+');
+    const re = new RegExp(
+      `\\b((?:(?!(?:${blocked})\\b)[a-z0-9]+\\s+){0,3}${areaPat})\\b`,
+      'i'
+    );
+    const m = q.match(re);
+    if (m?.[1]) {
+      const phrase = stripLocationLeadIns(m[1]);
+      if (phrase) return titleCaseLocation(phrase);
+    }
   }
 
   // "Location: Kitchen", "Sample location: Living room", "Area - Master bedroom"
@@ -217,6 +263,40 @@ function extractLocationFromText(text) {
   }
 
   return '';
+}
+
+/** Prefer the fuller section header when a line only matched a shorter room token. */
+function resolveFindingLocation(lineLocation, sectionLocation) {
+  const line = String(lineLocation || '').trim();
+  const section = String(sectionLocation || '').trim();
+  if (!line) return section;
+  if (!section) return line;
+  const lineQ = line.toLowerCase();
+  const sectionQ = section.toLowerCase();
+  if (sectionQ === lineQ) return section;
+  if (sectionQ.includes(lineQ) && section.length > line.length) return section;
+  return line;
+}
+
+/** Pull the room/area out of a "no mold detect …" line. */
+function locationFromNoMoldLine(line, sectionLocation) {
+  const stripped = String(line || '')
+    .replace(/\bno\s+mold(?:\s+(?:detect(?:ed)?|found|present|growth))?\b/gi, ' ')
+    .replace(/\bmold\s+(?:not\s+detect(?:ed)?|none|absent|nd)\b/gi, ' ')
+    .replace(/\bnone\s+detect(?:ed)?\b/gi, ' ')
+    .replace(/\bnot\s*detect(?:ed)?\b/gi, ' ')
+    .replace(/\bno\s+(?:detect(?:ed)?|growth|spores?)\b/gi, ' ')
+    .replace(/^\s*[:\-–]+\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const withoutIn = stripLocationLeadIns(stripped);
+  const fromText =
+    extractLocationFromText(withoutIn) ||
+    extractLocationFromText(stripped) ||
+    looksLikeLocationHeader(withoutIn) ||
+    '';
+  return resolveFindingLocation(fromText, sectionLocation);
 }
 
 function levelFromQuantityText(quantity) {
@@ -450,6 +530,20 @@ export function parseMoldFindingsFromLabText(findingsText) {
   let currentLocation = '';
   const moldOnlyPattern = buildMoldNamePattern();
 
+  const pushFinding = (entry) => {
+    const location = entry.location || '';
+    const name = entry.name || '';
+    const key = `${location.toLowerCase()}::${name.toLowerCase()}`;
+    if (!name || seen.has(key)) return;
+    seen.add(key);
+    findings.push({
+      name,
+      quantity: entry.quantity || entry.level || 'Detected',
+      level: entry.level || '',
+      location,
+    });
+  };
+
   for (const rawLine of lines) {
     const line = String(rawLine || '').trim();
     if (!line) continue;
@@ -457,6 +551,41 @@ export function parseMoldFindingsFromLabText(findingsText) {
     moldOnlyPattern.lastIndex = 0;
     const hasMold = moldOnlyPattern.test(line);
     moldOnlyPattern.lastIndex = 0;
+
+    // "Kitchen: no mold detect" / "no mold detect in the kitchen" — before location headers,
+    // so these lines are not swallowed as a bare "Kitchen" section title.
+    if (!hasMold && (isNoMoldDetectedPhrase(line) || /^\s*not\s*detect(?:ed)?\b/i.test(line))) {
+      const prefixed = line.match(
+        new RegExp(
+          `^\\s*((?:[a-z0-9]+\\s+){0,3}(?:${[...COMMON_AREAS]
+            .sort((a, b) => b.length - a.length)
+            .map((a) => a.replace(/\s+/g, '\\s+'))
+            .join('|')}))\\s*[:\\-–]\\s*`,
+          'i'
+        )
+      );
+      const freePrefixed = line.match(/^\s*([a-z0-9][a-z0-9 /&'#.-]{1,40}?)\s*[:\-–]\s+/i);
+      if (prefixed?.[1]) {
+        currentLocation = titleCaseLocation(stripLocationLeadIns(prefixed[1]));
+      } else if (
+        freePrefixed?.[1] &&
+        !isKnownMoldName(freePrefixed[1]) &&
+        !isNoMoldDetectedPhrase(freePrefixed[1])
+      ) {
+        currentLocation = titleCaseLocation(freePrefixed[1]);
+      }
+
+      const location = locationFromNoMoldLine(line, currentLocation);
+      if (location) currentLocation = location;
+
+      pushFinding({
+        name: 'No Mold Detected',
+        quantity: 'Not Detect',
+        level: 'Not Detect',
+        location: location || currentLocation || '',
+      });
+      continue;
+    }
 
     const locationHeader = looksLikeLocationHeader(line);
     // Section header for an area (no mold name on this line)
@@ -466,17 +595,18 @@ export function parseMoldFindingsFromLabText(findingsText) {
     }
 
     // "Kitchen: Aspergillus/Penicillium Rare" / "Living Room - Cladosporium: High"
+    // Also "Southwest Bedroom: Cladosporium High" via free-form prefix.
     const areaPrefix = line.match(
       new RegExp(
-        `^\\s*(${[...COMMON_AREAS]
+        `^\\s*((?:[a-z0-9]+\\s+){0,3}(?:${[...COMMON_AREAS]
           .sort((a, b) => b.length - a.length)
           .map((a) => a.replace(/\s+/g, '\\s+'))
-          .join('|')})\\s*[:\\-–]\\s*`,
+          .join('|')}))\\s*[:\\-–]\\s*`,
         'i'
       )
     );
     if (areaPrefix?.[1]) {
-      currentLocation = titleCaseLocation(areaPrefix[1]);
+      currentLocation = titleCaseLocation(stripLocationLeadIns(areaPrefix[1]));
     } else {
       // Free-form "Bedroom 2 - Cladosporium High"
       const freePrefix = line.match(/^\s*([a-z0-9][a-z0-9 /&'#.-]{1,40}?)\s*[:\-–]\s+/i);
@@ -501,16 +631,9 @@ export function parseMoldFindingsFromLabText(findingsText) {
         .slice(0, 80);
       if (!quantity && level) quantity = level;
 
-      const location =
-        extractLocationFromText(line) ||
-        currentLocation ||
-        '';
+      const location = resolveFindingLocation(extractLocationFromText(line), currentLocation);
 
-      const key = `${location.toLowerCase()}::${name.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      findings.push({
+      pushFinding({
         name,
         quantity: quantity || level || 'Detected',
         level,
