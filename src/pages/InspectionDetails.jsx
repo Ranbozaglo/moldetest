@@ -2588,7 +2588,12 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                         )}
                       </div>
                       {moldFindings.length > 0 && (
-                        <MoldFindingsBreakdown findings={moldFindings} className="mt-4" />
+                        <MoldFindingsBreakdown
+                          findings={moldFindings}
+                          samples={samples}
+                          conclusionText={inspection?.lab_conclusion || laboratoryFindings || ''}
+                          className="mt-4"
+                        />
                       )}
                       <Button
                         type="button"

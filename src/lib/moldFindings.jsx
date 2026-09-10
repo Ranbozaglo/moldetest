@@ -292,19 +292,70 @@ export function groupMoldFindingsByLocation(findings) {
   const groups = new Map();
 
   for (const row of rows) {
-    const key = row.location || 'General';
+    const key = row.location || 'Unspecified Area';
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   }
 
-  // Keep named areas first; put "General" last
+  // Keep named areas first; put unspecified last
   return Array.from(groups.entries())
     .sort(([a], [b]) => {
-      if (a === 'General' && b !== 'General') return 1;
-      if (b === 'General' && a !== 'General') return -1;
+      if (a === 'Unspecified Area' && b !== 'Unspecified Area') return 1;
+      if (b === 'Unspecified Area' && a !== 'Unspecified Area') return -1;
       return a.localeCompare(b);
     })
     .map(([location, items]) => ({ location, items }));
+}
+
+/**
+ * Fill missing finding locations from sample list / conclusion text when possible.
+ * Example: Sample #1 Living Room + Sample #2 Kitchen → attach those areas to findings.
+ */
+export function enrichMoldFindingsWithLocations(findings, { samples = [], conclusionText = '' } = {}) {
+  const rows = normalizeMoldFindings(findings);
+  if (!rows.length) return rows;
+
+  const sampleLocations = (Array.isArray(samples) ? samples : [])
+    .map((s, i) => ({
+      index: i + 1,
+      location: titleCaseLocation(s?.location || s?.sample_location || s?.area || ''),
+    }))
+    .filter((s) => s.location);
+
+  const conclusion = String(conclusionText || '');
+
+  return rows.map((row, idx) => {
+    if (row.location) return row;
+
+    // "in the living room", "from the kitchen", etc. near the mold name in conclusion
+    const nameRe = new RegExp(
+      `${row.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]{0,120}`,
+      'i'
+    );
+    const nearName = conclusion.match(nameRe)?.[0] || '';
+    const fromConclusion = extractLocationFromText(nearName) || extractLocationFromText(conclusion);
+    if (fromConclusion) return { ...row, location: fromConclusion };
+
+    // Match "Sample #N" mentions, else fall back to sample order
+    const sampleMention = conclusion.match(
+      new RegExp(`${row.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]{0,80}sample\\s*#?\\s*(\\d+)`, 'i')
+    );
+    if (sampleMention?.[1]) {
+      const sample = sampleLocations.find((s) => s.index === Number(sampleMention[1]));
+      if (sample?.location) return { ...row, location: sample.location };
+    }
+
+    if (sampleLocations[idx]?.location) {
+      return { ...row, location: sampleLocations[idx].location };
+    }
+
+    // If only one sample location exists, use it
+    if (sampleLocations.length === 1) {
+      return { ...row, location: sampleLocations[0].location };
+    }
+
+    return row;
+  });
 }
 
 /** Extract persisted mold findings marker from lab_conclusion (or any stored text). */
@@ -447,8 +498,9 @@ export function parseMoldFindingsFromLabText(findingsText) {
   return normalizeMoldFindings(findings);
 }
 
-export function MoldFindingsBreakdown({ findings, className = '' }) {
-  const groups = groupMoldFindingsByLocation(findings);
+export function MoldFindingsBreakdown({ findings, samples = [], conclusionText = '', className = '' }) {
+  const enriched = enrichMoldFindingsWithLocations(findings, { samples, conclusionText });
+  const groups = groupMoldFindingsByLocation(enriched);
   if (!groups.length) return null;
 
   return (
@@ -459,8 +511,11 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
       <div className="mt-4 space-y-5">
         {groups.map((group) => (
           <div key={group.location}>
-            <div className="text-sm font-semibold text-slate-800 mb-3">
-              {group.location}
+            <div className="text-sm font-bold text-[#0B2E59] mb-1">
+              Location: {group.location}
+            </div>
+            <div className="text-[11px] text-slate-400 mb-3 uppercase tracking-wide">
+              Rating scale: Rare · Low · Medium · High
             </div>
             <div className="space-y-3">
               {group.items.map((row) => (
@@ -477,7 +532,7 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
                       style={{ width: `${row.percent}%` }}
                     />
                   </div>
-                  <div className="text-sm font-medium text-teal-600 whitespace-nowrap min-w-[4.5rem] text-right">
+                  <div className="text-sm font-semibold text-teal-700 whitespace-nowrap min-w-[4.5rem] text-right">
                     {row.label}
                   </div>
                 </div>
@@ -490,8 +545,9 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
   );
 }
 
-export function buildMoldFindingsBreakdownHtml(findings) {
-  const groups = groupMoldFindingsByLocation(findings);
+export function buildMoldFindingsBreakdownHtml(findings, { samples = [], conclusionText = '' } = {}) {
+  const enriched = enrichMoldFindingsWithLocations(findings, { samples, conclusionText });
+  const groups = groupMoldFindingsByLocation(enriched);
   if (!groups.length) return '';
 
   const sections = groups
@@ -511,7 +567,8 @@ export function buildMoldFindingsBreakdownHtml(findings) {
 
       return `
       <div class="mold-finding-area">
-        <div class="mold-finding-area-title">${escapeHtml(group.location)}</div>
+        <div class="mold-finding-area-title">Location: ${escapeHtml(group.location)}</div>
+        <div class="mold-finding-scale">Rating: Rare · Low · Medium · High</div>
         <div class="mold-findings-list">
           ${items}
         </div>
@@ -549,10 +606,16 @@ export const MOLD_FINDINGS_REPORT_CSS = `
   margin-bottom: 0;
 }
 .mold-finding-area-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: #0B2E59;
+  margin: 0 0 4px 0;
+}
+.mold-finding-scale {
+  font-size: 11px;
+  color: #9ca3af;
   margin: 0 0 10px 0;
+  letter-spacing: 0.02em;
 }
 .mold-findings-list {
   display: flex;
