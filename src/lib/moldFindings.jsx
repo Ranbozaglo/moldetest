@@ -628,22 +628,22 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
             key={`${row.location || 'na'}-${row.name}-${index}`}
             className="grid grid-cols-[minmax(7rem,11rem)_1fr_auto] items-center gap-3"
           >
+            <div className="min-w-0 text-sm font-semibold text-slate-800 truncate" title={row.name}>
+              {row.name}
+            </div>
             <div className="min-w-0">
               <div
-                className="text-sm font-semibold text-slate-800 truncate"
+                className="mb-1.5 text-center text-xs font-medium text-slate-500 truncate"
                 title={row.location || 'Location not specified'}
               >
                 {row.location || 'Location not specified'}
               </div>
-              <div className="text-xs text-slate-500 truncate" title={row.name}>
-                {row.name}
+              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-sky-500 transition-all"
+                  style={{ width: `${row.percent}%` }}
+                />
               </div>
-            </div>
-            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-sky-500 transition-all"
-                style={{ width: `${row.percent}%` }}
-              />
             </div>
             <div
               className={`text-sm font-semibold whitespace-nowrap min-w-[4.5rem] text-right ${ratingLabelClass(row.label)}`}
@@ -669,12 +669,12 @@ export function buildMoldFindingsBreakdownHtml(findings) {
     .map(
       (row) => `
       <div class="mold-finding-row">
-        <div class="mold-finding-name-wrap">
-          <div class="mold-finding-location-primary">${escapeHtml(row.location || 'Location not specified')}</div>
-          <div class="mold-finding-mold-type">${escapeHtml(row.name)}</div>
-        </div>
-        <div class="mold-finding-bar-track">
-          <div class="mold-finding-bar-fill" style="width:${row.percent}%;"></div>
+        <div class="mold-finding-mold-type">${escapeHtml(row.name)}</div>
+        <div class="mold-finding-bar-wrap">
+          <div class="mold-finding-location-mid">${escapeHtml(row.location || 'Location not specified')}</div>
+          <div class="mold-finding-bar-track">
+            <div class="mold-finding-bar-fill" style="width:${row.percent}%;"></div>
+          </div>
         </div>
         <div class="mold-finding-qty" style="color:${ratingLabelColor(row.label)};">${escapeHtml(row.label)}</div>
       </div>`
@@ -717,13 +717,32 @@ export const MOLD_FINDINGS_REPORT_CSS = `
   align-items: center;
   gap: 14px;
 }
-.mold-finding-name-wrap {
+.mold-finding-mold-type {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mold-finding-bar-wrap {
+  min-width: 0;
+}
+.mold-finding-location-mid {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  text-align: center;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .mold-finding-name {
   font-size: 14px;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: #1f2937;
 }
 .mold-finding-location {
   font-size: 12px;
@@ -743,8 +762,7 @@ export const MOLD_FINDINGS_REPORT_CSS = `
 }
 .mold-finding-qty {
   font-size: 14px;
-  font-weight: 600;
-  color: #0d9488;
+  font-weight: 700;
   white-space: nowrap;
   min-width: 72px;
   text-align: right;

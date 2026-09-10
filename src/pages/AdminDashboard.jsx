@@ -2598,7 +2598,7 @@ export default function AdminDashboard() {
                                 className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
                               >
                                 <Eye className="w-4 h-4" />
-                                View Details
+                                Edit/Finalize Report
                               </DropdownMenuItem>
                               
                               <DropdownMenuItem 
@@ -2812,7 +2812,7 @@ export default function AdminDashboard() {
                                   className="flex items-center gap-2 hover:bg-blue-50 text-blue-700"
                                 >
                                   <Eye className="w-4 h-4" />
-                                  View Details
+                                  Edit/Finalize Report
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuItem 
