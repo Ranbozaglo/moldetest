@@ -174,8 +174,8 @@ Return valid JSON only with exactly these keys:
   "mold_findings": [
     {
       "name": "Cladosporium",
-      "quantity": "1,200 spores/m³",
-      "level": "Low",
+      "quantity": "1,200 spores",
+      "level": "High",
       "location": "Living Room"
     },
     {
@@ -190,8 +190,14 @@ Return valid JSON only with exactly these keys:
 === MOLD FINDINGS BREAKDOWN ===
 Also extract every mold/spore type mentioned in the laboratory findings (section B) into "mold_findings", grouped by sample area when possible.
 - "name": mold/spore type exactly as identified by the lab (do not invent types)
-- "quantity": the count, concentration, or qualitative amount from the lab text (for example "240", "1,200 spores/m³", "Rare", "Low")
+- "quantity": the count, concentration, or qualitative amount from the lab text (for example "240", "1,200 spores", "Rare", "Low")
 - "level": REQUIRED. One of exactly: "Rare", "Low", "Medium", or "High" (or "Not Detect" only if explicitly absent). Always fill this from the lab wording or count — never leave it blank. Map synonyms (trace/very low→Rare, moderate→Medium, abundant/numerous→High).
+- When mapping raw spore counts to level, use this lab scale exactly:
+  - Not Detect: 0 spores
+  - Rare: 1–10 spores
+  - Low: 11–100 spores
+  - Medium: 101–999 spores
+  - High: 1000+ spores
 - "location": the sample area/room for that result when stated (for example "Living Room", "Kitchen", "Master Bedroom"). Use customer sample locations from section A to match when the lab text refers to Sample #1, Sample #2, etc. If the area is unknown, use "".
 - Create a SEPARATE mold_findings entry for each area. The same mold type may appear more than once if found in different rooms.
 - The UI displays only the level word (Rare / Low / Medium / High), so level must always be set correctly.
@@ -537,7 +543,14 @@ def _normalize_report_assistant_recommendations(value) -> str:
 
 
 def _level_from_quantity(quantity: str) -> str:
-    """Map numeric counts onto Rare / Low / Medium / High when no word rating exists."""
+    """Map numeric spore counts onto the lab rating scale.
+
+    Not Detect: 0
+    Rare: 1–10
+    Low: 11–100
+    Medium: 101–999
+    High: 1000+
+    """
     text = str(quantity or '').strip()
     canonical = _canonicalize_mold_level(text)
     if canonical:
@@ -551,11 +564,11 @@ def _level_from_quantity(quantity: str) -> str:
         return ''
     if n <= 0:
         return 'Not Detect'
-    if n < 100:
+    if n <= 10:
         return 'Rare'
-    if n < 500:
+    if n <= 100:
         return 'Low'
-    if n < 2000:
+    if n < 1000:
         return 'Medium'
     return 'High'
 

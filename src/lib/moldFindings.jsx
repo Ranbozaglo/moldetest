@@ -71,8 +71,16 @@ const COMMON_AREAS = [
   'den',
 ];
 
-/** Canonical lab rating scale (lowest → highest). High is always the fullest bar. */
+/** Canonical lab rating scale from spore counts (lowest → highest). */
 export const MOLD_LEVEL_SCALE = ['Not Detect', 'Rare', 'Low', 'Medium', 'High'];
+
+/** Lab spore-count thresholds used when mapping numeric quantities to ratings. */
+export const MOLD_SPORE_THRESHOLDS = {
+  notDetectMax: 0, // 0 spores
+  rareMax: 10, // 1–10
+  lowMax: 100, // 11–100
+  mediumExclusiveMax: 1000, // 101–999; High is 1000+
+};
 
 const LEVEL_PERCENT = {
   'not detect': 6,
@@ -430,11 +438,11 @@ function levelFromQuantityText(quantity) {
   if (!numMatch) return '';
   const n = Number(numMatch[1]);
   if (!Number.isFinite(n)) return '';
-  // Numeric counts mapped onto the same 5-level scale (High = top of scale)
-  if (n <= 0) return 'Not Detect';
-  if (n < 100) return 'Rare';
-  if (n < 500) return 'Low';
-  if (n < 2000) return 'Medium';
+  // Lab scale: Not Detect 0 | Rare 1–10 | Low 11–100 | Medium 101–999 | High 1000+
+  if (n <= MOLD_SPORE_THRESHOLDS.notDetectMax) return 'Not Detect';
+  if (n <= MOLD_SPORE_THRESHOLDS.rareMax) return 'Rare';
+  if (n <= MOLD_SPORE_THRESHOLDS.lowMax) return 'Low';
+  if (n < MOLD_SPORE_THRESHOLDS.mediumExclusiveMax) return 'Medium';
   return 'High';
 }
 
@@ -450,8 +458,15 @@ function percentForFinding(finding, maxNumeric = 0) {
     return fromLevel;
   }
 
-  // Relative numeric bars when no rating word is present — scale so the max count = High (100%)
+  // Absolute spore counts should already map via levelFromQuantityText.
+  // Fallback: if only a relative max is known, still use the lab thresholds on the count.
   const numMatch = quantity.replace(/,/g, '').match(/(\d+(\.\d+)?)/);
+  if (numMatch) {
+    const mapped = levelFromQuantityText(numMatch[1]);
+    const pct = levelPercent(mapped);
+    if (pct != null) return pct;
+  }
+
   if (numMatch && maxNumeric > 0) {
     const n = Number(numMatch[1]);
     if (Number.isFinite(n) && n >= 0) {
