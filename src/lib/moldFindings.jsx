@@ -439,13 +439,13 @@ export function groupMoldFindingsByLocation(findings) {
 /** Extract persisted mold findings marker from lab_conclusion (or any stored text). */
 export function extractMoldFindingsFromText(text) {
   if (!text || typeof text !== 'string') {
-    return { findings: [], cleanText: text || '' };
+    return { findings: [], cleanText: text || '', sourceText: '' };
   }
 
   const start = text.indexOf(MOLD_FINDINGS_START);
   const end = text.indexOf(MOLD_FINDINGS_END);
   if (start === -1 || end === -1 || end <= start) {
-    return { findings: [], cleanText: text };
+    return { findings: [], cleanText: text, sourceText: '' };
   }
 
   const jsonPart = text.slice(start + MOLD_FINDINGS_START.length, end).trim();
@@ -455,9 +455,19 @@ export function extractMoldFindingsFromText(text) {
 
   try {
     const parsed = JSON.parse(jsonPart);
-    return { findings: normalizeMoldFindings(parsed), cleanText };
+    // New format: { findings, sourceText } — re-parse source with latest rules when present.
+    if (parsed && !Array.isArray(parsed) && Array.isArray(parsed.findings)) {
+      const sourceText = String(parsed.sourceText || '').trim();
+      const fromSource = sourceText ? parseMoldFindingsFromLabText(sourceText) : [];
+      return {
+        findings: fromSource.length ? fromSource : normalizeMoldFindings(parsed.findings),
+        cleanText,
+        sourceText,
+      };
+    }
+    return { findings: normalizeMoldFindings(parsed), cleanText, sourceText: '' };
   } catch {
-    return { findings: [], cleanText };
+    return { findings: [], cleanText, sourceText: '' };
   }
 }
 
@@ -465,17 +475,20 @@ export function stripMoldFindingsMarker(text) {
   return extractMoldFindingsFromText(text).cleanText;
 }
 
-export function attachMoldFindingsMarker(cleanText, findings) {
+export function attachMoldFindingsMarker(cleanText, findings, sourceText = '') {
   const normalized = normalizeMoldFindings(findings);
   const base = stripMoldFindingsMarker(cleanText || '').trim();
   if (!normalized.length) return base;
-  const payload = normalized.map(({ name, quantity, level, percent, location }) => ({
-    name,
-    quantity,
-    level,
-    location: location || '',
-    percent,
-  }));
+  const payload = {
+    findings: normalized.map(({ name, quantity, level, percent, location }) => ({
+      name,
+      quantity,
+      level,
+      location: location || '',
+      percent,
+    })),
+    sourceText: String(sourceText || '').trim(),
+  };
   const marker = `${MOLD_FINDINGS_START}${JSON.stringify(payload)}${MOLD_FINDINGS_END}`;
   return base ? `${base}\n\n${marker}` : marker;
 }

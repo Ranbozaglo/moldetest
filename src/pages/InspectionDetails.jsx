@@ -351,7 +351,7 @@ export default function InspectionDetails() {
       }
       
       setInspection(inspection);
-      setLaboratoryFindings('');
+      setLaboratoryFindings(storedMold.sourceText || '');
       setReportAssistantError(null);
       setReportAssistantSuccess(null);
       
@@ -943,7 +943,8 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
       await updateEntity.update(inspectionId, {
         lab_conclusion: attachMoldFindingsMarker(
           stripMoldFindingsMarker(inspection.lab_conclusion || ''),
-          findingsToPersist
+          findingsToPersist,
+          adminFindingsText
         ),
         lab_recommendations: inspection.lab_recommendations
       });
