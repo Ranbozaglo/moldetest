@@ -191,16 +191,139 @@ function looksLikeLocationHeader(line) {
   if (!cleaned || cleaned.length > 50) return '';
   if (isKnownMoldName(cleaned)) return '';
   if (isNoMoldDetectedPhrase(cleaned)) return '';
-  if (findRatingInText(cleaned) && cleaned.split(/\s+/).length <= 2) return '';
+  // Rated lines are findings (including typo mold names), never section headers.
+  if (findRatingInText(cleaned)) return '';
   if (/^\d+(\.\d+)?%?$/.test(cleaned)) return '';
   if (/\b(spores?|count|debris|sample\s*#?\d+)\b/i.test(cleaned)) return '';
 
-  // Keep the admin's full wording ("Southwest Bedroom", "Hallway Bathroom") —
-  // do not shrink to a generic known-area token like "Bedroom".
-  if (/^[a-z0-9][a-z0-9 /&'#.-]{1,48}$/i.test(cleaned)) {
+  // Known / room-like area — keep the admin's full wording.
+  if (extractLocationFromText(cleaned)) {
     return titleCaseLocation(cleaned);
   }
+  if (
+    /\b(rooms?|bedrooms?|bath(?:room)?s?|kitchen|hallway|basement|attic|garage|closets?|office|nursery|foyer|pantry|laundry|utility|crawl\s*spaces?|hvac|vents?|area|floor|upstairs|downstairs|porch|patio)\b/i.test(
+      cleaned
+    )
+  ) {
+    return titleCaseLocation(cleaned);
+  }
+
+  // Multi-word free-form area labels ("Front Porch", "Unit B") — not mold-like phrases.
+  if (
+    /^[a-z0-9][a-z0-9 /&'#.-]{1,48}$/i.test(cleaned) &&
+    cleaned.split(/\s+/).length >= 2 &&
+    !/\b(mold|spores?|fungi|fungus|growth)\b/i.test(cleaned)
+  ) {
+    return titleCaseLocation(cleaned);
+  }
+
+  // Single unknown token is treated as a possible mold type (typo/custom), not a location.
   return '';
+}
+
+/** True when the whole phrase is only a room/area label (not a mold type). */
+function isPureLocationLabel(text) {
+  const cleaned = String(text || '')
+    .replace(/^[:\-–,\s]+|[:\-–,\s]+$/g, '')
+    .trim();
+  if (!cleaned) return true;
+  if (isKnownMoldName(cleaned)) return false;
+  if (isNoMoldDetectedPhrase(cleaned)) return false;
+  if (findRatingInText(cleaned)) return false;
+  if (/\b(mold|spores?|fungi|fungus)\b/i.test(cleaned)) return false;
+
+  const titled = titleCaseLocation(cleaned);
+  const extracted = extractLocationFromText(cleaned);
+  if (extracted && extracted.toLowerCase() === titled.toLowerCase()) return true;
+  if (extracted && stripLocationLeadIns(cleaned).toLowerCase() === extracted.toLowerCase()) {
+    return true;
+  }
+
+  // Room vocabulary without being a known mold name.
+  if (
+    /\b(rooms?|bedrooms?|bath(?:room)?s?|kitchen|hallway|basement|attic|garage|closets?|office|nursery|foyer|pantry|laundry|utility|crawl\s*spaces?|hvac|vents?|area|floor|upstairs|downstairs|porch|patio)\b/i.test(
+      cleaned
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Capture admin-typed mold names that are not in the known list (typos / custom types).
+ * Examples: "Cladosporum High", "Kitchen: Black Mold Medium", "Weirdspore"
+ */
+function parseFreeformMoldFinding(line, currentLocation) {
+  let work = String(line || '').trim();
+  if (!work || isNoMoldDetectedPhrase(work)) return null;
+
+  let location = currentLocation || '';
+
+  const areaPrefix = work.match(
+    new RegExp(
+      `^\\s*((?:[a-z0-9]+\\s+){0,3}(?:${[...COMMON_AREAS]
+        .sort((a, b) => b.length - a.length)
+        .map((a) => a.replace(/\s+/g, '\\s+'))
+        .join('|')}))\\s*[:\\-–]\\s*`,
+      'i'
+    )
+  );
+  if (areaPrefix?.[1]) {
+    location = titleCaseLocation(stripLocationLeadIns(areaPrefix[1]));
+    work = work.slice(areaPrefix[0].length).trim();
+  } else {
+    const freePrefix = work.match(/^\s*([a-z0-9][a-z0-9 /&'#.-]{1,40}?)\s*[:\-–]\s+/i);
+    if (
+      freePrefix?.[1] &&
+      !isKnownMoldName(freePrefix[1]) &&
+      !findRatingInText(freePrefix[1]) &&
+      (extractLocationFromText(freePrefix[1]) || looksLikeLocationHeader(freePrefix[1]))
+    ) {
+      location = titleCaseLocation(freePrefix[1]);
+      work = work.slice(freePrefix[0].length).trim();
+    }
+  }
+
+  if (!work) return null;
+
+  const rated = work.match(new RegExp(`^(.+?)\\s*[:\\-–,]?\\s*(${RATING_TOKEN})\\s*$`, 'i'));
+  if (rated) {
+    const name = String(rated[1] || '')
+      .replace(/^[:\-–,\s]+|[:\-–,\s]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const level = canonicalizeLevel(rated[2]);
+    if (!name || isPureLocationLabel(name)) return null;
+    // Avoid treating a bare rating pair as a mold name.
+    if (canonicalizeLevel(name) && name.split(/\s+/).length <= 2) return null;
+
+    return {
+      name: titleCaseMold(name),
+      level,
+      quantity: level || 'Detected',
+      location: resolveFindingLocation(extractLocationFromText(line), location),
+    };
+  }
+
+  // Unrated custom / typo mold name on its own line under a location section.
+  if (
+    !findRatingInText(work) &&
+    !isPureLocationLabel(work) &&
+    !looksLikeLocationHeader(work) &&
+    /^[a-zA-Z][a-zA-Z0-9 /&'#.-]{0,48}$/.test(work) &&
+    work.split(/\s+/).length <= 5
+  ) {
+    return {
+      name: titleCaseMold(work),
+      level: 'Low',
+      quantity: 'Detected',
+      location: location || '',
+    };
+  }
+
+  return null;
 }
 
 const LOCATION_STOPWORDS =
@@ -621,15 +744,22 @@ export function parseMoldFindingsFromLabText(findingsText) {
     if (areaPrefix?.[1]) {
       currentLocation = titleCaseLocation(stripLocationLeadIns(areaPrefix[1]));
     } else {
-      // Free-form "Bedroom 2 - Cladosporium High"
+      // Free-form "Bedroom 2 - Cladosporium High" (not "Cladosporum: High")
       const freePrefix = line.match(/^\s*([a-z0-9][a-z0-9 /&'#.-]{1,40}?)\s*[:\-–]\s+/i);
-      if (freePrefix?.[1] && !isKnownMoldName(freePrefix[1]) && !findRatingInText(freePrefix[1])) {
+      if (
+        freePrefix?.[1] &&
+        !isKnownMoldName(freePrefix[1]) &&
+        !findRatingInText(freePrefix[1]) &&
+        (extractLocationFromText(freePrefix[1]) || looksLikeLocationHeader(freePrefix[1]))
+      ) {
         currentLocation = titleCaseLocation(freePrefix[1]);
       }
     }
 
+    let matchedKnown = false;
     let match;
     while ((match = moldOnlyPattern.exec(line)) !== null) {
+      matchedKnown = true;
       const name = normalizeParsedMoldName(match[1]);
 
       const before = line.slice(0, match.index);
@@ -652,6 +782,15 @@ export function parseMoldFindingsFromLabText(findingsText) {
         level,
         location,
       });
+    }
+
+    // Always keep admin-typed mold names, even with typos / unknown species.
+    if (!matchedKnown) {
+      const free = parseFreeformMoldFinding(line, currentLocation);
+      if (free) {
+        if (free.location) currentLocation = free.location;
+        pushFinding(free);
+      }
     }
   }
 
