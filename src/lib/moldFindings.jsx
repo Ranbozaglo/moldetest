@@ -76,7 +76,10 @@ const LEVEL_PERCENT = {
   high: 100,
 };
 
-/** Map free-text / aliases onto the 5-level scale. */
+const RATING_TOKEN =
+  'not\\s*detect(?:ed)?|nd|none|absent|rare|trace|very\\s*low|low|med(?:ium)?|moderate|common|high|abundant|numerous';
+
+/** Map free-text / aliases onto the 5-level scale. Higher ratings win when several appear. */
 export function canonicalizeLevel(raw) {
   const q = String(raw || '').toLowerCase().trim();
   if (!q) return '';
@@ -90,17 +93,18 @@ export function canonicalizeLevel(raw) {
   ) {
     return 'Not Detect';
   }
-  if (/\brare\b/.test(q) || /\btrace\b/.test(q) || /\bvery\s*low\b/.test(q)) {
-    return 'Rare';
-  }
-  if (/\blow\b/.test(q) && !/\bvery\s*low\b/.test(q) && !/\bmed(ium)?\b/.test(q)) {
-    return 'Low';
+  // Check High → Medium → Low → Rare so "High ... Medium" on one line does not become Medium/Low.
+  if (/\bhigh\b/.test(q) || /\babundant\b/.test(q) || /\bnumerous\b/.test(q)) {
+    return 'High';
   }
   if (/\bmed(ium)?\b/.test(q) || /\bmoderate\b/.test(q) || /\bcommon\b/.test(q)) {
     return 'Medium';
   }
-  if (/\bhigh\b/.test(q) || /\babundant\b/.test(q) || /\bnumerous\b/.test(q)) {
-    return 'High';
+  if (/\blow\b/.test(q) && !/\bvery\s*low\b/.test(q)) {
+    return 'Low';
+  }
+  if (/\brare\b/.test(q) || /\btrace\b/.test(q) || /\bvery\s*low\b/.test(q)) {
+    return 'Rare';
   }
   return '';
 }
@@ -147,23 +151,38 @@ function titleCaseLocation(location) {
     .join(' ');
 }
 
+function isKnownMoldName(name) {
+  const q = String(name || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!q) return false;
+  if (/^aspergillus\s*\/?\s*penicillium$/.test(q)) return true;
+  return COMMON_MOLDS.some((m) => m.toLowerCase() === q);
+}
+
 function extractLocationFromText(text) {
   const q = String(text || '').toLowerCase();
   if (!q) return '';
 
-  // "Location: Kitchen", "Sample location: Living room", "Area - Master bedroom"
-  const labeled = q.match(
-    /(?:sample\s*(?:#?\d+\s*)?(?:location|area)?|location|area|room|zone)\s*[:\-–]\s*([a-z0-9 /&-]{2,60})/i
-  );
-  if (labeled?.[1]) {
-    return titleCaseLocation(labeled[1].replace(/[.,;].*$/, '').trim());
-  }
-
-  // Prefer longer/more specific area names first
+  // Prefer known area names first so "Living Room - Cladosporium: High" → Living Room
+  // (not "Cladosporium" from a false "room - ..." label match).
   const sortedAreas = [...COMMON_AREAS].sort((a, b) => b.length - a.length);
   for (const area of sortedAreas) {
     const re = new RegExp(`\\b${area.replace(/\s+/g, '\\s+')}\\b`, 'i');
     if (re.test(q)) return titleCaseLocation(area);
+  }
+
+  // "Location: Kitchen", "Sample location: Living room", "Area - Master bedroom"
+  // Do not match bare "room" — it falsely captures "Living Room - MoldName".
+  const labeled = q.match(
+    /(?:sample\s*(?:#?\d+\s*)?(?:location|area)?|location|area|zone)\s*[:\-–]\s*([a-z0-9 /&-]{2,60})/i
+  );
+  if (labeled?.[1]) {
+    const candidate = labeled[1].replace(/[.,;].*$/, '').trim();
+    if (candidate && !isKnownMoldName(candidate)) {
+      return titleCaseLocation(candidate);
+    }
   }
 
   return '';
@@ -355,6 +374,40 @@ function findRatingInText(text) {
   return canonicalizeLevel(text) || levelFromQuantityText(text) || '';
 }
 
+/** Rating glued to the mold name beats other ratings later on the same line. */
+function findRatingNearMold(before, after) {
+  const afterAdj = String(after || '').match(
+    new RegExp(`^\\s*[:\\-–,]?\\s*(${RATING_TOKEN})\\b`, 'i')
+  );
+  if (afterAdj?.[1]) return canonicalizeLevel(afterAdj[1]);
+
+  const beforeAdj = String(before || '').match(
+    new RegExp(`\\b(${RATING_TOKEN})\\s*[:\\-–,]?\\s*$`, 'i')
+  );
+  if (beforeAdj?.[1]) return canonicalizeLevel(beforeAdj[1]);
+
+  // Only scan until the next mold-like token so multi-mold lines stay independent.
+  const afterUntilNext = String(after || '').split(
+    /\b(?:aspergillus\s*\/?\s*penicillium|cladosporium|aspergillus|penicillium|alternaria|stachybotrys)\b/i
+  )[0];
+  return findRatingInText(afterUntilNext) || findRatingInText(before) || '';
+}
+
+function buildMoldNamePattern() {
+  // Combined Aspergillus/Penicillium MUST come before the individual names.
+  const singles = COMMON_MOLDS.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return new RegExp(
+    `\\b(Aspergillus\\s*\\/\\s*Penicillium|Aspergillus\\s+\\/?\\s*Penicillium|${singles})\\b(?:\\s*(?:sp\\.?|spp\\.?))?`,
+    'gi'
+  );
+}
+
+function normalizeParsedMoldName(rawName) {
+  let name = String(rawName || '').replace(/\s+/g, ' ').trim();
+  if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
+  return titleCaseMold(name);
+}
+
 /** Lightweight parse of free-text laboratory findings for preview / fallback. */
 export function parseMoldFindingsFromLabText(findingsText) {
   const text = String(findingsText || '').trim();
@@ -364,12 +417,7 @@ export function parseMoldFindingsFromLabText(findingsText) {
   const seen = new Set();
   const lines = text.split(/\n+/);
   let currentLocation = '';
-
-  const moldAlt = COMMON_MOLDS.map((m) => m.replace('/', '\\/')).join('|');
-  const moldOnlyPattern = new RegExp(
-    `\\b(${moldAlt}|Aspergillus\\s*\\/?\\s*Penicillium)\\b(?:\\s*(?:sp\\.?|spp\\.?))?`,
-    'gi'
-  );
+  const moldOnlyPattern = buildMoldNamePattern();
 
   for (const rawLine of lines) {
     const line = String(rawLine || '').trim();
@@ -386,22 +434,28 @@ export function parseMoldFindingsFromLabText(findingsText) {
       continue;
     }
 
+    // "Kitchen: Aspergillus/Penicillium Rare" / "Living Room - Cladosporium: High"
+    const areaPrefix = line.match(
+      new RegExp(
+        `^\\s*(${[...COMMON_AREAS]
+          .sort((a, b) => b.length - a.length)
+          .map((a) => a.replace(/\s+/g, '\\s+'))
+          .join('|')})\\s*[:\\-–]\\s*`,
+        'i'
+      )
+    );
+    if (areaPrefix?.[1]) {
+      currentLocation = titleCaseLocation(areaPrefix[1]);
+    }
+
     let match;
     while ((match = moldOnlyPattern.exec(line)) !== null) {
-      let name = match[1].replace(/\s+/g, ' ').trim();
-      if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
-      name = titleCaseMold(name);
+      const name = normalizeParsedMoldName(match[1]);
 
-      // Prefer rating/quantity from the same line (before or after the mold name)
       const before = line.slice(0, match.index);
       const after = line.slice(match.index + match[0].length);
-      const level =
-        findRatingInText(after) ||
-        findRatingInText(before) ||
-        findRatingInText(line) ||
-        '';
+      const level = findRatingNearMold(before, after);
 
-      // Keep a short quantity snippet for display/debug, but rating comes from level
       let quantity = after
         .replace(/^[:\-–,\s]+/, '')
         .replace(/\s{2,}/g, ' ')
@@ -430,12 +484,10 @@ export function parseMoldFindingsFromLabText(findingsText) {
 
   // Fallback: whole-text scan if line parsing found nothing
   if (!findings.length) {
-    const whole = new RegExp(moldOnlyPattern.source, 'gi');
+    const whole = buildMoldNamePattern();
     let match;
     while ((match = whole.exec(text)) !== null) {
-      let name = match[1].replace(/\s+/g, ' ').trim();
-      if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
-      name = titleCaseMold(name);
+      const name = normalizeParsedMoldName(match[1]);
       const key = name.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
@@ -443,7 +495,9 @@ export function parseMoldFindingsFromLabText(findingsText) {
       const start = Math.max(0, match.index - 60);
       const end = Math.min(text.length, match.index + match[0].length + 60);
       const context = text.slice(start, end);
-      const level = findRatingInText(context);
+      const before = text.slice(start, match.index);
+      const after = text.slice(match.index + match[0].length, end);
+      const level = findRatingNearMold(before, after) || findRatingInText(context);
       findings.push({
         name,
         quantity: level || 'Detected',
@@ -458,7 +512,7 @@ export function parseMoldFindingsFromLabText(findingsText) {
 
 /**
  * Prefer admin-submitted laboratory findings text for ratings/locations.
- * AI mold_findings only fill gaps the admin text did not cover.
+ * AI mold_findings only fill molds the admin text did not mention at all.
  */
 export function mergeAdminAndAiMoldFindings(adminText, aiFindings = []) {
   const fromAdmin = parseMoldFindingsFromLabText(adminText);
@@ -467,19 +521,34 @@ export function mergeAdminAndAiMoldFindings(adminText, aiFindings = []) {
   if (!fromAdmin.length) return fromAi;
   if (!fromAi.length) return fromAdmin;
 
+  const adminNames = new Set();
+  for (const f of fromAdmin) {
+    const n = f.name.toLowerCase();
+    adminNames.add(n);
+    if (n === 'aspergillus/penicillium') {
+      adminNames.add('aspergillus');
+      adminNames.add('penicillium');
+    }
+  }
+
   const merged = [...fromAdmin];
   const seen = new Set(
     fromAdmin.map((f) => `${(f.location || '').toLowerCase()}::${f.name.toLowerCase()}`)
   );
 
   for (const ai of fromAi) {
-    const key = `${(ai.location || '').toLowerCase()}::${ai.name.toLowerCase()}`;
+    const nameKey = String(ai.name || '').toLowerCase();
+    // Admin already rated this mold (any location) — never let AI invent Low / blank location.
+    if (adminNames.has(nameKey)) continue;
+    if (
+      nameKey === 'aspergillus/penicillium' &&
+      (adminNames.has('aspergillus') || adminNames.has('penicillium'))
+    ) {
+      continue;
+    }
+
+    const key = `${(ai.location || '').toLowerCase()}::${nameKey}`;
     if (seen.has(key)) continue;
-    // Also skip if admin already listed this mold with no location
-    const adminHasName = fromAdmin.some(
-      (f) => f.name.toLowerCase() === ai.name.toLowerCase() && !f.location && !ai.location
-    );
-    if (adminHasName) continue;
     seen.add(key);
     merged.push(ai);
   }

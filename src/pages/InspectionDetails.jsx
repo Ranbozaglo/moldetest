@@ -929,12 +929,21 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
 
       // Use the appropriate entity to save changes
       const updateEntity = inspectionType === 'asbestos' ? AsbestosInspection : MoldInspection;
+
+      // Prefer ratings/locations parsed from Laboratory Findings over any stale AI chart state.
+      const adminFindingsText = (laboratoryFindings || '').trim();
+      const findingsToPersist = adminFindingsText
+        ? mergeAdminAndAiMoldFindings(adminFindingsText, moldFindings)
+        : moldFindings;
+      if (adminFindingsText) {
+        setMoldFindings(findingsToPersist);
+      }
       
       // Save the lab analysis changes (mold findings persist as a hidden marker in lab_conclusion)
       await updateEntity.update(inspectionId, {
         lab_conclusion: attachMoldFindingsMarker(
           stripMoldFindingsMarker(inspection.lab_conclusion || ''),
-          moldFindings
+          findingsToPersist
         ),
         lab_recommendations: inspection.lab_recommendations
       });
