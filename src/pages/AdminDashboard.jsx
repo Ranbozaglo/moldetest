@@ -772,11 +772,7 @@ export const generateReportHtmlContent = async (inspection, samples) => {
     const moldFindingsHtml = buildMoldFindingsBreakdownHtml(
       storedMoldFindings.findings.length
         ? storedMoldFindings.findings
-        : parseMoldFindingsFromLabText(inspection.lab_conclusion || inspection.conclusion || ''),
-      {
-        samples: samples || [],
-        conclusionText: storedMoldFindings.cleanText || inspection.lab_conclusion || inspection.conclusion || '',
-      }
+        : parseMoldFindingsFromLabText(inspection.lab_conclusion || inspection.conclusion || '')
     );
     const cleanLabConclusion = storedMoldFindings.cleanText || inspection.lab_conclusion || inspection.conclusion || '';
     const labAnalysisHtml = buildLabAnalysisFilesHtml(labAnalysisFiles);
