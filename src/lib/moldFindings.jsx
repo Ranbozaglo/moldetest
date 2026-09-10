@@ -884,6 +884,104 @@ function ratingLabelClass(label) {
   return 'text-teal-600';
 }
 
+/** Per-finding cleanliness (100 = clean). Used to build the overall /100 score. */
+const FINDING_CLEAN_SCORE = {
+  'Not Detect': 100,
+  Rare: 88,
+  Low: 72,
+  Medium: 48,
+  High: 18,
+};
+
+/**
+ * Overall findings score out of 100 from the severity split.
+ * Higher = cleaner (more Not Detect / Rare, fewer High / Medium).
+ */
+export function computeMoldFindingsScore(findings) {
+  const rows = normalizeMoldFindings(findings);
+  const split = { 'Not Detect': 0, Rare: 0, Low: 0, Medium: 0, High: 0 };
+  if (!rows.length) {
+    return { score: 0, split, total: 0 };
+  }
+
+  let sum = 0;
+  for (const row of rows) {
+    const level = row.label || resolveLevel(row);
+    if (split[level] != null) split[level] += 1;
+    sum += FINDING_CLEAN_SCORE[level] ?? 60;
+  }
+
+  const score = Math.max(0, Math.min(100, Math.round(sum / rows.length)));
+  return { score, split, total: rows.length };
+}
+
+function scoreRingColor(score) {
+  if (score >= 80) return '#2dd4bf'; // teal like the reference
+  if (score >= 60) return '#38bdf8';
+  if (score >= 40) return '#f59e0b';
+  return '#ef4444';
+}
+
+function MoldFindingsScoreRing({ score, size = 148, stroke = 16 }) {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.max(0, Math.min(100, Number(score) || 0));
+  const offset = circumference - (progress / 100) * circumference;
+  const color = scoreRingColor(progress);
+
+  return (
+    <div className="relative mx-auto" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="block -rotate-90" aria-hidden="true">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#f3f4f6"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="butt"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="text-[42px] leading-none font-bold text-slate-800 tabular-nums">{progress}</div>
+        <div className="mt-1 text-sm text-slate-400 font-medium">/100</div>
+      </div>
+    </div>
+  );
+}
+
+function buildMoldFindingsScoreRingHtml(score, size = 148, stroke = 16) {
+  const progress = Math.max(0, Math.min(100, Number(score) || 0));
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (progress / 100) * circumference;
+  const color = scoreRingColor(progress);
+  return `
+    <div class="mold-findings-score-ring" style="width:${size}px;height:${size}px;">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+        <g transform="rotate(-90 ${size / 2} ${size / 2})">
+          <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="#f3f4f6" stroke-width="${stroke}"></circle>
+          <circle cx="${size / 2}" cy="${size / 2}" r="${radius}" fill="none" stroke="${color}" stroke-width="${stroke}"
+            stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" stroke-linecap="butt"></circle>
+        </g>
+      </svg>
+      <div class="mold-findings-score-center">
+        <div class="mold-findings-score-value">${progress}</div>
+        <div class="mold-findings-score-denom">/100</div>
+      </div>
+    </div>`;
+}
+
 export function MoldFindingsBreakdown({ findings, className = '' }) {
   const rows = [...normalizeMoldFindings(findings)].sort((a, b) => {
     const loc = (a.location || '').localeCompare(b.location || '');
@@ -892,12 +990,26 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
   });
   if (!rows.length) return null;
 
+  const { score, split, total } = computeMoldFindingsScore(rows);
+  const splitParts = ['High', 'Medium', 'Low', 'Rare', 'Not Detect']
+    .filter((level) => split[level] > 0)
+    .map((level) => `${split[level]} ${level}`);
+
   return (
     <div className={`rounded-xl border border-slate-200 bg-white p-5 ${className}`}>
       <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
         Mold Findings Breakdown
       </div>
-      <div className="mt-4 space-y-4">
+
+      <div className="mt-5 mb-6 flex flex-col items-center">
+        <MoldFindingsScoreRing score={score} />
+        <div className="mt-3 text-xs text-slate-500 text-center max-w-xs">
+          Overall score from {total} finding{total === 1 ? '' : 's'}
+          {splitParts.length ? ` · ${splitParts.join(' · ')}` : ''}
+        </div>
+      </div>
+
+      <div className="space-y-4">
         {rows.map((row, index) => (
           <div
             key={`${row.location || 'na'}-${row.name}-${index}`}
@@ -940,6 +1052,12 @@ export function buildMoldFindingsBreakdownHtml(findings) {
   });
   if (!rows.length) return '';
 
+  const { score, split, total } = computeMoldFindingsScore(rows);
+  const splitParts = ['High', 'Medium', 'Low', 'Rare', 'Not Detect']
+    .filter((level) => split[level] > 0)
+    .map((level) => `${split[level]} ${level}`)
+    .join(' · ');
+
   const items = rows
     .map(
       (row) => `
@@ -959,6 +1077,12 @@ export function buildMoldFindingsBreakdownHtml(findings) {
   return `
     <div class="section keep-together mold-findings-breakdown">
       <div class="mold-findings-label">MOLD FINDINGS BREAKDOWN</div>
+      <div class="mold-findings-score-wrap">
+        ${buildMoldFindingsScoreRingHtml(score)}
+        <div class="mold-findings-score-caption">
+          Overall score from ${total} finding${total === 1 ? '' : 's'}${splitParts ? ` · ${escapeHtml(splitParts)}` : ''}
+        </div>
+      </div>
       <div class="mold-findings-list">
         ${items}
       </div>
@@ -980,6 +1104,45 @@ export const MOLD_FINDINGS_REPORT_CSS = `
   text-transform: uppercase;
   color: #9ca3af;
   margin-bottom: 16px;
+}
+.mold-findings-score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 8px 0 22px 0;
+}
+.mold-findings-score-ring {
+  position: relative;
+}
+.mold-findings-score-ring svg {
+  display: block;
+}
+.mold-findings-score-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.mold-findings-score-value {
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 700;
+  color: #1f2937;
+}
+.mold-findings-score-denom {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+.mold-findings-score-caption {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  max-width: 320px;
 }
 .mold-findings-list {
   display: flex;
