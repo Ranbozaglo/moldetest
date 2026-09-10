@@ -83,10 +83,10 @@ export const MOLD_SPORE_THRESHOLDS = {
 };
 
 const LEVEL_PERCENT = {
-  'not detect': 6,
-  'not detected': 6,
-  none: 6,
-  nd: 6,
+  'not detect': 0,
+  'not detected': 0,
+  none: 0,
+  nd: 0,
   rare: 28,
   low: 50,
   medium: 74,
