@@ -43,7 +43,11 @@ const COMMON_AREAS = [
   'bedroom',
   'primary bathroom',
   'master bathroom',
+  'primary bath',
+  'master bath',
   'bathroom',
+  'powder room',
+  'half bath',
   'basement',
   'attic',
   'garage',
@@ -59,6 +63,12 @@ const COMMON_AREAS = [
   'office',
   'nursery',
   'guest room',
+  'guest bedroom',
+  'mudroom',
+  'foyer',
+  'pantry',
+  'sunroom',
+  'den',
 ];
 
 /** Canonical lab rating scale (lowest → highest). High is always the fullest bar. */
@@ -159,6 +169,27 @@ function isKnownMoldName(name) {
   if (!q) return false;
   if (/^aspergillus\s*\/?\s*penicillium$/.test(q)) return true;
   return COMMON_MOLDS.some((m) => m.toLowerCase() === q);
+}
+
+function looksLikeLocationHeader(line) {
+  const cleaned = String(line || '')
+    .replace(/^[#*\-–•\d.)\s]+/, '')
+    .replace(/[:\-–]+$/g, '')
+    .trim();
+  if (!cleaned || cleaned.length > 50) return '';
+  if (isKnownMoldName(cleaned)) return '';
+  if (findRatingInText(cleaned) && cleaned.split(/\s+/).length <= 2) return '';
+  if (/^\d+(\.\d+)?%?$/.test(cleaned)) return '';
+  if (/\b(spores?|count|debris|sample\s*#?\d+)\b/i.test(cleaned)) return '';
+
+  const known = extractLocationFromText(cleaned);
+  if (known) return known;
+
+  // Free-form room/area label the admin typed (e.g. "Bedroom 2", "Front Hall")
+  if (/^[a-z0-9][a-z0-9 /&'#.-]{1,48}$/i.test(cleaned)) {
+    return titleCaseLocation(cleaned);
+  }
+  return '';
 }
 
 function extractLocationFromText(text) {
@@ -427,10 +458,10 @@ export function parseMoldFindingsFromLabText(findingsText) {
     const hasMold = moldOnlyPattern.test(line);
     moldOnlyPattern.lastIndex = 0;
 
-    const locationOnly = extractLocationFromText(line);
+    const locationHeader = looksLikeLocationHeader(line);
     // Section header for an area (no mold name on this line)
-    if (locationOnly && !hasMold) {
-      currentLocation = locationOnly;
+    if (locationHeader && !hasMold) {
+      currentLocation = locationHeader;
       continue;
     }
 
@@ -446,6 +477,12 @@ export function parseMoldFindingsFromLabText(findingsText) {
     );
     if (areaPrefix?.[1]) {
       currentLocation = titleCaseLocation(areaPrefix[1]);
+    } else {
+      // Free-form "Bedroom 2 - Cladosporium High"
+      const freePrefix = line.match(/^\s*([a-z0-9][a-z0-9 /&'#.-]{1,40}?)\s*[:\-–]\s+/i);
+      if (freePrefix?.[1] && !isKnownMoldName(freePrefix[1]) && !findRatingInText(freePrefix[1])) {
+        currentLocation = titleCaseLocation(freePrefix[1]);
+      }
     }
 
     let match;
@@ -557,7 +594,11 @@ export function mergeAdminAndAiMoldFindings(adminText, aiFindings = []) {
 }
 
 export function MoldFindingsBreakdown({ findings, className = '' }) {
-  const rows = normalizeMoldFindings(findings);
+  const rows = [...normalizeMoldFindings(findings)].sort((a, b) => {
+    const loc = (a.location || '').localeCompare(b.location || '');
+    if (loc !== 0) return loc;
+    return (a.name || '').localeCompare(b.name || '');
+  });
   if (!rows.length) return null;
 
   return (
@@ -572,14 +613,15 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
             className="grid grid-cols-[minmax(7rem,11rem)_1fr_auto] items-center gap-3"
           >
             <div className="min-w-0">
-              <div className="text-sm font-medium text-slate-700 truncate" title={row.name}>
+              <div
+                className="text-sm font-medium text-slate-700 truncate"
+                title={row.location || 'Location not specified'}
+              >
+                {row.location || 'Location not specified'}
+              </div>
+              <div className="text-xs text-slate-500 truncate" title={row.name}>
                 {row.name}
               </div>
-              {row.location ? (
-                <div className="text-xs text-slate-500 truncate" title={row.location}>
-                  {row.location}
-                </div>
-              ) : null}
             </div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
               <div
@@ -598,7 +640,11 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
 }
 
 export function buildMoldFindingsBreakdownHtml(findings) {
-  const rows = normalizeMoldFindings(findings);
+  const rows = [...normalizeMoldFindings(findings)].sort((a, b) => {
+    const loc = (a.location || '').localeCompare(b.location || '');
+    if (loc !== 0) return loc;
+    return (a.name || '').localeCompare(b.name || '');
+  });
   if (!rows.length) return '';
 
   const items = rows
@@ -606,8 +652,8 @@ export function buildMoldFindingsBreakdownHtml(findings) {
       (row) => `
       <div class="mold-finding-row">
         <div class="mold-finding-name-wrap">
-          <div class="mold-finding-name">${escapeHtml(row.name)}</div>
-          ${row.location ? `<div class="mold-finding-location">${escapeHtml(row.location)}</div>` : ''}
+          <div class="mold-finding-name">${escapeHtml(row.location || 'Location not specified')}</div>
+          <div class="mold-finding-location">${escapeHtml(row.name)}</div>
         </div>
         <div class="mold-finding-bar-track">
           <div class="mold-finding-bar-fill" style="width:${row.percent}%;"></div>
