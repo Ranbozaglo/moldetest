@@ -350,6 +350,11 @@ export function attachMoldFindingsMarker(cleanText, findings) {
   return base ? `${base}\n\n${marker}` : marker;
 }
 
+/** Find Rare/Low/Medium/High (or synonyms) anywhere in nearby text. */
+function findRatingInText(text) {
+  return canonicalizeLevel(text) || levelFromQuantityText(text) || '';
+}
+
 /** Lightweight parse of free-text laboratory findings for preview / fallback. */
 export function parseMoldFindingsFromLabText(findingsText) {
   const text = String(findingsText || '').trim();
@@ -361,54 +366,62 @@ export function parseMoldFindingsFromLabText(findingsText) {
   let currentLocation = '';
 
   const moldAlt = COMMON_MOLDS.map((m) => m.replace('/', '\\/')).join('|');
-  const linePattern = new RegExp(
-    `\\b(${moldAlt}|Aspergillus\\s*\\/?\\s*Penicillium)\\b(?:\\s*(?:sp\\.?|spp\\.?))?\\s*[:\\-–]?\\s*([^\\n;|]{0,80})`,
+  const moldOnlyPattern = new RegExp(
+    `\\b(${moldAlt}|Aspergillus\\s*\\/?\\s*Penicillium)\\b(?:\\s*(?:sp\\.?|spp\\.?))?`,
     'gi'
   );
 
-  for (const line of lines) {
+  for (const rawLine of lines) {
+    const line = String(rawLine || '').trim();
+    if (!line) continue;
+
+    moldOnlyPattern.lastIndex = 0;
+    const hasMold = moldOnlyPattern.test(line);
+    moldOnlyPattern.lastIndex = 0;
+
     const locationOnly = extractLocationFromText(line);
-    // If the line is mainly a section header for an area, remember it
-    if (locationOnly && !linePattern.test(line)) {
+    // Section header for an area (no mold name on this line)
+    if (locationOnly && !hasMold) {
       currentLocation = locationOnly;
-      linePattern.lastIndex = 0;
       continue;
     }
-    linePattern.lastIndex = 0;
 
     let match;
-    while ((match = linePattern.exec(line)) !== null) {
+    while ((match = moldOnlyPattern.exec(line)) !== null) {
       let name = match[1].replace(/\s+/g, ' ').trim();
       if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
       name = titleCaseMold(name);
 
-      let quantity = String(match[2] || '').trim();
-      quantity = quantity
+      // Prefer rating/quantity from the same line (before or after the mold name)
+      const before = line.slice(0, match.index);
+      const after = line.slice(match.index + match[0].length);
+      const level =
+        findRatingInText(after) ||
+        findRatingInText(before) ||
+        findRatingInText(line) ||
+        '';
+
+      // Keep a short quantity snippet for display/debug, but rating comes from level
+      let quantity = after
         .replace(/^[:\-–,\s]+/, '')
         .replace(/\s{2,}/g, ' ')
         .replace(/[.;]+$/, '')
-        .trim();
-
-      for (const mold of COMMON_MOLDS) {
-        const idx = quantity.toLowerCase().indexOf(mold.toLowerCase());
-        if (idx > 0) quantity = quantity.slice(0, idx).trim();
-      }
+        .trim()
+        .slice(0, 80);
+      if (!quantity && level) quantity = level;
 
       const location =
         extractLocationFromText(line) ||
-        extractLocationFromText(quantity) ||
         currentLocation ||
         '';
 
-      // Allow same mold in different rooms
       const key = `${location.toLowerCase()}::${name.toLowerCase()}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const level = levelFromQuantityText(quantity);
       findings.push({
         name,
-        quantity: quantity || (level ? level : 'Detected'),
+        quantity: quantity || level || 'Detected',
         level,
         location,
       });
@@ -417,8 +430,8 @@ export function parseMoldFindingsFromLabText(findingsText) {
 
   // Fallback: whole-text scan if line parsing found nothing
   if (!findings.length) {
+    const whole = new RegExp(moldOnlyPattern.source, 'gi');
     let match;
-    const whole = new RegExp(linePattern.source, 'gi');
     while ((match = whole.exec(text)) !== null) {
       let name = match[1].replace(/\s+/g, ' ').trim();
       if (/aspergillus\s*\/?\s*penicillium/i.test(name)) name = 'Aspergillus/Penicillium';
@@ -427,16 +440,13 @@ export function parseMoldFindingsFromLabText(findingsText) {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      let quantity = String(match[2] || '').trim()
-        .replace(/^[:\-–,\s]+/, '')
-        .replace(/[.;]+$/, '')
-        .trim();
-      const level = levelFromQuantityText(quantity);
-      const start = Math.max(0, match.index - 80);
-      const context = text.slice(start, match.index + match[0].length + 40);
+      const start = Math.max(0, match.index - 60);
+      const end = Math.min(text.length, match.index + match[0].length + 60);
+      const context = text.slice(start, end);
+      const level = findRatingInText(context);
       findings.push({
         name,
-        quantity: quantity || (level ? level : 'Detected'),
+        quantity: level || 'Detected',
         level,
         location: extractLocationFromText(context),
       });
@@ -444,6 +454,37 @@ export function parseMoldFindingsFromLabText(findingsText) {
   }
 
   return normalizeMoldFindings(findings);
+}
+
+/**
+ * Prefer admin-submitted laboratory findings text for ratings/locations.
+ * AI mold_findings only fill gaps the admin text did not cover.
+ */
+export function mergeAdminAndAiMoldFindings(adminText, aiFindings = []) {
+  const fromAdmin = parseMoldFindingsFromLabText(adminText);
+  const fromAi = normalizeMoldFindings(aiFindings);
+
+  if (!fromAdmin.length) return fromAi;
+  if (!fromAi.length) return fromAdmin;
+
+  const merged = [...fromAdmin];
+  const seen = new Set(
+    fromAdmin.map((f) => `${(f.location || '').toLowerCase()}::${f.name.toLowerCase()}`)
+  );
+
+  for (const ai of fromAi) {
+    const key = `${(ai.location || '').toLowerCase()}::${ai.name.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    // Also skip if admin already listed this mold with no location
+    const adminHasName = fromAdmin.some(
+      (f) => f.name.toLowerCase() === ai.name.toLowerCase() && !f.location && !ai.location
+    );
+    if (adminHasName) continue;
+    seen.add(key);
+    merged.push(ai);
+  }
+
+  return normalizeMoldFindings(merged);
 }
 
 export function MoldFindingsBreakdown({ findings, className = '' }) {

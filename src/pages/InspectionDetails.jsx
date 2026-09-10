@@ -7,6 +7,7 @@ import {
   MoldFindingsBreakdown,
   parseMoldFindingsFromLabText,
   normalizeMoldFindings,
+  mergeAdminAndAiMoldFindings,
   extractMoldFindingsFromText,
   attachMoldFindingsMarker,
   stripMoldFindingsMarker,
@@ -878,10 +879,11 @@ After flooding or water damage, inspect and dry affected areas promptly, and con
         customerSubmitted,
       });
 
-      const extractedFindings = normalizeMoldFindings(
-        result.moldFindings?.length
-          ? result.moldFindings
-          : parseMoldFindingsFromLabText(findings)
+      // Ratings must follow what the admin typed in Laboratory Findings.
+      // AI mold_findings only fill gaps the admin text did not cover.
+      const extractedFindings = mergeAdminAndAiMoldFindings(
+        findings,
+        result.moldFindings || []
       );
       setMoldFindings(extractedFindings);
 
@@ -2559,7 +2561,8 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                     <div>
                       <Label htmlFor="laboratory-findings">Laboratory Findings</Label>
                       <p className="text-xs text-slate-500 mt-1 mb-2">
-                        Temporary input for the AI Report Assistant only. Not saved to the customer report.
+                        Temporary input for the AI Report Assistant. Mold ratings (Rare / Low / Medium / High)
+                        and locations are taken from this text when you generate and save.
                         Generation also uses this inspection&apos;s submitted details (locations, moisture/water damage, humidity, samples).
                       </p>
                       <Textarea
@@ -2569,10 +2572,8 @@ ${inspection.year_built && parseInt(inspection.year_built) < 1980 ? '• Mandato
                           setLaboratoryFindings(e.target.value);
                           setReportAssistantError(null);
                           setReportAssistantSuccess(null);
-                          const preview = parseMoldFindingsFromLabText(e.target.value);
-                          if (preview.length) {
-                            setMoldFindings(preview);
-                          }
+                          // Always refresh ratings from the admin-submitted text
+                          setMoldFindings(parseMoldFindingsFromLabText(e.target.value));
                         }}
                         placeholder="Describe the lab findings in your own words (species, counts, sample location, debris, etc.)..."
                         className="min-h-28 mt-2"
