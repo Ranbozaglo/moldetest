@@ -593,6 +593,22 @@ export function mergeAdminAndAiMoldFindings(adminText, aiFindings = []) {
   return normalizeMoldFindings(merged);
 }
 
+function ratingLabelColor(label) {
+  const level = canonicalizeLevel(label) || String(label || '').trim();
+  if (level === 'High' || level === 'Medium') return '#dc2626'; // red
+  if (level === 'Rare' || level === 'Low') return '#ea580c'; // orange
+  if (level === 'Not Detect') return '#059669'; // green
+  return '#0d9488';
+}
+
+function ratingLabelClass(label) {
+  const level = canonicalizeLevel(label) || String(label || '').trim();
+  if (level === 'High' || level === 'Medium') return 'text-red-600';
+  if (level === 'Rare' || level === 'Low') return 'text-orange-600';
+  if (level === 'Not Detect') return 'text-emerald-600';
+  return 'text-teal-600';
+}
+
 export function MoldFindingsBreakdown({ findings, className = '' }) {
   const rows = [...normalizeMoldFindings(findings)].sort((a, b) => {
     const loc = (a.location || '').localeCompare(b.location || '');
@@ -614,7 +630,7 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
           >
             <div className="min-w-0">
               <div
-                className="text-sm font-medium text-slate-700 truncate"
+                className="text-sm font-semibold text-slate-800 truncate"
                 title={row.location || 'Location not specified'}
               >
                 {row.location || 'Location not specified'}
@@ -629,7 +645,9 @@ export function MoldFindingsBreakdown({ findings, className = '' }) {
                 style={{ width: `${row.percent}%` }}
               />
             </div>
-            <div className="text-sm font-medium text-teal-600 whitespace-nowrap min-w-[4.5rem] text-right">
+            <div
+              className={`text-sm font-semibold whitespace-nowrap min-w-[4.5rem] text-right ${ratingLabelClass(row.label)}`}
+            >
               {row.label}
             </div>
           </div>
@@ -652,13 +670,13 @@ export function buildMoldFindingsBreakdownHtml(findings) {
       (row) => `
       <div class="mold-finding-row">
         <div class="mold-finding-name-wrap">
-          <div class="mold-finding-name">${escapeHtml(row.location || 'Location not specified')}</div>
-          <div class="mold-finding-location">${escapeHtml(row.name)}</div>
+          <div class="mold-finding-location-primary">${escapeHtml(row.location || 'Location not specified')}</div>
+          <div class="mold-finding-mold-type">${escapeHtml(row.name)}</div>
         </div>
         <div class="mold-finding-bar-track">
           <div class="mold-finding-bar-fill" style="width:${row.percent}%;"></div>
         </div>
-        <div class="mold-finding-qty">${escapeHtml(row.label)}</div>
+        <div class="mold-finding-qty" style="color:${ratingLabelColor(row.label)};">${escapeHtml(row.label)}</div>
       </div>`
     )
     .join('');
