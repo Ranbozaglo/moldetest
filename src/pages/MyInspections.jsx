@@ -852,6 +852,67 @@ export default function MyInspections() {
     );
   }
 
+  const isFirstTimer = inspections.length === 0 && kitDownloads.length === 0;
+  const boughtKitNotSubmitted = inspections.length === 0 && kitDownloads.length > 0;
+  const isReturning = inspections.length > 0;
+
+  const packageButtons = (kitPackages.length
+    ? kitPackages
+    : [
+        { package_type: "spot_check", display_name: "Spot Check", stripe_payment_link_url: "" },
+        { package_type: "extended", display_name: "Extended", stripe_payment_link_url: "" },
+        { package_type: "full_house", display_name: "Full House", stripe_payment_link_url: "" },
+      ]
+  ).map((pkg) => (
+    <Button
+      key={pkg.package_type}
+      disabled={!pkg.stripe_payment_link_url}
+      onClick={() => pkg.stripe_payment_link_url && window.open(pkg.stripe_payment_link_url, "_blank")}
+      className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
+    >
+      <Package className="w-4 h-4 mr-2" />
+      {pkg.display_name}
+    </Button>
+  ));
+
+  const kitDownloadsCard = kitDownloads.length > 0 && (
+    <Card className="mb-8 border-green-100">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Package className="w-5 h-5" />
+          Your COC &amp; shipping labels
+        </CardTitle>
+        <p className="text-sm text-slate-600 font-normal">
+          These files come from your kit purchase (also emailed to you). Submitting an inspection does not create a new label.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {kitDownloads.map((d) => (
+          <div key={d.id} className="rounded-lg border border-slate-200 p-4">
+            <div className="font-medium text-slate-900 mb-2">{d.package_name}</div>
+            <div className="flex flex-wrap gap-3 text-sm">
+              {d.coc_url && (
+                <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                  Download COC
+                </a>
+              )}
+              {d.shipping_label_url && (
+                <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                  Download shipping label
+                </a>
+              )}
+              {d.instructions_url && (
+                <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                  Download instructions
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="max-w-6xl mx-auto py-12 px-6">
       <motion.div
@@ -859,117 +920,18 @@ export default function MyInspections() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Inspections</h1>
-            <p className="text-slate-600 mt-2 text-sm sm:text-base">Welcome back, {user?.full_name || (inspections.length > 0 ? inspections[0]?.full_name : null) || user?.email || 'User'}</p>
-          </div>
-          <Button
-            onClick={() => navigate(createPageUrl("Inspection"))}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Start new inspection
-          </Button>
-        </div>
-
-        {/* Hub: buy kit + start another job */}
-        <Card className="mb-8 border-blue-100 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-slate-900">Need another test?</CardTitle>
-            <p className="text-sm text-slate-600 font-normal">
-              Order a kit for a new property or job, then submit a new inspection when you are ready.
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              {isFirstTimer ? "Get started" : "My Inspections"}
+            </h1>
+            <p className="text-slate-600 mt-2 text-sm sm:text-base">
+              {isFirstTimer
+                ? `Welcome, ${user?.full_name || user?.email || "there"}. Follow the steps below.`
+                : `Welcome back, ${user?.full_name || (inspections.length > 0 ? inspections[0]?.full_name : null) || user?.email || "User"}`}
             </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800 mb-2">Order another kit</h3>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {(kitPackages.length
-                  ? kitPackages
-                  : [
-                      { package_type: "spot_check", display_name: "Spot Check", stripe_payment_link_url: "" },
-                      { package_type: "extended", display_name: "Extended", stripe_payment_link_url: "" },
-                      { package_type: "full_house", display_name: "Full House", stripe_payment_link_url: "" },
-                    ]
-                ).map((pkg) => (
-                  <Button
-                    key={pkg.package_type}
-                    disabled={!pkg.stripe_payment_link_url}
-                    onClick={() => pkg.stripe_payment_link_url && window.open(pkg.stripe_payment_link_url, "_blank")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
-                  >
-                    <Package className="w-4 h-4 mr-2" />
-                    {pkg.display_name}
-                  </Button>
-                ))}
-              </div>
-              {!kitPackages.some((p) => p.stripe_payment_link_url) && (
-                <p className="text-xs text-slate-500 mt-2">
-                  Package buy links are configured in Admin → Kit Fulfillment.
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1 border-t border-slate-100">
-              <p className="text-sm text-slate-600 flex-1">
-                Already have materials? Create a new inspection for this job.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() => navigate(createPageUrl("Inspection"))}
-                className="border-blue-600 text-blue-700 hover:bg-blue-50"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Start new inspection
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {kitDownloads.length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="w-5 h-5" />
-                Your kit downloads
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {kitDownloads.map((d) => (
-                <div key={d.id} className="rounded-lg border border-slate-200 p-4">
-                  <div className="font-medium text-slate-900 mb-2">{d.package_name}</div>
-                  <div className="flex flex-wrap gap-3 text-sm">
-                    {d.coc_url && (
-                      <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download COC
-                      </a>
-                    )}
-                    {d.shipping_label_url && (
-                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download shipping label
-                      </a>
-                    )}
-                    {d.instructions_url && (
-                      <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download instructions
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-          
-        {/* Inspections List */}
-        {inspections.length === 0 ? (
-          <div className="text-center py-12 rounded-xl border border-dashed border-slate-200 bg-white/70">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <FlaskConical className="w-8 h-8 text-slate-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">No Inspections Yet</h3>
-            <p className="text-slate-600 mb-6">Order a kit above, then start your first inspection when you are ready.</p>
+          </div>
+          {isReturning && (
             <Button
               onClick={() => navigate(createPageUrl("Inspection"))}
               className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -977,8 +939,138 @@ export default function MyInspections() {
               <Plus className="w-4 h-4 mr-2" />
               Start new inspection
             </Button>
-          </div>
-        ) : (
+          )}
+        </div>
+
+        {isFirstTimer && (
+          <Card className="mb-8 border-blue-100 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg text-slate-900">Your testing path</CardTitle>
+              <p className="text-sm text-slate-600 font-normal">
+                Buy a kit first to receive your Chain of Custody (COC) and prepaid shipping label. Then submit your inspection details.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">1</div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900">Choose your kit</h3>
+                    <p className="text-sm text-slate-600 mt-1 mb-3">
+                      After checkout you get an email with your unique prepaid label + COC. Files also appear here under downloads.
+                    </p>
+                    <div className="grid sm:grid-cols-3 gap-3">{packageButtons}</div>
+                    {!kitPackages.some((p) => p.stripe_payment_link_url) && (
+                      <p className="text-xs text-slate-500 mt-2">
+                        Package buy links are configured in Admin → Kit Fulfillment.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 opacity-90">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-sm font-bold text-white">2</div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">Collect samples</h3>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Use the sampling guide, fill out the COC, and pack samples with the prepaid label.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 opacity-90">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-sm font-bold text-white">3</div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-900">Submit your inspection</h3>
+                    <p className="text-sm text-slate-600 mt-1 mb-3">
+                      Tell us about the property and sample locations. This does not replace buying a kit — you still need the COC and label from step 1.
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(createPageUrl("Inspection"))}
+                      className="border-blue-600 text-blue-700 hover:bg-blue-50"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Start inspection form
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {boughtKitNotSubmitted && (
+          <>
+            <Card className="mb-8 border-blue-100 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg text-slate-900">Next: submit your inspection</CardTitle>
+                <p className="text-sm text-slate-600 font-normal">
+                  Your kit documents are ready below. Complete the inspection form so we can match your samples when they arrive at the lab.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={() => navigate(createPageUrl("Inspection"))}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Start inspection form
+                </Button>
+              </CardContent>
+            </Card>
+            {kitDownloadsCard}
+          </>
+        )}
+
+        {isReturning && (
+          <Card className="mb-8 border-blue-100 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg text-slate-900">Starting another test?</CardTitle>
+              <p className="text-sm text-slate-600 font-normal">
+                Each new job needs its own prepaid shipping label. Purchase a kit to receive a <strong>new COC + unique shipping label</strong> by email (and in downloads below). Then submit a new inspection form for that job.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 mb-1">1. Order a kit (gets new COC &amp; label)</h3>
+                <p className="text-xs text-slate-500 mb-3">
+                  Do not reuse an old shipping label. Submitting the inspection form alone does not email a new label.
+                </p>
+                <div className="grid sm:grid-cols-3 gap-3">{packageButtons}</div>
+                {!kitPackages.some((p) => p.stripe_payment_link_url) && (
+                  <p className="text-xs text-slate-500 mt-2">
+                    Package buy links are configured in Admin → Kit Fulfillment.
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1 border-t border-slate-100">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">2. Submit a new inspection</h3>
+                  <p className="text-sm text-slate-600">
+                    After you have the new COC/label, open a fresh inspection for the new property or job.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(createPageUrl("Inspection"))}
+                  className="border-blue-600 text-blue-700 hover:bg-blue-50"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Start new inspection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {isReturning && kitDownloadsCard}
+
+        {isReturning ? (
           <div className="space-y-6">
             <h2 className="text-lg font-semibold text-slate-900">Your past inspections</h2>
             {inspections.map((inspection) => {
@@ -1004,7 +1096,6 @@ export default function MyInspections() {
                     
                     <CardContent className="p-4">
                       <div className="space-y-4">
-                        {/* Status Detail */}
                         <div className="bg-slate-100 rounded-lg p-3">
                           <p className="text-sm font-medium text-slate-700">Current Status:</p>
                           <p className="text-sm text-slate-600">
@@ -1025,13 +1116,11 @@ export default function MyInspections() {
                           </p>
                         </div>
 
-                        {/* Inspection Summary */}
                         <div className="text-sm text-slate-600">
                           <p><strong>Property:</strong> {inspection.street_address}{inspection.unit_number ? `, ${inspection.unit_number}` : ''}, {inspection.city}</p>
                           <p><strong>Submission Date:</strong> {format(new Date(inspection.created_at), "MMMM d, yyyy")}</p>
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex justify-end gap-2 pt-2">
                           {isReportReady ? (
                             <>
@@ -1059,7 +1148,6 @@ export default function MyInspections() {
                           )}
                         </div>
 
-                        {/* Next Steps - Only show for non-completed inspections */}
                         {inspection.status !== 'completed' && inspection.status !== 'report_ready' && (
                           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                             <h4 className="font-medium text-blue-900 mb-2">What's Next?</h4>
@@ -1072,7 +1160,6 @@ export default function MyInspections() {
                           </div>
                         )}
 
-                        {/* Show completion message for completed inspections */}
                         {isReportReady && (
                           <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                             <h4 className="font-medium text-green-900 mb-2">Report Ready</h4>
@@ -1088,12 +1175,12 @@ export default function MyInspections() {
               );
             })}
           </div>
-        )}
+        ) : null}
 
-        {/* Information Section */}
         <div className="mt-12 bg-amber-50 rounded-xl p-6 border border-amber-200">
           <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
           <ul className="text-amber-800 text-sm space-y-2">
+            <li>• <strong>New COC / shipping label:</strong> Always comes from purchasing a kit — not from submitting the inspection form.</li>
             <li>• <strong>Sample Collection:</strong> Use a new swab for each sample location and place it in a Ziploc bag</li>
             <li>• <strong>Sample Labeling & Documentation:</strong> Clearly label each sample bag (e.g., “Living Room Vent”) and write the same name on your COC (Chain of Custody) form.</li>
             <li>• <strong>COC Form:</strong> Complete the Chain of Custody with your contact info, sample names, collection date, and signature. This ensures proper lab processing.</li>
@@ -1104,7 +1191,5 @@ export default function MyInspections() {
         </div>
       </motion.div>
     </div>
-    
-    
   );
 }
