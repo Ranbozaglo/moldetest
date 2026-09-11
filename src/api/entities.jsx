@@ -821,6 +821,7 @@ export const KitService = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ limit: 40 }),
+      timeoutMs: 120000,
     });
   },
 

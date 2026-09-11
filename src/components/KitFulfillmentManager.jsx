@@ -35,20 +35,34 @@ export default function KitFulfillmentManager() {
     setLoading(true);
     setMessage("");
     try {
-      const [pkgRes, labelRes, fulRes] = await Promise.all([
+      const [pkgRes, labelRes, fulRes] = await Promise.allSettled([
         KitService.getPackages(),
         KitService.listLabels(),
         KitService.listFulfillments(),
       ]);
-      const pkgList = pkgRes.packages || [];
-      pkgList.sort(
-        (a, b) => PACKAGE_ORDER.indexOf(a.package_type) - PACKAGE_ORDER.indexOf(b.package_type)
-      );
-      setPackages(pkgList);
-      const sortedLabels = [...(labelRes.labels || [])].sort(naturalLabelSort);
-      setLabels(sortedLabels);
-      setAvailableCount(labelRes.available_count || 0);
-      setFulfillments(fulRes.fulfillments || []);
+
+      if (pkgRes.status === "fulfilled") {
+        const pkgList = pkgRes.value.packages || [];
+        pkgList.sort(
+          (a, b) => PACKAGE_ORDER.indexOf(a.package_type) - PACKAGE_ORDER.indexOf(b.package_type)
+        );
+        setPackages(pkgList);
+      }
+      if (labelRes.status === "fulfilled") {
+        const sortedLabels = [...(labelRes.value.labels || [])].sort(naturalLabelSort);
+        setLabels(sortedLabels);
+        setAvailableCount(labelRes.value.available_count || 0);
+      }
+      if (fulRes.status === "fulfilled") {
+        setFulfillments(fulRes.value.fulfillments || []);
+      }
+
+      const errors = [pkgRes, labelRes, fulRes]
+        .filter((r) => r.status === "rejected")
+        .map((r) => r.reason?.message || "request failed");
+      if (errors.length) {
+        setMessage(`Some kit data failed to load: ${errors.join("; ")}`);
+      }
     } catch (e) {
       setMessage(e.message || "Failed to load kit fulfillment data. Did you run the SQL migration?");
     } finally {
@@ -181,7 +195,7 @@ export default function KitFulfillmentManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Kit Fulfillment</h2>
           <p className="text-sm text-slate-600">
@@ -189,20 +203,30 @@ export default function KitFulfillmentManager() {
             Purchases auto-email COC + unique label after Stripe checkout.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onSyncStripe} disabled={syncing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing…" : "Recover missed Stripe sales"}
-          </Button>
-          <Button variant="outline" onClick={load}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-        </div>
+
+        <Card className="border-blue-200 bg-blue-50/60">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Missed a Stripe sale?</CardTitle>
+            <CardDescription className="text-slate-700">
+              Click below to scan recent Stripe checkouts and create missing COC/label emails.
+              This can take up to a minute — keep this tab open.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={onSyncStripe} disabled={syncing} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Recovering sales…" : "Recover missed Stripe sales"}
+            </Button>
+            <Button variant="outline" onClick={load} disabled={syncing}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh list
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       {message && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">
           {message}
         </div>
       )}

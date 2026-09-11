@@ -2108,22 +2108,22 @@ export default function AdminDashboard() {
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200">
-            <TabsList className="grid w-full grid-cols-4 bg-slate-100">
-              <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+            <TabsList className="flex w-full flex-wrap h-auto gap-1 bg-slate-100 p-1">
+              <TabsTrigger value="overview" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <BarChart3 className="w-4 h-4" />
               Overview
             </TabsTrigger>
-              <TabsTrigger value="inspections" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <TabsTrigger value="inspections" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <Database className="w-4 h-4" />
               All Inspections
             </TabsTrigger>
 
-              <TabsTrigger value="kits" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <TabsTrigger value="kits" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <Package className="w-4 h-4" />
               Kit Fulfillment
             </TabsTrigger>
 
-              <TabsTrigger value="emails" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <TabsTrigger value="emails" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <Mail className="w-4 h-4" />
               Email Settings
             </TabsTrigger>
