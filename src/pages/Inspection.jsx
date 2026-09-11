@@ -129,6 +129,7 @@ export default function Inspection() {
   }, [currentStep, formData]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
+  const [hasExistingInspections, setHasExistingInspections] = useState(false);
   const [newInspection, setNewInspection] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -182,12 +183,14 @@ export default function Inspection() {
             full_name: currentUser.name || currentUser.email.split('@')[0]
           }));
           
-          // Check for existing inspections
+          // Check for existing inspections (returning clients can still create another)
           try {
-            const existingInspections = await MoldInspection.findMany({ user_id: currentUser.id });
+            const existingInspections = await MoldInspection.findMany({
+              email: currentUser.email,
+            });
             if (existingInspections && existingInspections.length > 0) {
               console.log("🔍 DEBUG: Found existing inspections:", existingInspections.length);
-              // You could show a message or handle existing inspections here
+              setHasExistingInspections(true);
             }
           } catch (error) {
             console.log("🔍 DEBUG: No existing inspections or error checking:", error);
@@ -473,6 +476,18 @@ export default function Inspection() {
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
               Mold Inspection & Testing Process
             </h1>
+
+            {hasExistingInspections && !isSubmitted && (
+              <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span>You already have inspections on file. This will create another one for a new job or property.</span>
+                <Link
+                  to={createPageUrl("MyInspections")}
+                  className="font-medium text-blue-700 underline whitespace-nowrap"
+                >
+                  Back to My Inspections
+                </Link>
+              </div>
+            )}
             
             {/* Progress Bar */}
             <div className="mb-6">

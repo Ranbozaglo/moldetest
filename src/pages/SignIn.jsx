@@ -57,18 +57,13 @@ export default function SignIn() {
             window.location.href = '/AdminDashboard';
           }
         } else {
-          // Redirect all non-admin users to Inspection page
-          console.log('🔍 DEBUG: Redirecting user to Inspection page');
-          console.log('🔍 PROD DEBUG: SignIn - Redirecting user to Inspection');
-          console.log('🔍 PROD DEBUG: SignIn - Current location before navigation:', window.location.href);
+          // Returning and new clients land on the dashboard hub
+          console.log('🔍 DEBUG: Redirecting user to MyInspections');
           try {
-            navigate('/Inspection', { replace: true });
-            console.log('🔍 PROD DEBUG: SignIn - Navigate to Inspection called successfully');
+            navigate('/MyInspections', { replace: true });
           } catch (navError) {
-            console.error('🔍 PROD DEBUG: SignIn - Navigation error to Inspection:', navError);
-            // Fallback navigation
-            console.log('🔍 PROD DEBUG: SignIn - Using fallback window.location redirect');
-            window.location.href = '/Inspection';
+            console.error('🔍 PROD DEBUG: SignIn - Navigation error to MyInspections:', navError);
+            window.location.href = '/MyInspections';
           }
         }
       } else {

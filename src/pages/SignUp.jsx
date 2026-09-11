@@ -42,7 +42,7 @@ export default function SignUp() {
         // Clear any existing inspection data for new users
         localStorage.removeItem('inspection_current_step');
         localStorage.removeItem('inspection_form_data');
-        navigate(createPageUrl('Inspection'));
+        navigate(createPageUrl('MyInspections'));
       } else {
         setError(result.error || 'Sign up failed');
       }
