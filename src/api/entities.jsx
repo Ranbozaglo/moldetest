@@ -716,6 +716,7 @@ export const KitService = {
     const allFiles = [...files];
     const chunkSize = 5;
     const created = [];
+    const skipped = [];
     const errors = [];
 
     for (let i = 0; i < allFiles.length; i += chunkSize) {
@@ -730,12 +731,14 @@ export const KitService = {
         timeoutMs: 120000,
       });
       created.push(...(res.created || []));
+      skipped.push(...(res.skipped || []));
       errors.push(...(res.errors || []));
     }
 
     return {
       success: errors.length === 0,
       created,
+      skipped,
       errors,
       uploaded: created.length,
       total: allFiles.length,
@@ -758,6 +761,34 @@ export const KitService = {
     const token = getAuthToken();
     const q = status ? `?status=${encodeURIComponent(status)}` : '';
     return apiCall(`/kit/labels${q}`, {
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+  },
+
+  updateLabelStatus: async (labelId, status) => {
+    const token = getAuthToken();
+    return apiCall(`/kit/labels/${labelId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  deleteLabel: async (labelId) => {
+    const token = getAuthToken();
+    return apiCall(`/kit/labels/${labelId}`, {
+      method: 'DELETE',
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+  },
+
+  dedupeLabels: async () => {
+    const token = getAuthToken();
+    return apiCall('/kit/labels/dedupe', {
+      method: 'POST',
       headers: { Authorization: token ? `Bearer ${token}` : '' },
     });
   },

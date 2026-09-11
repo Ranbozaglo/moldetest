@@ -5,9 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Package, Upload, Mail, RefreshCw } from "lucide-react";
+import { Package, Upload, Mail, RefreshCw, Trash2 } from "lucide-react";
 
 const PACKAGE_ORDER = ["spot_check", "extended", "full_house"];
+
+function naturalLabelSort(a, b) {
+  const as = String(a?.file_name || "");
+  const bs = String(b?.file_name || "");
+  return as.localeCompare(bs, undefined, { numeric: true, sensitivity: "base" });
+}
 
 export default function KitFulfillmentManager() {
   const [packages, setPackages] = useState([]);
@@ -16,6 +22,7 @@ export default function KitFulfillmentManager() {
   const [fulfillments, setFulfillments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [manual, setManual] = useState({
     customer_email: "",
     customer_name: "",
@@ -38,7 +45,8 @@ export default function KitFulfillmentManager() {
         (a, b) => PACKAGE_ORDER.indexOf(a.package_type) - PACKAGE_ORDER.indexOf(b.package_type)
       );
       setPackages(pkgList);
-      setLabels(labelRes.labels || []);
+      const sortedLabels = [...(labelRes.labels || [])].sort(naturalLabelSort);
+      setLabels(sortedLabels);
       setAvailableCount(labelRes.available_count || 0);
       setFulfillments(fulRes.fulfillments || []);
     } catch (e) {
@@ -83,11 +91,12 @@ export default function KitFulfillmentManager() {
     try {
       const res = await KitService.uploadLabels(fileList);
       const uploaded = res.uploaded ?? (res.created || []).length;
+      const skipped = (res.skipped || []).length;
       const errCount = (res.errors || []).length;
       setMessage(
-        errCount
-          ? `Uploaded ${uploaded} of ${res.total || fileList.length} labels (${errCount} failed)`
-          : `Uploaded ${uploaded} shipping label(s) successfully`
+        `Uploaded ${uploaded}` +
+          (skipped ? `, skipped ${skipped} duplicate(s)` : "") +
+          (errCount ? `, ${errCount} failed` : "")
       );
       await load();
     } catch (e) {
@@ -95,6 +104,38 @@ export default function KitFulfillmentManager() {
       await load();
     } finally {
       setUploadingLabels(false);
+    }
+  };
+
+  const onChangeStatus = async (labelId, status) => {
+    try {
+      await KitService.updateLabelStatus(labelId, status);
+      setMessage(`Label status set to ${status}`);
+      await load();
+    } catch (e) {
+      setMessage(e.message || "Failed to update status");
+    }
+  };
+
+  const onDeleteLabel = async (label) => {
+    if (!window.confirm(`Delete ${label.file_name}? This cannot be undone.`)) return;
+    try {
+      await KitService.deleteLabel(label.id);
+      setMessage(`Deleted ${label.file_name}`);
+      await load();
+    } catch (e) {
+      setMessage(e.message || "Delete failed");
+    }
+  };
+
+  const onDedupe = async () => {
+    if (!window.confirm("Remove duplicate filenames (keeps one of each)?")) return;
+    try {
+      const res = await KitService.dedupeLabels();
+      setMessage(`Removed ${res.deleted_count || 0} duplicate label(s)`);
+      await load();
+    } catch (e) {
+      setMessage(e.message || "Dedupe failed");
     }
   };
 
@@ -220,41 +261,83 @@ export default function KitFulfillmentManager() {
         <CardHeader>
           <CardTitle>Prepaid label stock</CardTitle>
           <CardDescription>
-            Scroll below the Stripe/COC section. Upload one PDF per unique prepaid label.
-            Available in stock: <strong>{availableCount}</strong> · Total listed: <strong>{labels.length}</strong>
+            Labels are ordered by file name (1, 2, 10…). Duplicate filenames are blocked on upload.
+            Available: <strong>{availableCount}</strong> · Total: <strong>{labels.length}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-            Label upload is separate from “Save links”. Use the button below (not the Stripe fields).
+          <div className="flex flex-wrap items-center gap-3">
+            <Label
+              className={`cursor-pointer inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white ${
+                uploadingLabels ? "bg-slate-400" : "bg-blue-600 hover:bg-blue-700"
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              {uploadingLabels ? "Uploading labels…" : "Upload label PDFs"}
+              <input
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                disabled={uploadingLabels}
+                className="hidden"
+                onChange={(e) => {
+                  onUploadLabels(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </Label>
+            <Button type="button" variant="outline" size="sm" onClick={onDedupe}>
+              Remove duplicates
+            </Button>
+            <select
+              className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All statuses</option>
+              <option value="available">Available</option>
+              <option value="assigned">Assigned</option>
+              <option value="void">Void</option>
+            </select>
           </div>
-          <Label
-            className={`cursor-pointer inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white ${
-              uploadingLabels ? "bg-slate-400" : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            <Upload className="w-4 h-4" />
-            {uploadingLabels ? "Uploading labels…" : "Upload label PDFs"}
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              multiple
-              disabled={uploadingLabels}
-              className="hidden"
-              onChange={(e) => {
-                onUploadLabels(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </Label>
-          <div className="max-h-64 overflow-auto text-sm space-y-1 border border-slate-100 rounded-md p-2">
-            {labels.map((l) => (
-              <div key={l.id} className="flex justify-between gap-2 border-b border-slate-100 py-1">
-                <span className="truncate">{l.file_name}</span>
-                <Badge variant={l.status === "available" ? "default" : "secondary"}>{l.status}</Badge>
-              </div>
-            ))}
-            {!labels.length && <p className="text-slate-500">No labels uploaded yet.</p>}
+          <div className="max-h-96 overflow-auto text-sm border border-slate-100 rounded-md">
+            <div className="grid grid-cols-[1fr_140px_90px] gap-2 px-3 py-2 bg-slate-50 font-medium text-slate-600 sticky top-0">
+              <span>File</span>
+              <span>Status</span>
+              <span>Actions</span>
+            </div>
+            {labels
+              .filter((l) => statusFilter === "all" || l.status === statusFilter)
+              .map((l) => (
+                <div
+                  key={l.id}
+                  className="grid grid-cols-[1fr_140px_90px] gap-2 px-3 py-2 border-t border-slate-100 items-center"
+                >
+                  <span className="truncate" title={l.file_name}>
+                    {l.file_name}
+                  </span>
+                  <select
+                    className="h-8 rounded border border-slate-200 px-2 text-xs"
+                    value={l.status || "available"}
+                    onChange={(e) => onChangeStatus(l.id, e.target.value)}
+                  >
+                    <option value="available">available</option>
+                    <option value="assigned">assigned</option>
+                    <option value="void">void</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => onDeleteLabel(l)}
+                    title="Delete label"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            {!labels.length && <p className="text-slate-500 p-3">No labels uploaded yet.</p>}
           </div>
         </CardContent>
       </Card>

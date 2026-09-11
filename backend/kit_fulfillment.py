@@ -5,6 +5,7 @@ Packages: spot_check, extended, full_house
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -21,9 +22,21 @@ PACKAGE_LABELS = {
     "full_house": "Full House",
 }
 
+LABEL_STATUSES = ("available", "assigned", "void")
+
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _natural_sort_key(name: str):
+    text = str(name or "")
+    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", text)]
+
+
+def _normalize_label_filename(name: str) -> str:
+    base = os.path.basename(str(name or "").strip()) or "Prepaid-Shipping-Label.pdf"
+    return re.sub(r"\s+", " ", base)
 
 
 def _frontend_dashboard_url() -> str:
@@ -134,19 +147,22 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
     def _claim_next_label(package_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
         if not supabase:
             return None
-        query = (
+        result = (
             supabase.table("shipping_labels")
             .select("*")
             .eq("status", "available")
-            .order("created_at")
-            .limit(20)
+            .limit(500)
+            .execute()
         )
-        result = query.execute()
         rows = result.data or []
-        # Prefer package-specific labels, else any shared (null package_type)
+        # Prefer package-specific labels, else shared; always in filename order.
         preferred = [r for r in rows if r.get("package_type") == package_type]
         shared = [r for r in rows if not r.get("package_type")]
-        ordered = preferred + shared + [r for r in rows if r not in preferred and r not in shared]
+        other = [r for r in rows if r not in preferred and r not in shared]
+        ordered = sorted(
+            preferred + shared + other,
+            key=lambda r: _natural_sort_key(r.get("file_name") or r.get("storage_path") or ""),
+        )
         for label in ordered:
             updated = (
                 supabase.table("shipping_labels")
@@ -158,6 +174,21 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             if updated.data:
                 return updated.data[0]
         return None
+
+    def _existing_label_names() -> set:
+        result = supabase.table("shipping_labels").select("file_name").limit(2000).execute()
+        return {_normalize_label_filename(r.get("file_name")) for r in (result.data or []) if r.get("file_name")}
+
+    def _sort_labels(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        status_rank = {"available": 0, "assigned": 1, "void": 2}
+        return sorted(
+            rows,
+            key=lambda r: (
+                status_rank.get(r.get("status"), 9),
+                _natural_sort_key(r.get("file_name") or ""),
+                r.get("created_at") or "",
+            ),
+        )
 
     def _fulfill_purchase(
         *,
@@ -356,12 +387,23 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             return jsonify({"error": "Unauthorized"}), 401
         status = request.args.get("status")
         try:
-            q = supabase.table("shipping_labels").select("*").order("created_at", desc=True).limit(200)
+            q = supabase.table("shipping_labels").select("*").limit(2000)
             if status:
                 q = q.eq("status", status)
             result = q.execute()
-            available = len([r for r in (result.data or []) if r.get("status") == "available"])
-            return jsonify({"labels": result.data or [], "available_count": available})
+            rows = _sort_labels(result.data or [])
+            available = len([r for r in rows if r.get("status") == "available"])
+            assigned = len([r for r in rows if r.get("status") == "assigned"])
+            voided = len([r for r in rows if r.get("status") == "void"])
+            return jsonify(
+                {
+                    "labels": rows,
+                    "available_count": available,
+                    "assigned_count": assigned,
+                    "void_count": voided,
+                    "total_count": len(rows),
+                }
+            )
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -380,13 +422,25 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if package_type and package_type not in PACKAGE_TYPES:
             return jsonify({"error": "Invalid package_type"}), 400
 
+        existing_names = _existing_label_names()
+        seen_batch = set()
         created = []
+        skipped = []
         errors = []
         for f in files:
             try:
-                ext = os.path.splitext(f.filename or "label.pdf")[1] or ".pdf"
+                file_name = _normalize_label_filename(f.filename or "Prepaid-Shipping-Label.pdf")
+                if file_name in existing_names or file_name in seen_batch:
+                    skipped.append({"file": file_name, "reason": "duplicate filename"})
+                    continue
+                seen_batch.add(file_name)
+
+                ext = os.path.splitext(file_name)[1] or ".pdf"
                 path = f"labels/{uuid.uuid4().hex}{ext}"
                 content = f.read()
+                if not content:
+                    errors.append({"file": file_name, "error": "empty file"})
+                    continue
                 supabase.storage.from_(KIT_BUCKET).upload(
                     path,
                     content,
@@ -394,17 +448,133 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 )
                 row = {
                     "storage_path": path,
-                    "file_name": f.filename or "Prepaid-Shipping-Label.pdf",
+                    "file_name": file_name,
                     "public_url": _public_url(path),
                     "status": "available",
                     "package_type": package_type,
                     "created_at": _utcnow(),
                 }
                 inserted = supabase.table("shipping_labels").insert(row).execute()
-                created.append((inserted.data or [row])[0])
+                created_row = (inserted.data or [row])[0]
+                created.append(created_row)
+                existing_names.add(file_name)
             except Exception as e:
                 errors.append({"file": getattr(f, "filename", None), "error": str(e)})
-        return jsonify({"success": len(errors) == 0, "created": created, "errors": errors})
+        return jsonify(
+            {
+                "success": len(errors) == 0,
+                "created": created,
+                "skipped": skipped,
+                "errors": errors,
+            }
+        )
+
+    @app.route("/api/kit/labels/dedupe", methods=["POST"])
+    def kit_dedupe_labels():
+        """Keep one row per filename, delete extras + storage files."""
+        if not _require_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        try:
+            result = supabase.table("shipping_labels").select("*").limit(2000).execute()
+            rows = result.data or []
+            by_name: Dict[str, List[Dict[str, Any]]] = {}
+            for row in rows:
+                key = _normalize_label_filename(row.get("file_name") or row.get("id"))
+                by_name.setdefault(key, []).append(row)
+
+            deleted = []
+            for _name, group in by_name.items():
+                if len(group) < 2:
+                    continue
+                assigned = [r for r in group if r.get("status") == "assigned"]
+                if assigned:
+                    keep = sorted(assigned, key=lambda r: r.get("created_at") or "")[0]
+                else:
+                    keep = sorted(group, key=lambda r: r.get("created_at") or "")[0]
+                for dup in group:
+                    if dup.get("id") == keep.get("id"):
+                        continue
+                    path = dup.get("storage_path")
+                    if path:
+                        try:
+                            supabase.storage.from_(KIT_BUCKET).remove([path])
+                        except Exception as e:
+                            print(f"⚠️ KIT: dedupe storage delete failed: {e}")
+                    supabase.table("shipping_labels").delete().eq("id", dup["id"]).execute()
+                    deleted.append(dup.get("id"))
+
+            remaining = supabase.table("shipping_labels").select("*").limit(2000).execute()
+            return jsonify(
+                {
+                    "success": True,
+                    "deleted_count": len(deleted),
+                    "deleted_ids": deleted,
+                    "labels": _sort_labels(remaining.data or []),
+                }
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/kit/labels/<label_id>", methods=["PATCH"])
+    def kit_update_label(label_id):
+        if not _require_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json() or {}
+        status = str(data.get("status") or "").strip().lower()
+        if status not in LABEL_STATUSES:
+            return jsonify({"error": f"status must be one of {', '.join(LABEL_STATUSES)}"}), 400
+        try:
+            payload = {"status": status}
+            if status == "available":
+                payload["assigned_at"] = None
+                payload["assigned_fulfillment_id"] = None
+            elif status == "assigned":
+                payload["assigned_at"] = _utcnow()
+            updated = (
+                supabase.table("shipping_labels")
+                .update(payload)
+                .eq("id", label_id)
+                .execute()
+            )
+            if not updated.data:
+                return jsonify({"error": "Label not found"}), 404
+            return jsonify({"label": updated.data[0]})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/kit/labels/<label_id>", methods=["DELETE"])
+    def kit_delete_label(label_id):
+        if not _require_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        try:
+            existing = (
+                supabase.table("shipping_labels")
+                .select("*")
+                .eq("id", label_id)
+                .limit(1)
+                .execute()
+            )
+            row = (existing.data or [None])[0]
+            if not row:
+                return jsonify({"error": "Label not found"}), 404
+            if row.get("status") == "assigned" and row.get("assigned_fulfillment_id"):
+                return jsonify(
+                    {
+                        "error": "Label is assigned to a fulfillment. Set status to void instead of deleting.",
+                    }
+                ), 400
+
+            path = row.get("storage_path")
+            if path:
+                try:
+                    supabase.storage.from_(KIT_BUCKET).remove([path])
+                except Exception as e:
+                    print(f"⚠️ KIT: storage delete failed for {path}: {e}")
+
+            supabase.table("shipping_labels").delete().eq("id", label_id).execute()
+            return jsonify({"success": True, "deleted_id": label_id})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/kit/fulfillments", methods=["GET"])
     def kit_list_fulfillments():
