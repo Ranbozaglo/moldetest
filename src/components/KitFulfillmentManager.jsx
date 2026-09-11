@@ -200,7 +200,7 @@ export default function KitFulfillmentManager() {
               </div>
               <div className="grid md:grid-cols-2 gap-3">
                 <div>
-                  <Label>Stripe Payment Link ID (plink_…)</Label>
+                  <Label>Stripe Payment Link ID (plink_…) or Product ID (prod_…)</Label>
                   <Input
                     value={pkg.stripe_payment_link_id || ""}
                     onChange={(e) =>
@@ -212,8 +212,20 @@ export default function KitFulfillmentManager() {
                         )
                       )
                     }
-                    placeholder="plink_..."
+                    placeholder="plink_... or prod_..."
                   />
+                  {(pkg.stripe_payment_link_id || "").startsWith("prod_") && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      Product ID detected — webhook can match this. Prefer Payment Link ID (plink_…) if you have it.
+                    </p>
+                  )}
+                  {(pkg.stripe_payment_link_id || "").startsWith("plink_") === false &&
+                    (pkg.stripe_payment_link_id || "") &&
+                    !(pkg.stripe_payment_link_id || "").startsWith("prod_") && (
+                    <p className="text-xs text-red-600 mt-1">
+                      Expected an ID starting with plink_ or prod_. Buy URL alone goes in the field on the right.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Buy URL (buy.stripe.com/…)</Label>

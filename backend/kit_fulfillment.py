@@ -131,17 +131,113 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             row["display_name"] = row.get("display_name") or PACKAGE_LABELS.get(key, key)
         return rows
 
-    def _resolve_package_type(payment_link_id: str = "", payment_link_url: str = "") -> Optional[str]:
+    def _extract_buy_slug(url: str) -> str:
+        raw = (url or "").strip()
+        if not raw:
+            return ""
+        try:
+            # buy.stripe.com/<slug> or payment links hosted URLs
+            path = raw.split("?")[0].rstrip("/").split("/")[-1]
+            return path
+        except Exception:
+            return ""
+
+    def _g(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    def _collect_session_product_ids(session_obj) -> List[str]:
+        """Best-effort product ids from a Checkout Session (expanded or via Stripe API)."""
+        ids: List[str] = []
+
+        def _walk_line_items(items):
+            for item in items or []:
+                price = _g(item, "price") if not isinstance(item, dict) else item.get("price")
+                if price is None:
+                    continue
+                product = _g(price, "product") if not isinstance(price, dict) else price.get("product")
+                if hasattr(product, "id"):
+                    product = product.id
+                if isinstance(product, str) and product:
+                    ids.append(product)
+
+        # Already expanded on the event object
+        line_items = _g(session_obj, "line_items")
+        if isinstance(line_items, dict):
+            _walk_line_items(line_items.get("data") or [])
+        elif line_items is not None and hasattr(line_items, "data"):
+            _walk_line_items(getattr(line_items, "data", None))
+
+        # Fetch from Stripe when missing (common for webhook payloads)
+        if not ids:
+            session_id = _g(session_obj, "id") or ""
+            api_key = os.getenv("STRIPE_SECRET_KEY", "")
+            if session_id and api_key:
+                try:
+                    import stripe
+
+                    stripe.api_key = api_key
+                    full = stripe.checkout.Session.retrieve(
+                        session_id,
+                        expand=["line_items.data.price.product"],
+                    )
+                    data = []
+                    if getattr(full, "line_items", None) is not None:
+                        data = getattr(full.line_items, "data", None) or []
+                    _walk_line_items(data)
+                except Exception as e:
+                    print(f"⚠️ KIT: could not load session line_items: {e}")
+        return ids
+
+    def _resolve_package_type(
+        payment_link_id: str = "",
+        payment_link_url: str = "",
+        product_ids: Optional[List[str]] = None,
+        session_obj=None,
+    ) -> Optional[str]:
         packages = _get_packages()
         plink = (payment_link_id or "").strip()
         url = (payment_link_url or "").strip()
+        products = set(product_ids or [])
+
+        # If we only have a plink id, resolve its public buy URL from Stripe
+        if plink.startswith("plink_") and not url:
+            api_key = os.getenv("STRIPE_SECRET_KEY", "")
+            if api_key:
+                try:
+                    import stripe
+
+                    stripe.api_key = api_key
+                    pl = stripe.PaymentLink.retrieve(plink)
+                    url = getattr(pl, "url", None) or ""
+                except Exception as e:
+                    print(f"⚠️ KIT: PaymentLink.retrieve failed for {plink}: {e}")
+
+        if session_obj is not None and not products:
+            products = set(_collect_session_product_ids(session_obj))
+
+        url_slug = _extract_buy_slug(url)
+
         for row in packages:
-            if plink and row.get("stripe_payment_link_id") == plink:
-                return row.get("package_type")
+            stored_id = (row.get("stripe_payment_link_id") or "").strip()
             buy = (row.get("stripe_payment_link_url") or "").strip()
-            if url and buy and (url == buy or url.endswith(buy.split("/")[-1]) or buy.endswith(url.split("/")[-1])):
+            buy_slug = _extract_buy_slug(buy)
+
+            # Exact payment-link id match
+            if plink and stored_id and plink == stored_id:
                 return row.get("package_type")
-        # Env fallbacks already merged into packages
+
+            # Admin sometimes pasted Product ID (prod_…) into the plink field
+            if products and stored_id and stored_id in products:
+                return row.get("package_type")
+
+            # Match buy.stripe.com URL / slug
+            if url and buy and (url == buy or (url_slug and buy_slug and url_slug == buy_slug)):
+                return row.get("package_type")
+            if plink and buy and plink in buy:
+                return row.get("package_type")
+
         return None
 
     def _claim_next_label(package_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -772,18 +868,12 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             return jsonify({"received": True, "ignored": etype})
 
         # Stripe object may be dict-like
-        def _g(obj, key, default=None):
-            if isinstance(obj, dict):
-                return obj.get(key, default)
-            return getattr(obj, key, default)
-
         session = data_obj
-        customer_email = (
-            _g(session, "customer_details", {}) or {}
-        )
-        if isinstance(customer_email, dict):
-            email = customer_email.get("email") or _g(session, "customer_email")
-            name = customer_email.get("name") or ""
+
+        customer_details = _g(session, "customer_details", {}) or {}
+        if isinstance(customer_details, dict):
+            email = customer_details.get("email") or _g(session, "customer_email")
+            name = customer_details.get("name") or ""
         else:
             email = _g(session, "customer_email")
             name = ""
@@ -799,14 +889,20 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if hasattr(payment_intent, "id"):
             payment_intent = payment_intent.id
 
-        package_type = _resolve_package_type(payment_link_id=str(payment_link or ""))
+        package_type = _resolve_package_type(
+            payment_link_id=str(payment_link or ""),
+            session_obj=session,
+        )
         if not package_type:
             # Try metadata
             meta = _g(session, "metadata") or {}
             if isinstance(meta, dict):
                 package_type = meta.get("package_type") or meta.get("package")
         if not package_type:
-            print(f"❌ KIT: could not resolve package for payment_link={payment_link}")
+            print(
+                f"❌ KIT: could not resolve package for payment_link={payment_link} "
+                f"session={session_id} email={email}"
+            )
             return jsonify({"error": "Unknown payment link / package mapping"}), 400
 
         result = _fulfill_purchase(
