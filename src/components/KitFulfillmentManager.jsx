@@ -389,11 +389,44 @@ export default function KitFulfillmentManager() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {fulfillments.slice(0, 20).map((f) => (
-            <div key={f.id} className="flex flex-wrap justify-between gap-2 border-b border-slate-100 py-2">
-              <span>
-                {f.customer_email} · {f.package_type}
-              </span>
-              <Badge variant={f.email_status === "sent" ? "default" : "secondary"}>{f.email_status}</Badge>
+            <div key={f.id} className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 py-2">
+              <div className="min-w-0 flex-1">
+                <div>
+                  {f.customer_email} · {f.package_type}
+                </div>
+                {f.email_error && (
+                  <div className="mt-1 text-xs text-red-600 break-words">{f.email_error}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={f.email_status === "sent" ? "default" : "destructive"}>
+                  {f.email_status || "unknown"}
+                </Badge>
+                {f.email_status !== "sent" && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      setMessage("");
+                      try {
+                        const res = await KitService.resendFulfillment(f.id);
+                        if (res?.success) {
+                          setMessage(`Resent kit email to ${f.customer_email}`);
+                          load();
+                        } else {
+                          setMessage(res?.error || res?.email?.error || "Resend failed");
+                          load();
+                        }
+                      } catch (err) {
+                        setMessage(err?.message || "Resend failed");
+                      }
+                    }}
+                  >
+                    Resend email
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
           {!fulfillments.length && <p className="text-slate-500">No purchases fulfilled yet.</p>}

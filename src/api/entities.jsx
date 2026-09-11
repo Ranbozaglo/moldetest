@@ -812,6 +812,14 @@ export const KitService = {
     });
   },
 
+  resendFulfillment: async (fulfillmentId) => {
+    const token = getAuthToken();
+    return apiCall(`/kit/fulfillments/${fulfillmentId}/resend`, {
+      method: 'POST',
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+  },
+
   myDownloads: async (email) =>
     apiCall(`/kit/my-downloads?email=${encodeURIComponent(email || '')}`),
 };
