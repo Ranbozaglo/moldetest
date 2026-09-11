@@ -23,33 +23,76 @@ class EmailService:
         self.default_templates = {
             "kit_purchase": {
                 "subject": "Total Testing - Your {package_name} Kit Materials",
-                "body": """<html>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #004aac; margin: 0 0 8px 0;">Total Testing</h1>
-        <p style="color: #666; margin: 0 0 24px 0;">DIY Mold Testing</p>
+                "body": """<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your kit materials</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f1f5f9;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#004aac 0%,#0b2e59 100%);padding:28px 32px;text-align:center;">
+              <img src="{logo_url}" alt="Total Testing" width="180" style="display:block;margin:0 auto 12px auto;max-width:180px;height:auto;border:0;" />
+              <p style="margin:0;color:#dbeafe;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">DIY Mold Testing</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">Purchase confirmed</p>
+              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0b2e59;">Your {package_name} kit is ready</h1>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Thank you for choosing Total Testing. Your kit documents are attached to this email and also available in your dashboard.
+              </p>
 
-        <p>Hi {full_name},</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">Attached files</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Chain of Custody (COC) for {package_name}</p>
+                    <p style="margin:0;font-size:15px;color:#334155;">&#10003; Your unique prepaid return shipping label</p>
+                  </td>
+                </tr>
+              </table>
 
-        <p>Thank you for purchasing the <strong>{package_name}</strong> kit. Attached you will find:</p>
-        <ul>
-            <li>Chain of Custody (COC) form for your package</li>
-            <li>Your unique prepaid return shipping label</li>
-        </ul>
+              <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0b2e59;">Next steps</p>
+              <ol style="margin:0 0 28px 0;padding-left:22px;font-size:15px;line-height:1.7;color:#334155;">
+                <li>Collect your samples using the sampling guide</li>
+                <li>Complete and sign the attached COC form</li>
+                <li>Pack samples + COC, then apply the prepaid shipping label</li>
+                <li>Drop the package at any FedEx location</li>
+              </ol>
 
-        <p><strong>Next steps:</strong></p>
-        <ol>
-            <li>Collect your samples as shown in the sampling guide</li>
-            <li>Complete and sign the attached COC</li>
-            <li>Pack samples + COC and apply the prepaid shipping label</li>
-            <li>Drop off at FedEx</li>
-        </ol>
-
-        <p>You can also download these files anytime from your dashboard:</p>
-        <p><a href="{dashboard_url}" style="color: #004aac; font-weight: bold;">Open My Inspections / Downloads</a></p>
-
-        <p>Warm regards,<br>The Total Testing Team</p>
-    </div>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 8px auto;">
+                <tr>
+                  <td align="center" bgcolor="#004aac" style="border-radius:8px;">
+                    <a href="{dashboard_url}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+                      Open dashboard / downloads
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#94a3b8;text-align:center;">
+                If the button does not work, visit:<br>
+                <a href="{dashboard_url}" style="color:#004aac;word-break:break-all;">{dashboard_url}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px 32px;border-top:1px solid #e2e8f0;background-color:#f8fafc;">
+              <p style="margin:0 0 6px 0;font-size:14px;color:#334155;">Warm regards,<br><strong>The Total Testing Team</strong></p>
+              <p style="margin:12px 0 0 0;font-size:12px;color:#94a3b8;">Test Before You Guess. · This is an automated message.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>"""
             },
@@ -426,14 +469,22 @@ class EmailService:
         # get_templates may return wrapped structure
         if isinstance(templates, dict) and 'templates' in templates:
             templates = templates.get('templates') or {}
-        template = (templates or {}).get('kit_purchase') or self.default_templates.get('kit_purchase')
+        # Always prefer the current branded default for kit purchase layout
+        # (admin JSON may still hold an older plain template without logo).
+        template = self.default_templates.get('kit_purchase')
+        saved = (templates or {}).get('kit_purchase')
+        if saved and '{logo_url}' in str(saved.get('body') or ''):
+            template = saved
         if not template:
             return {"success": False, "error": "kit_purchase template missing"}
 
+        base = self.frontend_base_url()
+        logo_url = os.getenv('EMAIL_LOGO_URL') or f"{base}/logos.png"
         vars_map = {
             'full_name': full_name or 'Customer',
             'package_name': package_name or 'Mold Testing',
-            'dashboard_url': dashboard_url or '',
+            'dashboard_url': dashboard_url or f"{base}/MyInspections",
+            'logo_url': logo_url,
         }
         try:
             subject = template['subject'].format(**vars_map)
