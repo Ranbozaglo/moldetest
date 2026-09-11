@@ -34,6 +34,11 @@ except ImportError as e:
 
 # Import email endpoints
 from email_endpoints import register_email_endpoints
+try:
+    from kit_fulfillment import register_kit_fulfillment_endpoints
+except Exception as _kit_import_err:
+    register_kit_fulfillment_endpoints = None
+    print(f"Warning: kit_fulfillment import failed: {_kit_import_err}")
 
 
 app = Flask(__name__)
@@ -1059,6 +1064,17 @@ try:
     register_email_endpoints(app, supabase)
 except Exception as e:
     print(f"Warning: email endpoints not registered: {e}")
+
+# Kit fulfillment (prepaid labels + COC + Stripe webhook)
+try:
+    from app.services.email_service import email_service as _kit_email_service
+except Exception:
+    _kit_email_service = None
+try:
+    if register_kit_fulfillment_endpoints:
+        register_kit_fulfillment_endpoints(app, supabase, _kit_email_service)
+except Exception as e:
+    print(f"Warning: kit fulfillment endpoints not registered: {e}")
 
 # Database setup
 def init_db():

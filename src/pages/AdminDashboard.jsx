@@ -19,6 +19,7 @@ import { downloadPDF, downloadHTML } from "@/utils/pdfDownload";
 import { resolveCoverAssets } from "@/utils/reportAssets";
 import { sanitizeReportText } from "@/utils/reportText";
 import EmailTemplateManager from "@/components/EmailTemplateManager";
+import KitFulfillmentManager from "@/components/KitFulfillmentManager";
 
 import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
 import { usePopup } from "@/components/ui/popup";
@@ -2107,7 +2108,7 @@ export default function AdminDashboard() {
         {/* Dashboard Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-200">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-100">
+            <TabsList className="grid w-full grid-cols-4 bg-slate-100">
               <TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <BarChart3 className="w-4 h-4" />
               Overview
@@ -2115,6 +2116,11 @@ export default function AdminDashboard() {
               <TabsTrigger value="inspections" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
               <Database className="w-4 h-4" />
               All Inspections
+            </TabsTrigger>
+
+              <TabsTrigger value="kits" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <Package className="w-4 h-4" />
+              Kit Fulfillment
             </TabsTrigger>
 
               <TabsTrigger value="emails" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
@@ -3127,6 +3133,12 @@ export default function AdminDashboard() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+
+          {/* Kit Fulfillment Tab */}
+          <TabsContent value="kits" className="space-y-6">
+            <KitFulfillmentManager />
           </TabsContent>
 
 

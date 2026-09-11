@@ -42,6 +42,34 @@ services:
         value: gpt-4o-mini
       - key: JWT_SECRET_KEY
         sync: false
+      - key: SMTP_SERVER
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: KIT_STORAGE_BUCKET
+        value: kit-fulfillment
+      - key: STRIPE_BUY_URL_SPOT_CHECK
+        sync: false
+      - key: STRIPE_BUY_URL_EXTENDED
+        sync: false
+      - key: STRIPE_BUY_URL_FULL_HOUSE
+        sync: false
+      - key: STRIPE_PLINK_SPOT_CHECK
+        sync: false
+      - key: STRIPE_PLINK_EXTENDED
+        sync: false
+      - key: STRIPE_PLINK_FULL_HOUSE
+        sync: false
 
   - type: web
     name: moldetest-F-Frontend

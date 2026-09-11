@@ -1,7 +1,9 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Dict, Any, Optional
+from email.mime.base import MIMEBase
+from email import encoders
+from typing import Dict, Any, Optional, List
 import os
 import json
 from datetime import datetime
@@ -19,6 +21,38 @@ class EmailService:
         
         # Default templates
         self.default_templates = {
+            "kit_purchase": {
+                "subject": "Total Testing - Your {package_name} Kit Materials",
+                "body": """<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #004aac; margin: 0 0 8px 0;">Total Testing</h1>
+        <p style="color: #666; margin: 0 0 24px 0;">DIY Mold Testing</p>
+
+        <p>Hi {full_name},</p>
+
+        <p>Thank you for purchasing the <strong>{package_name}</strong> kit. Attached you will find:</p>
+        <ul>
+            <li>Chain of Custody (COC) form for your package</li>
+            <li>Your unique prepaid return shipping label</li>
+        </ul>
+
+        <p><strong>Next steps:</strong></p>
+        <ol>
+            <li>Collect your samples as shown in the sampling guide</li>
+            <li>Complete and sign the attached COC</li>
+            <li>Pack samples + COC and apply the prepaid shipping label</li>
+            <li>Drop off at FedEx</li>
+        </ol>
+
+        <p>You can also download these files anytime from your dashboard:</p>
+        <p><a href="{dashboard_url}" style="color: #004aac; font-weight: bold;">Open My Inspections / Downloads</a></p>
+
+        <p>Warm regards,<br>The Total Testing Team</p>
+    </div>
+</body>
+</html>"""
+            },
             "password_reset": {
                 "subject": "Total Testing - Password Reset Request",
                 "body": """<html>
@@ -276,9 +310,16 @@ class EmailService:
         print(f"🔧 EMAIL DEBUG: From Email: {self.from_email}")
         print(f"🔧 EMAIL DEBUG: Templates file: {self.templates_file}")
     
-    def send_email(self, to_email: str, subject: str, body: str) -> Dict[str, Any]:
+    def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        body: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         """
-        Send email using SMTP
+        Send email using SMTP.
+        attachments: optional list of {filename, content (bytes), mime (optional)}
         """
         try:
             print(f"🔧 EMAIL DEBUG: Attempting to send email to {to_email}")
@@ -302,6 +343,21 @@ class EmailService:
             
             # Add body
             msg.attach(MIMEText(body, 'html'))
+
+            for item in attachments or []:
+                filename = str(item.get('filename') or 'attachment.bin')
+                content = item.get('content') or b''
+                if isinstance(content, str):
+                    content = content.encode('utf-8')
+                mime = str(item.get('mime') or 'application/octet-stream')
+                maintype, _, subtype = mime.partition('/')
+                if not subtype:
+                    maintype, subtype = 'application', 'octet-stream'
+                part = MIMEBase(maintype, subtype)
+                part.set_payload(content)
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', 'attachment', filename=filename)
+                msg.attach(part)
             
             print(f"🔧 EMAIL DEBUG: Connecting to {self.smtp_server}:{self.smtp_port}")
             
@@ -356,6 +412,42 @@ class EmailService:
                 "error": error_msg,
                 "message": "Failed to send email"
             }
+
+    def send_kit_purchase_email(
+        self,
+        to_email: str,
+        full_name: str,
+        package_name: str,
+        dashboard_url: str,
+        attachments: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Send post-purchase kit email with COC + prepaid label attachments."""
+        templates = self.get_templates() if hasattr(self, 'get_templates') else self.default_templates
+        # get_templates may return wrapped structure
+        if isinstance(templates, dict) and 'templates' in templates:
+            templates = templates.get('templates') or {}
+        template = (templates or {}).get('kit_purchase') or self.default_templates.get('kit_purchase')
+        if not template:
+            return {"success": False, "error": "kit_purchase template missing"}
+
+        vars_map = {
+            'full_name': full_name or 'Customer',
+            'package_name': package_name or 'Mold Testing',
+            'dashboard_url': dashboard_url or '',
+        }
+        try:
+            subject = template['subject'].format(**vars_map)
+            body = template['body'].format(**vars_map)
+        except Exception:
+            subject = f"Total Testing - Your {vars_map['package_name']} Kit Materials"
+            body = self.default_templates['kit_purchase']['body'].format(**vars_map)
+
+        return self.send_email(
+            to_email=to_email,
+            subject=subject,
+            body=body,
+            attachments=attachments or [],
+        )
     
     def send_lab_received_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
         """

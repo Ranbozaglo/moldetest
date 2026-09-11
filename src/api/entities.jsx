@@ -10,14 +10,17 @@ logEnvironmentInfo();
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  const config = {
-    headers: {
-
-      
+  const headers = {
       'Content-Type': 'application/json',
       ...options.headers
-    },
-    ...options
+  };
+  // Let the browser set multipart boundary for FormData uploads
+  if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+    delete headers['Content-Type'];
+  }
+  const config = {
+    ...options,
+    headers,
   };
 
   // Enhanced logging for production debugging
@@ -689,6 +692,76 @@ export const EmailService = {
     });
     return response;
   }
+};
+
+// Kit fulfillment (COC + prepaid labels)
+export const KitService = {
+  getPackages: async () => apiCall('/kit/packages'),
+
+  updatePackage: async (packageType, data) => {
+    const token = getAuthToken();
+    return apiCall(`/kit/packages/${packageType}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+  },
+
+  uploadCoc: async (packageType, file) => {
+    const token = getAuthToken();
+    const form = new FormData();
+    form.append('file', file);
+    return apiCall(`/kit/packages/${packageType}/upload-coc`, {
+      method: 'POST',
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+      body: form,
+    });
+  },
+
+  listLabels: async (status) => {
+    const token = getAuthToken();
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+    return apiCall(`/kit/labels${q}`, {
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+  },
+
+  uploadLabels: async (files, packageType = '') => {
+    const token = getAuthToken();
+    const form = new FormData();
+    [...files].forEach((f) => form.append('files', f));
+    if (packageType) form.append('package_type', packageType);
+    return apiCall('/kit/labels/upload', {
+      method: 'POST',
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+      body: form,
+    });
+  },
+
+  listFulfillments: async () => {
+    const token = getAuthToken();
+    return apiCall('/kit/fulfillments', {
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+    });
+  },
+
+  manualFulfill: async (payload) => {
+    const token = getAuthToken();
+    return apiCall('/kit/fulfillments/manual', {
+      method: 'POST',
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  myDownloads: async (email) =>
+    apiCall(`/kit/my-downloads?email=${encodeURIComponent(email || '')}`),
 };
 
 // Production debugging helper - attach to window for console access

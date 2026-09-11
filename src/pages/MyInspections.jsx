@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { MoldInspection } from "@/api/entities";
 import { Sample } from "@/api/entities";
+import { KitService } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,8 @@ import {
   Calendar,
   MapPin,
   Loader2,
-  Eye
+  Eye,
+  Package
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +40,8 @@ export default function MyInspections() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [downloading, setDownloading] = useState({});
+  const [kitPackages, setKitPackages] = useState([]);
+  const [kitDownloads, setKitDownloads] = useState([]);
   const [downloadStatus, setDownloadStatus] = useState(null);
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
@@ -102,6 +106,16 @@ export default function MyInspections() {
                   
                   setInspections(filteredInspections);
                   console.log("🔍 SECURITY: Set", filteredInspections.length, "verified user inspections");
+                  try {
+                    const [pkgRes, dlRes] = await Promise.all([
+                      KitService.getPackages(),
+                      KitService.myDownloads(currentUser.email),
+                    ]);
+                    setKitPackages(pkgRes.packages || []);
+                    setKitDownloads(dlRes.downloads || []);
+                  } catch (kitErr) {
+                    console.warn("Kit downloads unavailable:", kitErr);
+                  }
                 } else {
                   console.log("🔍 SECURITY: No inspections found for user");
                   setInspections([]);
@@ -988,15 +1002,71 @@ export default function MyInspections() {
         </div>
       </motion.div>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mt-8">
-<Button 
-              onClick={() => window.open('https://buy.stripe.com/6oU28r2Wb2KF9Tv3xEabK01', '_blank')}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Start New Testing
-            </Button>
+      <div className="mt-8 space-y-6">
+        {kitDownloads.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Package className="w-5 h-5" />
+                Your kit downloads
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {kitDownloads.map((d) => (
+                <div key={d.id} className="rounded-lg border border-slate-200 p-4">
+                  <div className="font-medium text-slate-900 mb-2">{d.package_name}</div>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {d.coc_url && (
+                      <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download COC
+                      </a>
+                    )}
+                    {d.shipping_label_url && (
+                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download shipping label
+                      </a>
+                    )}
+                    {d.instructions_url && (
+                      <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download instructions
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Start new testing</h3>
+          <div className="grid sm:grid-cols-3 gap-3">
+            {(kitPackages.length
+              ? kitPackages
+              : [
+                  { package_type: "spot_check", display_name: "Spot Check", stripe_payment_link_url: "" },
+                  { package_type: "extended", display_name: "Extended", stripe_payment_link_url: "" },
+                  { package_type: "full_house", display_name: "Full House", stripe_payment_link_url: "" },
+                ]
+            ).map((pkg) => (
+              <Button
+                key={pkg.package_type}
+                disabled={!pkg.stripe_payment_link_url}
+                onClick={() => pkg.stripe_payment_link_url && window.open(pkg.stripe_payment_link_url, "_blank")}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {pkg.display_name}
+              </Button>
+            ))}
           </div>
+          {!kitPackages.some((p) => p.stripe_payment_link_url) && (
+            <p className="text-xs text-slate-500 mt-2">
+              Package buy links are configured in Admin → Kit Fulfillment.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
     
     

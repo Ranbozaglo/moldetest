@@ -1,0 +1,296 @@
+import React, { useEffect, useState } from "react";
+import { KitService } from "@/api/entities";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Package, Upload, Mail, RefreshCw } from "lucide-react";
+
+const PACKAGE_ORDER = ["spot_check", "extended", "full_house"];
+
+export default function KitFulfillmentManager() {
+  const [packages, setPackages] = useState([]);
+  const [labels, setLabels] = useState([]);
+  const [availableCount, setAvailableCount] = useState(0);
+  const [fulfillments, setFulfillments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [manual, setManual] = useState({
+    customer_email: "",
+    customer_name: "",
+    package_type: "spot_check",
+  });
+
+  const load = async () => {
+    setLoading(true);
+    setMessage("");
+    try {
+      const [pkgRes, labelRes, fulRes] = await Promise.all([
+        KitService.getPackages(),
+        KitService.listLabels(),
+        KitService.listFulfillments(),
+      ]);
+      const pkgList = pkgRes.packages || [];
+      pkgList.sort(
+        (a, b) => PACKAGE_ORDER.indexOf(a.package_type) - PACKAGE_ORDER.indexOf(b.package_type)
+      );
+      setPackages(pkgList);
+      setLabels(labelRes.labels || []);
+      setAvailableCount(labelRes.available_count || 0);
+      setFulfillments(fulRes.fulfillments || []);
+    } catch (e) {
+      setMessage(e.message || "Failed to load kit fulfillment data. Did you run the SQL migration?");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const savePackageLinks = async (pkg) => {
+    try {
+      await KitService.updatePackage(pkg.package_type, {
+        stripe_payment_link_id: pkg.stripe_payment_link_id || "",
+        stripe_payment_link_url: pkg.stripe_payment_link_url || "",
+      });
+      setMessage(`Saved payment link settings for ${pkg.display_name}`);
+      load();
+    } catch (e) {
+      setMessage(e.message || "Save failed");
+    }
+  };
+
+  const onUploadCoc = async (packageType, file) => {
+    if (!file) return;
+    try {
+      await KitService.uploadCoc(packageType, file);
+      setMessage(`COC uploaded for ${packageType}`);
+      load();
+    } catch (e) {
+      setMessage(e.message || "COC upload failed");
+    }
+  };
+
+  const onUploadLabels = async (fileList) => {
+    if (!fileList?.length) return;
+    try {
+      const res = await KitService.uploadLabels(fileList);
+      setMessage(`Uploaded ${(res.created || []).length} label(s)`);
+      load();
+    } catch (e) {
+      setMessage(e.message || "Label upload failed");
+    }
+  };
+
+  const onManualSend = async () => {
+    try {
+      const res = await KitService.manualFulfill(manual);
+      if (res.success || res.duplicate) {
+        setMessage(res.duplicate ? "Already fulfilled for that session" : "Kit pack emailed successfully");
+      } else {
+        setMessage(res.error || "Manual send failed");
+      }
+      load();
+    } catch (e) {
+      setMessage(e.message || "Manual send failed");
+    }
+  };
+
+  if (loading) {
+    return <div className="text-slate-600 p-4">Loading kit fulfillment…</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Kit Fulfillment</h2>
+          <p className="text-sm text-slate-600">
+            Upload 3 COCs (Spot Check / Extended / Full House), stock prepaid labels, map Stripe payment links.
+            Purchases auto-email COC + unique label after Stripe checkout.
+          </p>
+        </div>
+        <Button variant="outline" onClick={load}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {message && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          {message}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Packages & COC
+          </CardTitle>
+          <CardDescription>
+            One fixed COC per package. Paste each Stripe Payment Link ID (<code>plink_…</code>) and buy URL.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {packages.map((pkg) => (
+            <div key={pkg.package_type} className="rounded-xl border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold text-slate-900">{pkg.display_name}</h3>
+                <Badge variant={pkg.coc_storage_path ? "default" : "secondary"}>
+                  {pkg.coc_storage_path ? "COC ready" : "COC missing"}
+                </Badge>
+              </div>
+              <div className="grid md:grid-cols-2 gap-3">
+                <div>
+                  <Label>Stripe Payment Link ID (plink_…)</Label>
+                  <Input
+                    value={pkg.stripe_payment_link_id || ""}
+                    onChange={(e) =>
+                      setPackages((prev) =>
+                        prev.map((p) =>
+                          p.package_type === pkg.package_type
+                            ? { ...p, stripe_payment_link_id: e.target.value }
+                            : p
+                        )
+                      )
+                    }
+                    placeholder="plink_..."
+                  />
+                </div>
+                <div>
+                  <Label>Buy URL (buy.stripe.com/…)</Label>
+                  <Input
+                    value={pkg.stripe_payment_link_url || ""}
+                    onChange={(e) =>
+                      setPackages((prev) =>
+                        prev.map((p) =>
+                          p.package_type === pkg.package_type
+                            ? { ...p, stripe_payment_link_url: e.target.value }
+                            : p
+                        )
+                      )
+                    }
+                    placeholder="https://buy.stripe.com/..."
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button size="sm" onClick={() => savePackageLinks(pkg)}>
+                  Save links
+                </Button>
+                <Label className="cursor-pointer inline-flex items-center gap-2 text-sm text-blue-700">
+                  <Upload className="w-4 h-4" />
+                  Upload COC PDF
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => onUploadCoc(pkg.package_type, e.target.files?.[0])}
+                  />
+                </Label>
+                {pkg.coc_url && (
+                  <a href={pkg.coc_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline">
+                    View COC
+                  </a>
+                )}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Prepaid label stock</CardTitle>
+          <CardDescription>
+            Upload one PDF per unique prepaid label. Available: <strong>{availableCount}</strong>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Label className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-blue-700">
+            <Upload className="w-4 h-4" />
+            Upload label PDFs
+            <input
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => onUploadLabels(e.target.files)}
+            />
+          </Label>
+          <div className="max-h-48 overflow-auto text-sm space-y-1">
+            {labels.slice(0, 30).map((l) => (
+              <div key={l.id} className="flex justify-between gap-2 border-b border-slate-100 py-1">
+                <span className="truncate">{l.file_name}</span>
+                <Badge variant={l.status === "available" ? "default" : "secondary"}>{l.status}</Badge>
+              </div>
+            ))}
+            {!labels.length && <p className="text-slate-500">No labels uploaded yet.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Manual send (test)
+          </CardTitle>
+          <CardDescription>Send kit pack without Stripe — uses next available label.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-4 gap-3 items-end">
+          <div>
+            <Label>Email</Label>
+            <Input
+              value={manual.customer_email}
+              onChange={(e) => setManual({ ...manual, customer_email: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>Name</Label>
+            <Input
+              value={manual.customer_name}
+              onChange={(e) => setManual({ ...manual, customer_name: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label>Package</Label>
+            <select
+              className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm"
+              value={manual.package_type}
+              onChange={(e) => setManual({ ...manual, package_type: e.target.value })}
+            >
+              {PACKAGE_ORDER.map((k) => (
+                <option key={k} value={k}>
+                  {packages.find((p) => p.package_type === k)?.display_name || k}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button onClick={onManualSend}>Send kit pack</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent fulfillments</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {fulfillments.slice(0, 20).map((f) => (
+            <div key={f.id} className="flex flex-wrap justify-between gap-2 border-b border-slate-100 py-2">
+              <span>
+                {f.customer_email} · {f.package_type}
+              </span>
+              <Badge variant={f.email_status === "sent" ? "default" : "secondary"}>{f.email_status}</Badge>
+            </div>
+          ))}
+          {!fulfillments.length && <p className="text-slate-500">No purchases fulfilled yet.</p>}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
