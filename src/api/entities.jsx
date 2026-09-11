@@ -10,16 +10,17 @@ logEnvironmentInfo();
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
+  const { timeoutMs: customTimeout, headers: optionHeaders, ...restOptions } = options;
   const headers = {
       'Content-Type': 'application/json',
-      ...options.headers
+      ...optionHeaders
   };
   // Let the browser set multipart boundary for FormData uploads
-  if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+  if (typeof FormData !== 'undefined' && restOptions.body instanceof FormData) {
     delete headers['Content-Type'];
   }
   const config = {
-    ...options,
+    ...restOptions,
     headers,
   };
 
@@ -27,8 +28,8 @@ const apiCall = async (endpoint, options = {}) => {
   const isProduction = window.location.hostname !== 'localhost';
   const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
 
-  // Add timeout for production
-  const timeoutMs = isProduction ? 15000 : 30000;
+  // Add timeout (uploads can override with options.timeoutMs)
+  const timeoutMs = customTimeout ?? (isProduction ? 15000 : 30000);
   const timeoutPromise = new Promise((_, reject) => 
     setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs}ms`)), timeoutMs)
   );
@@ -710,6 +711,37 @@ export const KitService = {
     });
   },
 
+  uploadLabels: async (files, packageType = '') => {
+    const token = getAuthToken();
+    const allFiles = [...files];
+    const chunkSize = 5;
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < allFiles.length; i += chunkSize) {
+      const chunk = allFiles.slice(i, i + chunkSize);
+      const form = new FormData();
+      chunk.forEach((f) => form.append('files', f));
+      if (packageType) form.append('package_type', packageType);
+      const res = await apiCall('/kit/labels/upload', {
+        method: 'POST',
+        headers: { Authorization: token ? `Bearer ${token}` : '' },
+        body: form,
+        timeoutMs: 120000,
+      });
+      created.push(...(res.created || []));
+      errors.push(...(res.errors || []));
+    }
+
+    return {
+      success: errors.length === 0,
+      created,
+      errors,
+      uploaded: created.length,
+      total: allFiles.length,
+    };
+  },
+
   uploadCoc: async (packageType, file) => {
     const token = getAuthToken();
     const form = new FormData();
@@ -718,6 +750,7 @@ export const KitService = {
       method: 'POST',
       headers: { Authorization: token ? `Bearer ${token}` : '' },
       body: form,
+      timeoutMs: 120000,
     });
   },
 
@@ -726,18 +759,6 @@ export const KitService = {
     const q = status ? `?status=${encodeURIComponent(status)}` : '';
     return apiCall(`/kit/labels${q}`, {
       headers: { Authorization: token ? `Bearer ${token}` : '' },
-    });
-  },
-
-  uploadLabels: async (files, packageType = '') => {
-    const token = getAuthToken();
-    const form = new FormData();
-    [...files].forEach((f) => form.append('files', f));
-    if (packageType) form.append('package_type', packageType);
-    return apiCall('/kit/labels/upload', {
-      method: 'POST',
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
-      body: form,
     });
   },
 

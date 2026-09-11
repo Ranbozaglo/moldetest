@@ -22,6 +22,8 @@ export default function KitFulfillmentManager() {
     package_type: "spot_check",
   });
 
+  const [uploadingLabels, setUploadingLabels] = useState(false);
+
   const load = async () => {
     setLoading(true);
     setMessage("");
@@ -76,12 +78,23 @@ export default function KitFulfillmentManager() {
 
   const onUploadLabels = async (fileList) => {
     if (!fileList?.length) return;
+    setUploadingLabels(true);
+    setMessage(`Uploading ${fileList.length} label PDF(s)… please wait`);
     try {
       const res = await KitService.uploadLabels(fileList);
-      setMessage(`Uploaded ${(res.created || []).length} label(s)`);
-      load();
+      const uploaded = res.uploaded ?? (res.created || []).length;
+      const errCount = (res.errors || []).length;
+      setMessage(
+        errCount
+          ? `Uploaded ${uploaded} of ${res.total || fileList.length} labels (${errCount} failed)`
+          : `Uploaded ${uploaded} shipping label(s) successfully`
+      );
+      await load();
     } catch (e) {
-      setMessage(e.message || "Label upload failed");
+      setMessage(e.message || "Label upload failed — click Refresh; some files may still have saved");
+      await load();
+    } finally {
+      setUploadingLabels(false);
     }
   };
 
@@ -207,23 +220,35 @@ export default function KitFulfillmentManager() {
         <CardHeader>
           <CardTitle>Prepaid label stock</CardTitle>
           <CardDescription>
-            Upload one PDF per unique prepaid label. Available: <strong>{availableCount}</strong>
+            Scroll below the Stripe/COC section. Upload one PDF per unique prepaid label.
+            Available in stock: <strong>{availableCount}</strong> · Total listed: <strong>{labels.length}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Label className="cursor-pointer inline-flex items-center gap-2 text-sm font-medium text-blue-700">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Label upload is separate from “Save links”. Use the button below (not the Stripe fields).
+          </div>
+          <Label
+            className={`cursor-pointer inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white ${
+              uploadingLabels ? "bg-slate-400" : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
             <Upload className="w-4 h-4" />
-            Upload label PDFs
+            {uploadingLabels ? "Uploading labels…" : "Upload label PDFs"}
             <input
               type="file"
-              accept="application/pdf"
+              accept="application/pdf,.pdf"
               multiple
+              disabled={uploadingLabels}
               className="hidden"
-              onChange={(e) => onUploadLabels(e.target.files)}
+              onChange={(e) => {
+                onUploadLabels(e.target.files);
+                e.target.value = "";
+              }}
             />
           </Label>
-          <div className="max-h-48 overflow-auto text-sm space-y-1">
-            {labels.slice(0, 30).map((l) => (
+          <div className="max-h-64 overflow-auto text-sm space-y-1 border border-slate-100 rounded-md p-2">
+            {labels.map((l) => (
               <div key={l.id} className="flex justify-between gap-2 border-b border-slate-100 py-1">
                 <span className="truncate">{l.file_name}</span>
                 <Badge variant={l.status === "available" ? "default" : "secondary"}>{l.status}</Badge>
