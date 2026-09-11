@@ -402,30 +402,28 @@ export default function KitFulfillmentManager() {
                 <Badge variant={f.email_status === "sent" ? "default" : "destructive"}>
                   {f.email_status || "unknown"}
                 </Badge>
-                {f.email_status !== "sent" && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      setMessage("");
-                      try {
-                        const res = await KitService.resendFulfillment(f.id);
-                        if (res?.success) {
-                          setMessage(`Resent kit email to ${f.customer_email}`);
-                          load();
-                        } else {
-                          setMessage(res?.error || res?.email?.error || "Resend failed");
-                          load();
-                        }
-                      } catch (err) {
-                        setMessage(err?.message || "Resend failed");
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setMessage("");
+                    try {
+                      const res = await KitService.resendFulfillment(f.id);
+                      if (res?.success) {
+                        setMessage(`Resent kit email to ${f.customer_email}`);
+                        load();
+                      } else {
+                        setMessage(res?.error || res?.email?.error || "Resend failed");
+                        load();
                       }
-                    }}
-                  >
-                    Resend email
-                  </Button>
-                )}
+                    } catch (err) {
+                      setMessage(err?.message || "Resend failed");
+                    }
+                  }}
+                >
+                  Resend email
+                </Button>
               </div>
             </div>
           ))}

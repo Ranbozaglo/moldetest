@@ -379,13 +379,26 @@ class EmailService:
                 }
             
             # Create message
-            msg = MIMEMultipart()
-            msg['From'] = self.from_email
+            msg = MIMEMultipart('mixed')
+            display_from = os.getenv("FROM_NAME", "Total Testing").strip() or "Total Testing"
+            from_addr = self.from_email or self.username
+            msg['From'] = f"{display_from} <{from_addr}>"
             msg['To'] = to_email
             msg['Subject'] = subject
-            
-            # Add body
-            msg.attach(MIMEText(body, 'html'))
+            msg['Reply-To'] = os.getenv("REPLY_TO_EMAIL", from_addr)
+            msg['X-Mailer'] = "Total Testing Kit Fulfillment"
+
+            # HTML + plain text alternative (better inbox placement than HTML-only)
+            alt = MIMEMultipart('alternative')
+            plain = (
+                "Total Testing — your kit materials\n\n"
+                "Your Chain of Custody (COC) and prepaid shipping label are attached.\n"
+                "You can also download them from your dashboard.\n\n"
+                "— The Total Testing Team\n"
+            )
+            alt.attach(MIMEText(plain, 'plain', 'utf-8'))
+            alt.attach(MIMEText(body, 'html', 'utf-8'))
+            msg.attach(alt)
 
             for item in attachments or []:
                 filename = str(item.get('filename') or 'attachment.bin')
