@@ -23,6 +23,7 @@ const apiCall = async (endpoint, options = {}) => {
     ...restOptions,
     headers,
   };
+  const skipAuthRedirect = Boolean(options.skipAuthRedirect);
 
   // Enhanced logging for production debugging
   const isProduction = window.location.hostname !== 'localhost';
@@ -52,7 +53,7 @@ const apiCall = async (endpoint, options = {}) => {
       });
       
       // Handle authentication errors specifically
-      if (response.status === 401 || response.status === 403) {
+      if ((response.status === 401 || response.status === 403) && !skipAuthRedirect) {
         // Clear localStorage to force re-login
         localStorage.removeItem('mth_user');
 
@@ -762,6 +763,8 @@ export const KitService = {
     const q = status ? `?status=${encodeURIComponent(status)}` : '';
     return apiCall(`/kit/labels${q}`, {
       headers: { Authorization: token ? `Bearer ${token}` : '' },
+      timeoutMs: 60000,
+      skipAuthRedirect: true,
     });
   },
 
@@ -797,6 +800,8 @@ export const KitService = {
     const token = getAuthToken();
     return apiCall('/kit/fulfillments', {
       headers: { Authorization: token ? `Bearer ${token}` : '' },
+      timeoutMs: 60000,
+      skipAuthRedirect: true,
     });
   },
 
@@ -809,6 +814,8 @@ export const KitService = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      timeoutMs: 120000,
+      skipAuthRedirect: true,
     });
   },
 
@@ -822,6 +829,7 @@ export const KitService = {
       },
       body: JSON.stringify({ limit: 40 }),
       timeoutMs: 120000,
+      skipAuthRedirect: true,
     });
   },
 
@@ -830,6 +838,8 @@ export const KitService = {
     return apiCall(`/kit/fulfillments/${fulfillmentId}/resend`, {
       method: 'POST',
       headers: { Authorization: token ? `Bearer ${token}` : '' },
+      timeoutMs: 120000,
+      skipAuthRedirect: true,
     });
   },
 

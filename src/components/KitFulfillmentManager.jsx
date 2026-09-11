@@ -189,8 +189,19 @@ export default function KitFulfillmentManager() {
     }
   };
 
-  if (loading) {
-    return <div className="text-slate-600 p-4">Loading kit fulfillment…</div>;
+  if (loading && !packages.length && !labels.length) {
+    return (
+      <div className="space-y-4 p-4">
+        <div className="text-slate-700 font-medium">Loading kit fulfillment…</div>
+        <p className="text-sm text-slate-500">
+          If this takes more than a few seconds, the API may be waking up. The panel will appear when ready.
+        </p>
+        <Button variant="outline" onClick={load}>
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   return (

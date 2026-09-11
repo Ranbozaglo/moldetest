@@ -31,6 +31,41 @@ import {
   parseMoldFindingsFromLabText,
 } from "@/lib/moldFindings.jsx";
 
+class KitFulfillmentErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Kit Fulfillment tab crashed:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 space-y-3">
+          <h3 className="font-semibold text-red-900">Kit Fulfillment failed to open</h3>
+          <p className="text-sm text-red-800 break-words">
+            {this.state.error?.message || String(this.state.error)}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => this.setState({ error: null })}
+          >
+            Try again
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const generateReportHtmlContent = async (inspection, samples) => {
     const displayNum = getDisplayNumber(inspection);
     const { logoSrc, coverKitSrc } = await resolveCoverAssets();
@@ -3138,7 +3173,9 @@ export default function AdminDashboard() {
 
           {/* Kit Fulfillment Tab */}
           <TabsContent value="kits" className="space-y-6">
-            <KitFulfillmentManager />
+            <KitFulfillmentErrorBoundary>
+              <KitFulfillmentManager />
+            </KitFulfillmentErrorBoundary>
           </TabsContent>
 
 
