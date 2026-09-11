@@ -153,7 +153,26 @@ export default function MyInspections() {
     })();
   }, [navigate, currentUser]);
 
-
+  // Refresh kit downloads when user returns to the tab (e.g. after Stripe checkout)
+  useEffect(() => {
+    const reloadKits = async () => {
+      const email = currentUser?.email;
+      if (!email) return;
+      try {
+        const [pkgRes, dlRes] = await Promise.all([
+          KitService.getPackages(),
+          KitService.myDownloads(email),
+        ]);
+        setKitPackages(pkgRes.packages || []);
+        setKitDownloads(dlRes.downloads || []);
+      } catch (err) {
+        console.warn("Kit refresh skipped:", err);
+      }
+    };
+    const onFocus = () => reloadKits();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [currentUser?.email]);
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -856,6 +875,22 @@ export default function MyInspections() {
   const boughtKitNotSubmitted = inspections.length === 0 && kitDownloads.length > 0;
   const isReturning = inspections.length > 0;
 
+  const openKitCheckout = (paymentUrl) => {
+    if (!paymentUrl) return;
+    const accountEmail = (currentUser?.email || user?.email || "").trim();
+    try {
+      const u = new URL(paymentUrl);
+      // Prefill Stripe Checkout with the logged-in email so the new COC/label
+      // is stored under the same account downloads list.
+      if (accountEmail) {
+        u.searchParams.set("prefilled_email", accountEmail);
+      }
+      window.open(u.toString(), "_blank");
+    } catch {
+      window.open(paymentUrl, "_blank");
+    }
+  };
+
   const packageButtons = (kitPackages.length
     ? kitPackages
     : [
@@ -867,13 +902,22 @@ export default function MyInspections() {
     <Button
       key={pkg.package_type}
       disabled={!pkg.stripe_payment_link_url}
-      onClick={() => pkg.stripe_payment_link_url && window.open(pkg.stripe_payment_link_url, "_blank")}
+      onClick={() => openKitCheckout(pkg.stripe_payment_link_url)}
       className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
     >
       <Package className="w-4 h-4 mr-2" />
       {pkg.display_name}
     </Button>
   ));
+
+  const formatPurchaseDate = (value) => {
+    if (!value) return "Date unavailable";
+    try {
+      return format(new Date(value), "MMM d, yyyy 'at' h:mm a");
+    } catch {
+      return "Date unavailable";
+    }
+  };
 
   const kitDownloadsCard = kitDownloads.length > 0 && (
     <Card className="mb-8 border-green-100">
@@ -883,13 +927,26 @@ export default function MyInspections() {
           Your COC &amp; shipping labels
         </CardTitle>
         <p className="text-sm text-slate-600 font-normal">
-          These files come from your kit purchase (also emailed to you). Submitting an inspection does not create a new label.
+          Newest purchases appear first. Use the purchase date to tell new labels from older ones.
+          Kit files are linked to your account email ({currentUser?.email || user?.email}).
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {kitDownloads.map((d) => (
-          <div key={d.id} className="rounded-lg border border-slate-200 p-4">
-            <div className="font-medium text-slate-900 mb-2">{d.package_name}</div>
+        {kitDownloads.map((d, index) => (
+          <div
+            key={d.id}
+            className={`rounded-lg border p-4 ${index === 0 ? "border-green-300 bg-green-50/50" : "border-slate-200"}`}
+          >
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <div className="font-medium text-slate-900">{d.package_name}</div>
+              {index === 0 && (
+                <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Newest</Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mb-2">
+              Purchased {formatPurchaseDate(d.created_at)}
+              {d.shipping_label_name ? ` · Label file: ${d.shipping_label_name}` : ""}
+            </p>
             <div className="flex flex-wrap gap-3 text-sm">
               {d.coc_url && (
                 <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">

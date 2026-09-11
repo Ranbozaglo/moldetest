@@ -685,6 +685,8 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if not email:
             return jsonify({"error": "email required"}), 400
         try:
+            # All purchases for this email (any package) land on the same account list.
+            # Prefer exact lowercase match; also include legacy mixed-case rows.
             result = (
                 supabase.table("kit_fulfillments")
                 .select("*")
@@ -692,8 +694,23 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 .order("created_at", desc=True)
                 .execute()
             )
+            rows = list(result.data or [])
+            if not rows:
+                # Case-insensitive fallback for older rows
+                all_rows = (
+                    supabase.table("kit_fulfillments")
+                    .select("*")
+                    .order("created_at", desc=True)
+                    .limit(500)
+                    .execute()
+                )
+                rows = [
+                    r
+                    for r in (all_rows.data or [])
+                    if str(r.get("customer_email") or "").strip().lower() == email
+                ]
             items = []
-            for row in result.data or []:
+            for row in rows:
                 label = None
                 if row.get("shipping_label_id"):
                     lr = (
@@ -711,6 +728,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         "package_name": PACKAGE_LABELS.get(row.get("package_type"), row.get("package_type")),
                         "created_at": row.get("created_at"),
                         "email_status": row.get("email_status"),
+                        "customer_email": row.get("customer_email"),
                         "coc_url": _public_url(row.get("coc_storage_path") or ""),
                         "instructions_url": _public_url(row.get("instructions_storage_path") or ""),
                         "shipping_label_url": (label or {}).get("public_url")
@@ -769,6 +787,9 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         else:
             email = _g(session, "customer_email")
             name = ""
+        # Always normalize so repeat purchases with the same address attach to one account
+        email = (email or "").strip().lower()
+        name = (name or "").strip()
 
         payment_link = _g(session, "payment_link") or ""
         if hasattr(payment_link, "id"):
