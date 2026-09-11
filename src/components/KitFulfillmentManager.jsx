@@ -30,6 +30,7 @@ export default function KitFulfillmentManager() {
   });
 
   const [syncing, setSyncing] = useState(false);
+  const [uploadingLabels, setUploadingLabels] = useState(false);
 
   const load = async () => {
     setLoading(true);
