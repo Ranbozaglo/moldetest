@@ -37,7 +37,7 @@ class EmailService:
         <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
           <tr>
             <td style="background:linear-gradient(135deg,#004aac 0%,#0b2e59 100%);padding:28px 32px;text-align:center;">
-              <img src="{logo_url}" alt="Total Testing" width="180" style="display:block;margin:0 auto 12px auto;max-width:180px;height:auto;border:0;" />
+              <img src="{logo_url}" alt="Total Testing" width="180" style="display:block;margin:0 auto 12px auto;max-width:180px;height:auto;border:0;border-radius:16px;" />
               <p style="margin:0;color:#dbeafe;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">DIY Mold Testing</p>
             </td>
           </tr>
