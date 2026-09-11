@@ -812,6 +812,18 @@ export const KitService = {
     });
   },
 
+  syncStripeFulfillments: async () => {
+    const token = getAuthToken();
+    return apiCall('/kit/fulfillments/sync-stripe', {
+      method: 'POST',
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ limit: 40 }),
+    });
+  },
+
   resendFulfillment: async (fulfillmentId) => {
     const token = getAuthToken();
     return apiCall(`/kit/fulfillments/${fulfillmentId}/resend`, {

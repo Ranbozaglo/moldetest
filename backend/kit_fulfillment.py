@@ -754,6 +754,161 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         status = 200 if result.get("success") or result.get("duplicate") else 400
         return jsonify(result), status
 
+    @app.route("/api/kit/fulfillments/sync-stripe", methods=["POST"])
+    def kit_sync_stripe_fulfillments():
+        """
+        Recover missed Stripe checkouts: pull recent completed Checkout Sessions
+        and fulfill any that are not already in kit_fulfillments.
+        """
+        if not _require_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        api_key = os.getenv("STRIPE_SECRET_KEY", "")
+        if not api_key:
+            return jsonify({"error": "STRIPE_SECRET_KEY not configured on server"}), 500
+        try:
+            import stripe
+
+            stripe.api_key = api_key
+            data = request.get_json(silent=True) or {}
+            limit = int(data.get("limit") or 30)
+            limit = max(1, min(limit, 100))
+
+            sessions = stripe.checkout.Session.list(limit=limit, status="complete")
+            created = []
+            skipped = []
+            failed = []
+
+            for session in sessions.data or []:
+                # Only walk the first page (limit) — auto_paging could be huge
+                session_id = getattr(session, "id", None) or ""
+                if not session_id:
+                    continue
+
+                existing = (
+                    supabase.table("kit_fulfillments")
+                    .select("id,email_status")
+                    .eq("stripe_session_id", session_id)
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    row = existing.data[0]
+                    if row.get("email_status") == "sent":
+                        skipped.append({"session_id": session_id, "reason": "already_sent"})
+                        continue
+                    # Retry email for existing failed/pending fulfillment
+                    full = (
+                        supabase.table("kit_fulfillments")
+                        .select("*")
+                        .eq("id", row["id"])
+                        .limit(1)
+                        .execute()
+                    )
+                    if full.data:
+                        emailed = _email_existing_fulfillment(full.data[0])
+                        if emailed.get("success"):
+                            created.append(
+                                {
+                                    "session_id": session_id,
+                                    "action": "email_retried",
+                                    "email": full.data[0].get("customer_email"),
+                                }
+                            )
+                        else:
+                            failed.append(
+                                {
+                                    "session_id": session_id,
+                                    "error": emailed.get("error") or "email retry failed",
+                                }
+                            )
+                    continue
+
+                payment_link = getattr(session, "payment_link", None) or ""
+                if hasattr(payment_link, "id"):
+                    payment_link = payment_link.id
+
+                details = getattr(session, "customer_details", None)
+                email = ""
+                name = ""
+                if details is not None:
+                    email = getattr(details, "email", None) or ""
+                    name = getattr(details, "name", None) or ""
+                if not email:
+                    email = getattr(session, "customer_email", None) or ""
+                email = (email or "").strip().lower()
+                name = (name or "").strip()
+
+                package_type = _resolve_package_type(
+                    payment_link_id=str(payment_link or ""),
+                    session_obj=session,
+                )
+                if not package_type:
+                    meta = getattr(session, "metadata", None) or {}
+                    if isinstance(meta, dict):
+                        package_type = meta.get("package_type") or meta.get("package")
+                if not package_type:
+                    failed.append(
+                        {
+                            "session_id": session_id,
+                            "email": email,
+                            "error": f"Could not map payment_link={payment_link} to a package",
+                        }
+                    )
+                    continue
+                if not email:
+                    failed.append(
+                        {
+                            "session_id": session_id,
+                            "error": "Checkout session has no customer email",
+                        }
+                    )
+                    continue
+
+                payment_intent = getattr(session, "payment_intent", None) or ""
+                if hasattr(payment_intent, "id"):
+                    payment_intent = payment_intent.id
+
+                result = _fulfill_purchase(
+                    customer_email=email,
+                    customer_name=name,
+                    package_type=package_type,
+                    stripe_session_id=session_id,
+                    stripe_payment_link_id=str(payment_link or ""),
+                    stripe_payment_intent_id=str(payment_intent or ""),
+                )
+                if result.get("success") or result.get("duplicate"):
+                    created.append(
+                        {
+                            "session_id": session_id,
+                            "email": email,
+                            "package_type": package_type,
+                            "action": "fulfilled" if result.get("success") else "duplicate",
+                            "email_status": (result.get("fulfillment") or {}).get("email_status"),
+                        }
+                    )
+                else:
+                    failed.append(
+                        {
+                            "session_id": session_id,
+                            "email": email,
+                            "package_type": package_type,
+                            "error": result.get("error") or "fulfill failed",
+                        }
+                    )
+
+            return jsonify(
+                {
+                    "success": True,
+                    "scanned": len(sessions.data or []),
+                    "recovered": created,
+                    "skipped": skipped,
+                    "failed": failed,
+                }
+            )
+        except Exception as e:
+            print(f"❌ KIT: sync-stripe failed: {e}")
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/kit/fulfillments/<fulfillment_id>/resend", methods=["POST"])
     def kit_resend_fulfillment_email(fulfillment_id):
         """Resend COC + label email for an existing sale (no new label assigned)."""

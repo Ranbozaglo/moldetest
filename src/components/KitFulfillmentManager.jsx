@@ -29,7 +29,7 @@ export default function KitFulfillmentManager() {
     package_type: "spot_check",
   });
 
-  const [uploadingLabels, setUploadingLabels] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -153,6 +153,28 @@ export default function KitFulfillmentManager() {
     }
   };
 
+  const onSyncStripe = async () => {
+    setSyncing(true);
+    setMessage("Scanning recent Stripe checkouts…");
+    try {
+      const res = await KitService.syncStripeFulfillments();
+      const recovered = res.recovered || [];
+      const failed = res.failed || [];
+      const skipped = res.skipped || [];
+      setMessage(
+        `Stripe sync done. Scanned ${res.scanned || 0}. Recovered ${recovered.length}. ` +
+          `Already OK ${skipped.length}. Failed ${failed.length}.` +
+          (failed[0]?.error ? ` First error: ${failed[0].error}` : "") +
+          (recovered[0]?.email ? ` Latest recovered: ${recovered[0].email} (${recovered[0].package_type || recovered[0].action})` : "")
+      );
+      await load();
+    } catch (e) {
+      setMessage(e.message || "Stripe sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-slate-600 p-4">Loading kit fulfillment…</div>;
   }
@@ -167,10 +189,16 @@ export default function KitFulfillmentManager() {
             Purchases auto-email COC + unique label after Stripe checkout.
           </p>
         </div>
-        <Button variant="outline" onClick={load}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onSyncStripe} disabled={syncing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Recover missed Stripe sales"}
+          </Button>
+          <Button variant="outline" onClick={load}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {message && (
