@@ -86,7 +86,7 @@ export default function Layout({ children, currentPageName }) {
                         My Inspections
                       </Link>
                       <Link 
-                        to={createPageUrl("Inspection")} 
+                        to={createPageUrl("StartNewInspection")} 
                         className={`px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50`}
                       >
                         <PlusCircle className="w-4 h-4 inline mr-2" />
@@ -147,7 +147,7 @@ export default function Layout({ children, currentPageName }) {
                       <span className="font-medium">My Inspections</span>
                     </Link>
                     <Link 
-                      to={createPageUrl("Inspection")} 
+                      to={createPageUrl("StartNewInspection")} 
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
                     >

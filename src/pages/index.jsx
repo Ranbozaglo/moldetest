@@ -7,6 +7,7 @@ import InspectionDetails from "./InspectionDetails";
 import SamplingGuide from "./SamplingGuide";
 import ThankYou from "./ThankYou";
 import MyInspections from "./MyInspections";
+import StartNewInspection from "./StartNewInspection";
 import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import ForgotPassword from "./ForgotPassword";
@@ -63,6 +64,7 @@ const PAGES = {
     SamplingGuide: SamplingGuide,
     ThankYou: ThankYou,
     MyInspections: MyInspections,
+    StartNewInspection: StartNewInspection,
     SignIn: SignIn,
     SignUp: SignUp,
     ForgotPassword: ForgotPassword,
@@ -156,6 +158,12 @@ function PagesContent() {
                 <Route path="/MyInspections" element={
                     <ProtectedRoute allowAdmin={false}>
                         <MyInspections />
+                    </ProtectedRoute>
+                } />
+
+                <Route path="/StartNewInspection" element={
+                    <ProtectedRoute allowAdmin={false}>
+                        <StartNewInspection />
                     </ProtectedRoute>
                 } />
                 

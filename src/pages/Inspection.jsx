@@ -480,12 +480,20 @@ export default function Inspection() {
             {hasExistingInspections && !isSubmitted && (
               <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span>You already have inspections on file. This will create another one for a new job or property.</span>
-                <Link
-                  to={createPageUrl("MyInspections")}
-                  className="font-medium text-blue-700 underline whitespace-nowrap"
-                >
-                  Back to My Inspections
-                </Link>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    to={createPageUrl("MyInspections")}
+                    className="font-medium text-blue-700 underline whitespace-nowrap"
+                  >
+                    My Inspections
+                  </Link>
+                  <Link
+                    to={createPageUrl("StartNewInspection")}
+                    className="font-medium text-blue-700 underline whitespace-nowrap"
+                  >
+                    Buy kit / new COC
+                  </Link>
+                </div>
               </div>
             )}
             
