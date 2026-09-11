@@ -10,7 +10,7 @@ logEnvironmentInfo();
 // Helper function for API calls
 const apiCall = async (endpoint, options = {}) => {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  const { timeoutMs: customTimeout, headers: optionHeaders, ...restOptions } = options;
+  const { timeoutMs: customTimeout, headers: optionHeaders, skipAuthRedirect = false, ...restOptions } = options;
   const headers = {
       'Content-Type': 'application/json',
       ...optionHeaders
@@ -23,7 +23,6 @@ const apiCall = async (endpoint, options = {}) => {
     ...restOptions,
     headers,
   };
-  const skipAuthRedirect = Boolean(options.skipAuthRedirect);
 
   // Enhanced logging for production debugging
   const isProduction = window.location.hostname !== 'localhost';
