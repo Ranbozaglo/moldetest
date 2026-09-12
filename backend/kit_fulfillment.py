@@ -564,6 +564,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 "mode": "payment",
                 "line_items": [{"price": price_id, "quantity": 1}],
                 "return_url": return_url,
+                "allow_promotion_codes": True,
                 "metadata": {"package_type": package_type},
             }
             if customer_email:
