@@ -530,6 +530,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         data = request.get_json() or {}
         package_type = (data.get("package_type") or "").strip()
         customer_email = (data.get("email") or "").strip().lower()
+        promotion_code = (data.get("promotion_code") or data.get("coupon") or "").strip()
 
         if package_type not in PACKAGE_TYPES:
             return jsonify({"error": "Invalid package_type"}), 400
@@ -564,11 +565,29 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 "mode": "payment",
                 "line_items": [{"price": price_id, "quantity": 1}],
                 "return_url": return_url,
-                "allow_promotion_codes": True,
                 "metadata": {"package_type": package_type},
             }
             if customer_email:
                 session_params["customer_email"] = customer_email
+
+            # Stripe: cannot combine discounts[] with allow_promotion_codes.
+            # Prefer an explicit code from our UI; otherwise show Stripe's promo field.
+            if promotion_code:
+                promos = stripe.PromotionCode.list(code=promotion_code, active=True, limit=1)
+                promo = (getattr(promos, "data", None) or [None])[0]
+                if not promo:
+                    return jsonify(
+                        {
+                            "error": (
+                                f"Coupon code “{promotion_code}” was not found or is inactive. "
+                                "In Stripe, open your Coupon → create a Promotion code customers can type."
+                            )
+                        }
+                    ), 400
+                session_params["discounts"] = [{"promotion_code": promo.id}]
+                session_params["metadata"]["promotion_code"] = promotion_code
+            else:
+                session_params["allow_promotion_codes"] = True
 
             session = stripe.checkout.Session.create(**session_params)
             return jsonify(
@@ -577,6 +596,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                     "session_id": session.id,
                     "publishable_key": publishable_key,
                     "package_type": package_type,
+                    "promotion_applied": bool(promotion_code),
                 }
             )
         except Exception as e:
