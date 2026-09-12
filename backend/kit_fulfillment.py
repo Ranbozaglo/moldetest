@@ -472,6 +472,113 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    def _resolve_price_id_for_package(package_type: str) -> str:
+        """Map kit package → Stripe Price ID (from prod_… / plink_… / price_…)."""
+        import stripe
+
+        api_key = os.getenv("STRIPE_SECRET_KEY", "")
+        if not api_key:
+            raise RuntimeError("STRIPE_SECRET_KEY not configured on server")
+        stripe.api_key = api_key
+
+        packages = _get_packages()
+        row = next((p for p in packages if p.get("package_type") == package_type), None)
+        if not row:
+            raise ValueError("Unknown package_type")
+
+        stored = (row.get("stripe_payment_link_id") or "").strip()
+        if stored.startswith("price_"):
+            return stored
+
+        if stored.startswith("prod_"):
+            product = stripe.Product.retrieve(stored)
+            default_price = getattr(product, "default_price", None)
+            if hasattr(default_price, "id"):
+                return default_price.id
+            if isinstance(default_price, str) and default_price.startswith("price_"):
+                return default_price
+            prices = stripe.Price.list(product=stored, active=True, limit=10)
+            for price in getattr(prices, "data", None) or []:
+                price_id = getattr(price, "id", None)
+                if price_id:
+                    return price_id
+            raise ValueError(f"No active price found for product {stored}")
+
+        if stored.startswith("plink_"):
+            items = stripe.PaymentLink.list_line_items(stored, limit=5)
+            data = getattr(items, "data", None) or []
+            if not data:
+                raise ValueError(f"Payment link {stored} has no line items")
+            price = getattr(data[0], "price", None)
+            if hasattr(price, "id"):
+                return price.id
+            if isinstance(price, str) and price.startswith("price_"):
+                return price
+            raise ValueError(f"Could not read price from payment link {stored}")
+
+        raise ValueError(
+            "Configure a Product ID (prod_…), Payment Link ID (plink_…), or Price ID (price_…) "
+            "for this package in Admin → Kit Fulfillment"
+        )
+
+    @app.route("/api/kit/checkout/embedded", methods=["POST"])
+    def kit_create_embedded_checkout():
+        """Create a Stripe Embedded Checkout Session for in-page kit purchase."""
+        data = request.get_json() or {}
+        package_type = (data.get("package_type") or "").strip()
+        customer_email = (data.get("email") or "").strip().lower()
+
+        if package_type not in PACKAGE_TYPES:
+            return jsonify({"error": "Invalid package_type"}), 400
+
+        publishable_key = (
+            os.getenv("STRIPE_PUBLISHABLE_KEY")
+            or os.getenv("STRIPE_PUBLISHABLE")
+            or ""
+        ).strip()
+        if not publishable_key:
+            return jsonify(
+                {
+                    "error": "STRIPE_PUBLISHABLE_KEY not configured on server",
+                    "fallback": True,
+                }
+            ), 503
+
+        try:
+            import stripe
+
+            stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+            price_id = _resolve_price_id_for_package(package_type)
+
+            frontend = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
+            return_url = (
+                f"{frontend}/StartNewInspection"
+                f"?checkout=success&session_id={{CHECKOUT_SESSION_ID}}"
+            )
+
+            session_params = {
+                "ui_mode": "embedded",
+                "mode": "payment",
+                "line_items": [{"price": price_id, "quantity": 1}],
+                "return_url": return_url,
+                "metadata": {"package_type": package_type},
+            }
+            if customer_email:
+                session_params["customer_email"] = customer_email
+
+            session = stripe.checkout.Session.create(**session_params)
+            return jsonify(
+                {
+                    "client_secret": session.client_secret,
+                    "session_id": session.id,
+                    "publishable_key": publishable_key,
+                    "package_type": package_type,
+                }
+            )
+        except Exception as e:
+            print(f"❌ KIT: embedded checkout create failed: {e}")
+            return jsonify({"error": str(e), "fallback": True}), 500
+
     @app.route("/api/kit/packages/<package_type>", methods=["PUT"])
     def kit_update_package(package_type):
         if package_type not in PACKAGE_TYPES:

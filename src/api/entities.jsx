@@ -699,6 +699,17 @@ export const EmailService = {
 export const KitService = {
   getPackages: async () => apiCall('/kit/packages'),
 
+  createEmbeddedCheckout: async ({ packageType, email }) =>
+    apiCall('/kit/checkout/embedded', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        package_type: packageType,
+        email: email || '',
+      }),
+      skipAuthRedirect: true,
+    }),
+
   updatePackage: async (packageType, data) => {
     const token = getAuthToken();
     return apiCall(`/kit/packages/${packageType}`, {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { KitService } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
 import { createPageUrl } from "@/utils";
@@ -7,7 +7,14 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Plus, ArrowLeft, RefreshCw, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Package, Plus, ArrowLeft, RefreshCw, Loader2, ExternalLink, X } from "lucide-react";
 import { motion } from "framer-motion";
 
 const PACKAGE_FALLBACKS = [
@@ -25,8 +32,28 @@ function formatPurchaseDate(value) {
   }
 }
 
+function loadStripeJs() {
+  if (typeof window === "undefined") return Promise.reject(new Error("No window"));
+  if (window.Stripe) return Promise.resolve(window.Stripe);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[src="https://js.stripe.com/v3/"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.Stripe));
+      existing.addEventListener("error", () => reject(new Error("Failed to load Stripe.js")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://js.stripe.com/v3/";
+    script.async = true;
+    script.onload = () => resolve(window.Stripe);
+    script.onerror = () => reject(new Error("Failed to load Stripe.js"));
+    document.head.appendChild(script);
+  });
+}
+
 export default function StartNewInspection() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [kitPackages, setKitPackages] = useState([]);
   const [packagesLoading, setPackagesLoading] = useState(true);
@@ -34,17 +61,32 @@ export default function StartNewInspection() {
   const [waitingForPurchase, setWaitingForPurchase] = useState(false);
   const [newPurchase, setNewPurchase] = useState(null);
   const [selectedPackageName, setSelectedPackageName] = useState("");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
+  const [fallbackUrl, setFallbackUrl] = useState("");
+  const [embeddedSession, setEmbeddedSession] = useState(null);
 
   const baselineIdsRef = useRef(new Set());
   const checkoutStartedAtRef = useRef(null);
   const pollTimerRef = useRef(null);
-  const popupRef = useRef(null);
+  const embeddedCheckoutRef = useRef(null);
+  const checkoutMountRef = useRef(null);
 
   const stopPolling = () => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current);
       pollTimerRef.current = null;
     }
+  };
+
+  const destroyEmbeddedCheckout = () => {
+    try {
+      embeddedCheckoutRef.current?.destroy?.();
+    } catch {
+      /* ignore */
+    }
+    embeddedCheckoutRef.current = null;
   };
 
   const fetchDownloads = async () => {
@@ -75,11 +117,8 @@ export default function StartNewInspection() {
         setWaitingForPurchase(false);
         setMessage("New COC and shipping label are ready.");
         stopPolling();
-        try {
-          popupRef.current?.close?.();
-        } catch {
-          /* ignore */
-        }
+        setCheckoutOpen(false);
+        destroyEmbeddedCheckout();
         return true;
       }
     } catch (e) {
@@ -91,12 +130,10 @@ export default function StartNewInspection() {
   const startPolling = () => {
     stopPolling();
     setWaitingForPurchase(true);
-    // Immediate check, then every 4s
     refreshForNewPurchase();
     pollTimerRef.current = setInterval(() => {
       refreshForNewPurchase();
     }, 4000);
-    // Stop after 10 minutes
     setTimeout(() => {
       stopPolling();
       setWaitingForPurchase((stillWaiting) => {
@@ -123,7 +160,6 @@ export default function StartNewInspection() {
         if (cancelled) return;
         setKitPackages(pkgRes.packages || []);
         baselineIdsRef.current = new Set(downloads.map((d) => d.id));
-        // Do not show previous purchases as the "new" kit for this job
         setNewPurchase(null);
       } catch (e) {
         if (!cancelled) setMessage(e.message || "Could not load kit packages");
@@ -134,8 +170,24 @@ export default function StartNewInspection() {
     return () => {
       cancelled = true;
       stopPolling();
+      destroyEmbeddedCheckout();
     };
   }, [user?.email]);
+
+  // After Stripe embedded checkout redirects back with ?checkout=success
+  useEffect(() => {
+    if (!user?.email) return;
+    if (searchParams.get("checkout") !== "success") return;
+    if (!checkoutStartedAtRef.current) {
+      checkoutStartedAtRef.current = new Date().toISOString();
+    }
+    setMessage("Payment received — preparing your new COC and shipping label…");
+    startPolling();
+    const next = new URLSearchParams(searchParams);
+    next.delete("checkout");
+    next.delete("session_id");
+    setSearchParams(next, { replace: true });
+  }, [user?.email, searchParams]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -147,6 +199,45 @@ export default function StartNewInspection() {
     return () => window.removeEventListener("focus", onFocus);
   }, [waitingForPurchase, user?.email]);
 
+  // Mount Stripe Embedded Checkout once the modal + session are ready
+  useEffect(() => {
+    if (!checkoutOpen || !embeddedSession?.client_secret || !embeddedSession?.publishable_key) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const StripeCtor = await loadStripeJs();
+        if (cancelled) return;
+        destroyEmbeddedCheckout();
+        const stripe = StripeCtor(embeddedSession.publishable_key);
+        const checkout = await stripe.initEmbeddedCheckout({
+          clientSecret: embeddedSession.client_secret,
+        });
+        if (cancelled) {
+          checkout.destroy?.();
+          return;
+        }
+        embeddedCheckoutRef.current = checkout;
+        const el = checkoutMountRef.current;
+        if (el) {
+          el.innerHTML = "";
+          checkout.mount(el);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.warn("Stripe mount failed:", e);
+          setCheckoutError(e.message || "Could not load embedded checkout.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutOpen, embeddedSession]);
+
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto py-12 px-6 text-center">
@@ -156,38 +247,74 @@ export default function StartNewInspection() {
     );
   }
 
-  const openKitCheckout = (pkg) => {
+  const buildPaymentUrl = (pkg) => {
     const paymentUrl = pkg?.stripe_payment_link_url;
-    if (!paymentUrl) return;
-
-    setSelectedPackageName(pkg.display_name || pkg.package_type);
-    setNewPurchase(null);
-    setMessage("");
-    checkoutStartedAtRef.current = new Date().toISOString();
-
-    let checkoutUrl = paymentUrl;
+    if (!paymentUrl) return "";
     try {
       const u = new URL(paymentUrl);
       if (user.email) u.searchParams.set("prefilled_email", user.email);
-      checkoutUrl = u.toString();
+      return u.toString();
     } catch {
-      /* use raw url */
+      return paymentUrl;
     }
+  };
 
-    const width = Math.min(520, window.screen.availWidth - 40);
-    const height = Math.min(720, window.screen.availHeight - 80);
-    const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
-    const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
-    const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
-
-    const popup = window.open(checkoutUrl, "tt_stripe_checkout", features);
-    popupRef.current = popup;
-    if (!popup) {
-      setMessage("Popup was blocked. Allow popups for this site, or checkout will open in a new tab.");
-      window.open(checkoutUrl, "_blank");
-    }
-
+  const openFallbackCheckout = (url) => {
+    if (!url) return;
+    setEmbeddedSession(null);
+    setFallbackUrl(url);
+    setCheckoutError(
+      "Embedded checkout is unavailable. Use the secure Stripe link below (opens in a new tab)."
+    );
+    setCheckoutOpen(true);
     startPolling();
+  };
+
+  const openKitCheckout = async (pkg) => {
+    setSelectedPackageName(pkg.display_name || pkg.package_type);
+    setNewPurchase(null);
+    setMessage("");
+    setCheckoutError("");
+    setFallbackUrl("");
+    setEmbeddedSession(null);
+    checkoutStartedAtRef.current = new Date().toISOString();
+    destroyEmbeddedCheckout();
+    setCheckoutOpen(true);
+    setCheckoutLoading(true);
+
+    const paymentUrl = buildPaymentUrl(pkg);
+
+    try {
+      const res = await KitService.createEmbeddedCheckout({
+        packageType: pkg.package_type,
+        email: user.email,
+      });
+      setEmbeddedSession({
+        client_secret: res.client_secret,
+        publishable_key: res.publishable_key,
+      });
+      startPolling();
+    } catch (e) {
+      console.warn("Embedded checkout failed, falling back:", e);
+      if (paymentUrl) {
+        openFallbackCheckout(paymentUrl);
+      } else {
+        setCheckoutError(e.message || "Could not start checkout. Try again or contact support.");
+      }
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
+  const closeCheckoutModal = (open) => {
+    if (!open) {
+      destroyEmbeddedCheckout();
+      setEmbeddedSession(null);
+      setCheckoutOpen(false);
+      // Keep polling if payment may still complete
+    } else {
+      setCheckoutOpen(true);
+    }
   };
 
   const packages = kitPackages.length ? kitPackages : PACKAGE_FALLBACKS;
@@ -229,8 +356,8 @@ export default function StartNewInspection() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-slate-900">Purchase a kit</h3>
                   <p className="text-sm text-slate-600 mt-1 mb-3">
-                    Checkout opens in a popup. Keep this page open — your new COC/label will appear in step 2 automatically
-                    (emailed to <strong>{user.email}</strong>).
+                    Checkout opens in an embedded window on this page. Keep this tab open — your new COC/label
+                    appears in step 2 automatically (emailed to <strong>{user.email}</strong>).
                   </p>
                   {packagesLoading ? (
                     <p className="text-sm text-slate-500 flex items-center gap-2">
@@ -242,7 +369,10 @@ export default function StartNewInspection() {
                       {packages.map((pkg) => (
                         <Button
                           key={pkg.package_type}
-                          disabled={!pkg.stripe_payment_link_url || waitingForPurchase}
+                          disabled={
+                            (!pkg.stripe_payment_link_url && !pkg.stripe_payment_link_id) ||
+                            checkoutLoading
+                          }
                           onClick={() => openKitCheckout(pkg)}
                           className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
                         >
@@ -252,11 +382,12 @@ export default function StartNewInspection() {
                       ))}
                     </div>
                   )}
-                  {!packagesLoading && !packages.some((p) => p.stripe_payment_link_url) && (
-                    <p className="text-xs text-slate-500 mt-2">
-                      Package buy links are not configured yet (Admin → Kit Fulfillment).
-                    </p>
-                  )}
+                  {!packagesLoading &&
+                    !packages.some((p) => p.stripe_payment_link_url || p.stripe_payment_link_id) && (
+                      <p className="text-xs text-slate-500 mt-2">
+                        Package buy links are not configured yet (Admin → Kit Fulfillment).
+                      </p>
+                    )}
                 </div>
               </div>
             </div>
@@ -332,7 +463,8 @@ export default function StartNewInspection() {
                         Waiting for your {selectedPackageName || "kit"} checkout to finish…
                       </div>
                       <p className="mt-1 text-blue-800">
-                        Complete payment in the popup. This box updates automatically when the new COC and label are ready.
+                        Complete payment in the checkout window. This box updates automatically when the new COC and
+                        label are ready.
                       </p>
                       <Button
                         type="button"
@@ -409,6 +541,53 @@ export default function StartNewInspection() {
           </CardContent>
         </Card>
       </motion.div>
+
+      <Dialog open={checkoutOpen} onOpenChange={closeCheckoutModal}>
+        <DialogContent className="max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle>Checkout — {selectedPackageName || "Kit"}</DialogTitle>
+            <DialogDescription>
+              Complete payment below. When Stripe finishes, this page updates with your new COC and shipping label.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            {checkoutLoading && (
+              <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-600">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Loading secure checkout…
+              </div>
+            )}
+            {checkoutError && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {checkoutError}
+                {fallbackUrl && (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => window.open(fallbackUrl, "_blank", "noopener,noreferrer")}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open Stripe checkout
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+            <div ref={checkoutMountRef} id="tt-embedded-checkout" className="min-h-[420px]" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-3 w-full text-slate-500"
+              onClick={() => closeCheckoutModal(false)}
+            >
+              <X className="w-3.5 h-3.5 mr-1" />
+              Close checkout
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
