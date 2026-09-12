@@ -8,6 +8,72 @@ import os
 import json
 from datetime import datetime
 
+
+def _branded_email(
+    *,
+    eyebrow: str,
+    title: str,
+    content_html: str,
+    cta_href: str = "",
+    cta_label: str = "",
+) -> str:
+    """Shared Total Testing email chrome (matches kit purchase style)."""
+    cta = ""
+    if cta_href and cta_label:
+        cta = f"""
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px auto 8px auto;">
+                <tr>
+                  <td align="center" bgcolor="#004aac" style="border-radius:8px;">
+                    <a href="{cta_href}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+                      {cta_label}
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:16px 0 0 0;font-size:13px;line-height:1.5;color:#94a3b8;text-align:center;">
+                If the button does not work, visit:<br>
+                <a href="{cta_href}" style="color:#004aac;word-break:break-all;">{cta_href}</a>
+              </p>"""
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#f1f5f9;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#004aac 0%,#0b2e59 100%);padding:28px 32px;text-align:center;">
+              <img src="{{logo_url}}" alt="Total Testing" width="180" style="display:block;margin:0 auto 12px auto;max-width:180px;height:auto;border:0;border-radius:16px;" />
+              <p style="margin:0;color:#dbeafe;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;">DIY Mold Testing</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;">
+              <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">{eyebrow}</p>
+              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0b2e59;">{title}</h1>
+              {content_html}
+              {cta}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px 32px;border-top:1px solid #e2e8f0;background-color:#f8fafc;">
+              <p style="margin:0 0 6px 0;font-size:14px;color:#334155;">Warm regards,<br><strong>The Total Testing Team</strong></p>
+              <p style="margin:12px 0 0 0;font-size:12px;color:#94a3b8;">Test Before You Guess. · This is an automated message.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
 class EmailService:
     def __init__(self):
         self.smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
@@ -98,251 +164,211 @@ class EmailService:
             },
             "password_reset": {
                 "subject": "Total Testing - Password Reset Request",
-                "body": """<html>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #004aac; margin: 0;">Total Testing</h1>
-            <p style="color: #666; margin: 5px 0 0 0;">DIY Mold Testing</p>
-        </div>
-        
-        <h2 style="color: #004aac;">Password Reset Request</h2>
-        
-        <p>Hi {full_name},</p>
-        
-        <p>We received a request to reset your password for your Total Testing account. If you made this request, click the button below to reset your password:</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-            <a href="{reset_link}" style="background-color: #004aac; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Reset My Password</a>
-        </div>
-        
-        <p>This link will expire in 24 hours for security reasons.</p>
-        
-        <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
-        
-        <p>If the button above doesn't work, you can copy and paste this link into your browser:</p>
-        <p style="word-break: break-all; color: #004aac;">{reset_link}</p>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-        
-        <p style="color: #666; font-size: 14px;">
-            If you have any questions or concerns, please contact our support team.<br>
-            This is an automated message, please do not reply to this email.
-        </p>
-        
-        <p style="color: #666; font-size: 14px;">
-            Best regards,<br>
-            The Total Testing Team
-        </p>
-    </div>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Account security",
+                    title="Password reset request",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                We received a request to reset your password for your Total Testing account. If you made this request, use the button below.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:15px;line-height:1.6;color:#334155;">
+                This link expires in 24 hours. If you did not request a reset, you can safely ignore this email.
+              </p>
+""",
+                    cta_href="{reset_link}",
+                    cta_label="Reset My Password",
+                ),
             },
             "lab_received": {
                 "subject": "Total Testing - Lab Samples Received (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <p>Hi {full_name},</p>
-    
-    <p>Just a quick update, your mold test samples have been received by our lab and are now being processed.</p>
-    
-    <p>Our team is reviewing the findings and preparing your personalized report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
-    
-    <p>You can track the status of your report here: <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold;">Track My Report</a></p>
-    
-    <p>We'll notify you the moment your report is ready.</p>
-    
-    <p>Thank you for trusting Total Testing with your health and home!</p>
-    
-    <br>
-    <p>Warm regards,<br>Total Testing</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Lab update · Inspection #{inspection_number}",
+                    title="Your samples have been received",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your mold test samples are at our lab and are now being processed.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Our team is preparing your personalized report. You can expect full results and expert interpretation within 48–72 business hours.
+              </p>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="Track My Report",
+                ),
             },
             "lab_received_asbestos": {
                 "subject": "Total Testing - Asbestos Lab Samples Received (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <p>Hi {full_name},</p>
-    
-    <p>Just a quick update, your asbestos test samples have been received by our lab and are now being processed.</p>
-    
-    <p>Our team is reviewing the findings and preparing your personalized asbestos analysis report. You can expect to receive your full results and expert interpretation within 48–72 business hours.</p>
-    
-    <p>You can track the status of your report here: <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold;">Track My Report</a></p>
-    
-    <p>We'll notify you the moment your report is ready.</p>
-    
-    <p>Thank you for trusting Total Testing with your asbestos testing needs!</p>
-    
-    <br>
-    <p>Warm regards,<br>Total Testing</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Lab update · Inspection #{inspection_number}",
+                    title="Your asbestos samples have been received",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your asbestos test samples are at our lab and are now being processed.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Our team is preparing your asbestos analysis report. You can expect full results and expert interpretation within 48–72 business hours.
+              </p>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="Track My Report",
+                ),
             },
             "report_ready": {
                 "subject": "Total Testing - Report Ready (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <p>Hi {full_name},</p>
-    
-    <p>Your lab results and mold inspection report are now ready to view in your secure portal.</p>
-    
-    <p><strong>This report includes:</strong></p>
-    <ul style="margin-left: 20px; line-height: 1.6;">
-        <li>Inspection finding</li>
-        <li>Lab-verified analysis of your samples</li>
-        <li>Mold types identified and spore levels</li>
-        <li>Professional interpretation and next steps (if needed)</li>
-    </ul>
-    
-    <p>🔗 View your report now by visiting your portal:</p>
-    <p>👉 <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold; background-color: #f0f8ff; padding: 8px 16px; border-radius: 5px; display: inline-block;">Access Your Report</a></p>
-    
-    <br>
-    <p>Thanks again for choosing Total Testing!</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Results ready · Inspection #{inspection_number}",
+                    title="Your mold report is ready",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your lab results and mold inspection report are ready to view in your secure portal.
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">This report includes</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Inspection findings</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Lab-verified sample analysis</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Mold types and spore levels</p>
+                    <p style="margin:0;font-size:15px;color:#334155;">&#10003; Professional interpretation and next steps</p>
+                  </td>
+                </tr>
+              </table>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="Access Your Report",
+                ),
             },
             "report_ready_asbestos": {
                 "subject": "Total Testing - Asbestos Report Ready (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <p>Hi {full_name},</p>
-    
-    <p>Your lab results and asbestos inspection report are now ready to view in your secure portal.</p>
-    
-    <p><strong>This report includes:</strong></p>
-    <ul style="margin-left: 20px; line-height: 1.6;">
-        <li>Asbestos inspection findings</li>
-        <li>Lab-verified analysis of your samples</li>
-        <li>Asbestos types identified and concentration levels</li>
-        <li>Material condition assessment</li>
-        <li>Professional interpretation and next steps (if needed)</li>
-    </ul>
-    
-    <p>🔗 View your report now by visiting your portal:</p>
-    <p>👉 <a href="{dashboard_url}" style="color: #004aac; text-decoration: none; font-weight: bold; background-color: #f0f8ff; padding: 8px 16px; border-radius: 5px; display: inline-block;">Access Your Report</a></p>
-    
-    <br>
-    <p>Thanks again for choosing Total Testing!</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Results ready · Inspection #{inspection_number}",
+                    title="Your asbestos report is ready",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your lab results and asbestos inspection report are ready to view in your secure portal.
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 8px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">This report includes</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Asbestos inspection findings</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Lab-verified sample analysis</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Asbestos types and concentration levels</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Material condition assessment</p>
+                    <p style="margin:0;font-size:15px;color:#334155;">&#10003; Professional interpretation and next steps</p>
+                  </td>
+                </tr>
+              </table>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="Access Your Report",
+                ),
             },
             "review_request": {
                 "subject": "Total Testing - Review Request (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <h2>Total Testing - Review Request</h2>
-    <p>Dear {full_name},</p>
-    <p>Thank you for using our mold testing services. We hope you found our service helpful.</p>
-    <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
-    <p>Thank you for choosing Total Testing.</p>
-    <br>
-    <p>Best regards,<br>Total Testing Team</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="We value your feedback · Inspection #{inspection_number}",
+                    title="Would you leave us a quick review?",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Thank you again for trusting Total Testing. We hope your experience was smooth, informative, and gave you peace of mind.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
+                If you found our service helpful, a short Google review helps others find reliable help when they need it most.
+              </p>
+""",
+                    cta_href="https://g.page/r/CYI0lXIHJ-W-EBE/review",
+                    cta_label="Leave a Google Review",
+                ),
             },
             "review_request_asbestos": {
                 "subject": "Total Testing - Asbestos Review Request (Inspection #{inspection_number})",
-                "body": """<html>
-<body>
-    <h2>Total Testing - Asbestos Review Request</h2>
-    <p>Dear {full_name},</p>
-    <p>Thank you for using our asbestos testing services. We hope you found our service helpful.</p>
-    <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
-    <p>Thank you for choosing Total Testing.</p>
-    <br>
-    <p>Best regards,<br>Total Testing Team</p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="We value your feedback · Inspection #{inspection_number}",
+                    title="Would you leave us a quick review?",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Thank you for using our asbestos testing services. We hope you found the experience helpful.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
+                If you could take a moment to leave a review, it would mean a lot to us and help other customers make informed decisions.
+              </p>
+""",
+                    cta_href="https://g.page/r/CYI0lXIHJ-W-EBE/review",
+                    cta_label="Leave a Google Review",
+                ),
             },
             "inspection_created": {
                 "subject": "Welcome to Total Testing - Inspection #{inspection_number} Created",
-                "body": """<html>
-<body>
-    <h2>Welcome to Total Testing!</h2>
-    <p>Dear {full_name},</p>
-    <p>Congratulations! Your mold inspection has been successfully created.</p>
-    
-    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-        <h3 style="color: #004aac; margin-top: 0;">Your Inspection Details:</h3>
-        <p><strong>Inspection Number:</strong> {inspection_number}</p>
-        <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
-        <p><strong>Status:</strong> Ready for Sample Collection</p>
-    </div>
-    
-    <h3>📋 Next Steps:</h3>
-    <ol>
-        <li><strong>Collect Your Samples:</strong> Follow the sampling guide provided during your inspection setup</li>
-        <li><strong>Send Samples to Lab:</strong> Use the prepaid shipping materials to send your samples</li>
-        <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
-        <li><strong>Receive Results:</strong> Get your detailed report within 3-5 business days</li>
-    </ol>
-    
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            View My Inspections
-        </a>
-    </div>
-    
-    <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-    <p>Thank you for choosing Total Testing for your mold inspection needs!</p>
-    
-    <br>
-    <p>Best regards,<br>The Total Testing Team</p>
-    
-    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
-    <p style="font-size: 12px; color: #6c757d;">
-        This email was sent to {email} regarding inspection #{inspection_number}. 
-        You received this because you created a new mold inspection with Total Testing.
-    </p>
-</body>
-</html>"""
+                "body": _branded_email(
+                    eyebrow="Welcome · Inspection #{inspection_number}",
+                    title="Your mold inspection is set up",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your mold inspection has been created successfully. Here are the details:
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">Inspection details</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;"><strong>Number:</strong> {inspection_number}</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;"><strong>Property:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
+                    <p style="margin:0;font-size:15px;color:#334155;"><strong>Status:</strong> Ready for sample collection</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0b2e59;">Next steps</p>
+              <ol style="margin:0 0 8px 0;padding-left:22px;font-size:15px;line-height:1.7;color:#334155;">
+                <li>Collect your samples using the sampling guide</li>
+                <li>Send samples to the lab with your prepaid label</li>
+                <li>Track progress in your dashboard</li>
+                <li>Receive your detailed report within a few business days</li>
+              </ol>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="View My Inspections",
+                ),
             },
             "inspection_created_asbestos": {
                 "subject": "Welcome to Total Testing - Asbestos Inspection #{inspection_number} Created",
-                "body": """<html>
-<body>
-    <h2>Welcome to Total Testing!</h2>
-    <p>Dear {full_name},</p>
-    <p>Congratulations! Your asbestos inspection has been successfully created.</p>
-    
-    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0;">
-        <h3 style="color: #004aac; margin-top: 0;">Your Asbestos Inspection Details:</h3>
-        <p><strong>Inspection Number:</strong> {inspection_number}</p>
-        <p><strong>Property Address:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
-        <p><strong>Status:</strong> Ready for Sample Collection</p>
-    </div>
-    
-    <h3>📋 Next Steps:</h3>
-    <ol>
-        <li><strong>Collect Your Samples:</strong> Follow the asbestos sampling guide provided during your inspection setup</li>
-        <li><strong>Send Samples to Lab:</strong> Use the prepaid shipping materials to send your samples</li>
-        <li><strong>Track Progress:</strong> Monitor your inspection status in your dashboard</li>
-        <li><strong>Receive Results:</strong> Get your detailed asbestos analysis report within 3-5 business days</li>
-    </ol>
-    
-    <div style="text-align: center; margin: 30px 0;">
-        <a href="{dashboard_url}" style="background-color: #004aac; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            View My Inspections
-        </a>
-    </div>
-    
-    <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-    <p>Thank you for choosing Total Testing for your asbestos inspection needs!</p>
-    
-    <br>
-    <p>Best regards,<br>The Total Testing Team</p>
-    
-    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
-    <p style="font-size: 12px; color: #6c757d;">
-        This email was sent to {email} regarding asbestos inspection #{inspection_number}. 
-        You received this because you created a new asbestos inspection with Total Testing.
-    </p>
-</body>
-</html>"""
-            }
+                "body": _branded_email(
+                    eyebrow="Welcome · Inspection #{inspection_number}",
+                    title="Your asbestos inspection is set up",
+                    content_html="""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
+              <p style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Your asbestos inspection has been created successfully. Here are the details:
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">Inspection details</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;"><strong>Number:</strong> {inspection_number}</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;"><strong>Property:</strong> {street_address}{unit_number}, {city}, {state} {zip_code}</p>
+                    <p style="margin:0;font-size:15px;color:#334155;"><strong>Status:</strong> Ready for sample collection</p>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0b2e59;">Next steps</p>
+              <ol style="margin:0 0 8px 0;padding-left:22px;font-size:15px;line-height:1.7;color:#334155;">
+                <li>Collect your samples using the asbestos sampling guide</li>
+                <li>Send samples to the lab with your prepaid label</li>
+                <li>Track progress in your dashboard</li>
+                <li>Receive your detailed asbestos report within a few business days</li>
+              </ol>
+""",
+                    cta_href="{dashboard_url}",
+                    cta_label="View My Inspections",
+                ),
+            },
         }
         
         # Debug logging
@@ -514,84 +540,28 @@ class EmailService:
         )
     
     def send_lab_received_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send lab received notification email
-        """
-        subject = f"Total Testing - Lab Samples Received (Inspection #{inspection_data.get('inspection_number', 'N/A')})"
-        
-        body = f"""
-        <html>
-        <body>
-            <h2>Total Testing - Lab Samples Received</h2>
-            <p>Dear {inspection_data.get('full_name', 'Valued Customer')},</p>
-            <p>We have received your mold testing samples for inspection #{inspection_data.get('inspection_number', 'N/A')}.</p>
-            <p>Our laboratory is now processing your samples and will provide results within 3-5 business days.</p>
-            <p>We will notify you as soon as your report is ready.</p>
-            <p>Thank you for choosing Total Testing.</p>
-            <br>
-            <p>Best regards,<br>Total Testing Team</p>
-        </body>
-        </html>
-        """ 
-        
-        return self.send_email(
-            inspection_data.get('email'),
-            subject,
-            body
-        )
+        """Send lab received notification email"""
+        template = self.resolve_template('lab_received')
+        vars_map = self.enrich_template_data(inspection_data)
+        subject = self.format_template(template['subject'], vars_map)
+        body = self.format_template(template['body'], vars_map)
+        return self.send_email(inspection_data.get('email'), subject, body)
     
     def send_report_ready_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send report ready notification email
-        """
-        subject = f"Total Testing - Report Ready (Inspection #{inspection_data.get('inspection_number', 'N/A')})"
-        
-        body = f"""
-        <html>
-        <body>
-            <h2>Total Testing - Report Ready</h2>
-            <p>Dear {inspection_data.get('full_name', 'Valued Customer')},</p>
-            <p>Your Total Testing report for inspection #{inspection_data.get('inspection_number', 'N/A')} is now ready.</p>
-            <p>You can download your report from your account dashboard.</p>
-            <p>If you have any questions about your results, please don't hesitate to contact us.</p>
-            <p>Thank you for choosing Total Testing.</p>
-            <br>
-            <p>Best regards,<br>Total Testing Team</p>
-        </body>
-        </html>
-        """
-        
-        return self.send_email(
-            inspection_data.get('email'),
-            subject,
-            body
-        )
+        """Send report ready notification email"""
+        template = self.resolve_template('report_ready')
+        vars_map = self.enrich_template_data(inspection_data)
+        subject = self.format_template(template['subject'], vars_map)
+        body = self.format_template(template['body'], vars_map)
+        return self.send_email(inspection_data.get('email'), subject, body)
     
     def send_review_request_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send review request email
-        """
-        subject = f"Total Testing - Review Request (Inspection #{inspection_data.get('inspection_number', 'N/A')})"
-        
-        body = f"""
-        <html>
-        <body>
-            <h2>Total Testing - Review Request</h2>
-            <p>Dear {inspection_data.get('full_name', 'Valued Customer')},</p>
-            <p>Thank you for using our mold testing services. We hope you found our service helpful.</p>
-            <p>If you could take a moment to leave us a review, it would mean a lot to us and help other customers make informed decisions.</p>
-            <p>Thank you for choosing Total Testing.</p>
-            <br>
-            <p>Best regards,<br>Total Testing Team</p>
-        </body>
-        </html>
-        """
-        
-        return self.send_email(
-            inspection_data.get('email'),
-            subject,
-            body
-        )
+        """Send review request email"""
+        template = self.resolve_template('review_request')
+        vars_map = self.enrich_template_data(inspection_data)
+        subject = self.format_template(template['subject'], vars_map)
+        body = self.format_template(template['body'], vars_map)
+        return self.send_email(inspection_data.get('email'), subject, body)
     
     def get_templates(self) -> Dict[str, Any]:
         """
@@ -665,6 +635,46 @@ class EmailService:
             raw = f'https://{raw}'
         return raw or 'https://total-testing-diy.com'
 
+    def email_logo_url(self) -> str:
+        return os.getenv('EMAIL_LOGO_URL') or f"{self.frontend_base_url()}/logos.png"
+
+    def _unwrap_templates(self, templates: Any) -> Dict[str, Any]:
+        if isinstance(templates, dict) and 'templates' in templates:
+            return templates.get('templates') or {}
+        return templates if isinstance(templates, dict) else {}
+
+    def resolve_template(self, key: str) -> Dict[str, Any]:
+        """Prefer branded default when saved admin template lacks logo branding."""
+        saved_map = self._unwrap_templates(self.get_templates())
+        default = self.default_templates.get(key) or {}
+        saved = saved_map.get(key) or {}
+        if saved and '{logo_url}' in str(saved.get('body') or ''):
+            return saved
+        return default or saved
+
+    def enrich_template_data(self, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        out = dict(data or {})
+        base = self.frontend_base_url()
+        out.setdefault('dashboard_url', f"{base}/MyInspections")
+        out['logo_url'] = self.email_logo_url()
+        out.setdefault('full_name', out.get('full_name') or 'Customer')
+        for key in (
+            'street_address',
+            'city',
+            'state',
+            'zip_code',
+            'email',
+            'inspection_number',
+            'reset_link',
+        ):
+            out.setdefault(key, '')
+        unit = str(out.get('unit_number') or '').strip()
+        if unit and not unit.startswith(','):
+            out['unit_number'] = f", {unit}"
+        else:
+            out['unit_number'] = unit
+        return out
+
     def format_template(self, template: str, data: Dict[str, Any]) -> str:
         """
         Format template string with data variables
@@ -682,187 +692,91 @@ class EmailService:
             return template
     
     def send_lab_received_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send lab received notification email using stored template
-        """
+        """Send lab received notification email using stored template"""
         try:
-            templates = self.get_templates()
-            
-            # Determine template based on inspection type
             inspection_type = inspection_data.get('inspection_type', 'mold')
-            if inspection_type == 'asbestos':
-                template = templates.get('lab_received_asbestos', self.default_templates['lab_received_asbestos'])
-            else:
-                template = templates.get('lab_received', self.default_templates['lab_received'])
-            
-            # Add dashboard URL to inspection data
-            inspection_data_with_url = inspection_data.copy()
-            dashboard_url = self.frontend_base_url() + '/MyInspections'
-            inspection_data_with_url['dashboard_url'] = dashboard_url
-            
-            subject = self.format_template(template['subject'], inspection_data_with_url)
-            body = self.format_template(template['body'], inspection_data_with_url)
-            
+            key = 'lab_received_asbestos' if inspection_type == 'asbestos' else 'lab_received'
+            template = self.resolve_template(key)
+            vars_map = self.enrich_template_data(inspection_data)
+            subject = self.format_template(template['subject'], vars_map)
+            body = self.format_template(template['body'], vars_map)
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending templated lab received email: {e}")
-            # Fallback to original method
             return self.send_lab_received_email(inspection_data)
-    
+
     def send_report_ready_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send report ready notification email using stored template
-        """
+        """Send report ready notification email using stored template"""
         try:
-            templates = self.get_templates()
-            
-            # Determine template based on inspection type
             inspection_type = inspection_data.get('inspection_type', 'mold')
-            if inspection_type == 'asbestos':
-                template = templates.get('report_ready_asbestos', self.default_templates['report_ready_asbestos'])
-            else:
-                template = templates.get('report_ready', self.default_templates['report_ready'])
-            
-            # Add dashboard URL to inspection data
-            inspection_data_with_url = inspection_data.copy()
-            dashboard_url = self.frontend_base_url() + '/MyInspections'
-            inspection_data_with_url['dashboard_url'] = dashboard_url
-            
-            subject = self.format_template(template['subject'], inspection_data_with_url)
-            body = self.format_template(template['body'], inspection_data_with_url)
-            
+            key = 'report_ready_asbestos' if inspection_type == 'asbestos' else 'report_ready'
+            template = self.resolve_template(key)
+            vars_map = self.enrich_template_data(inspection_data)
+            subject = self.format_template(template['subject'], vars_map)
+            body = self.format_template(template['body'], vars_map)
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending templated report ready email: {e}")
-            # Fallback to original method
             return self.send_report_ready_email(inspection_data)
-    
+
     def send_review_request_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send review request email using stored template
-        """
+        """Send review request email using stored template"""
         try:
-            templates = self.get_templates()
-            
-            # Determine template based on inspection type
             inspection_type = inspection_data.get('inspection_type', 'mold')
-            if inspection_type == 'asbestos':
-                template = templates.get('review_request_asbestos', self.default_templates['review_request_asbestos'])
-            else:
-                template = templates.get('review_request', self.default_templates['review_request'])
-            
-            # Add dashboard URL to inspection data (for future template use)
-            inspection_data_with_url = inspection_data.copy()
-            dashboard_url = self.frontend_base_url() + '/MyInspections'
-            inspection_data_with_url['dashboard_url'] = dashboard_url
-            
-            subject = self.format_template(template['subject'], inspection_data_with_url)
-            body = self.format_template(template['body'], inspection_data_with_url)
-            
+            key = 'review_request_asbestos' if inspection_type == 'asbestos' else 'review_request'
+            template = self.resolve_template(key)
+            vars_map = self.enrich_template_data(inspection_data)
+            subject = self.format_template(template['subject'], vars_map)
+            body = self.format_template(template['body'], vars_map)
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending templated review request email: {e}")
-            # Fallback to original method
             return self.send_review_request_email(inspection_data)
-    
+
     def send_inspection_created_email_with_template(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Send inspection created welcome email using stored template
-        """
+        """Send inspection created welcome email using stored template"""
         try:
             print(f"🔍 EMAIL DEBUG: Sending inspection created email with template")
-            print(f"🔍 EMAIL DEBUG: Inspection data: {inspection_data}")
-            
-            templates = self.get_templates()
-            
-            # Determine template based on inspection type
             inspection_type = inspection_data.get('inspection_type', 'mold')
-            if inspection_type == 'asbestos':
-                template = templates.get('inspection_created_asbestos', self.default_templates['inspection_created_asbestos'])
-            else:
-                template = templates.get('inspection_created', self.default_templates['inspection_created'])
-            
-            # Add dashboard URL to inspection data
-            inspection_data_with_url = inspection_data.copy()
-            dashboard_url = self.frontend_base_url() + '/MyInspections'
-            inspection_data_with_url['dashboard_url'] = dashboard_url
-            
-            # Handle missing address fields gracefully
-            inspection_data_with_url['unit_number'] = inspection_data.get('unit_number', '')
-            if inspection_data_with_url['unit_number']:
-                inspection_data_with_url['unit_number'] = f", {inspection_data_with_url['unit_number']}"
-            
-            # Ensure all required fields have defaults
-            inspection_data_with_url.setdefault('street_address', 'Not provided')
-            inspection_data_with_url.setdefault('city', 'Not provided')
-            inspection_data_with_url.setdefault('state', 'Not provided')
-            inspection_data_with_url.setdefault('zip_code', 'Not provided')
-            
-            subject = self.format_template(template['subject'], inspection_data_with_url)
-            body = self.format_template(template['body'], inspection_data_with_url)
-            
-            print(f"🔍 EMAIL DEBUG: Formatted subject: {subject}")
-            print(f"🔍 EMAIL DEBUG: Sending to email: {inspection_data.get('email')}")
-            
+            key = 'inspection_created_asbestos' if inspection_type == 'asbestos' else 'inspection_created'
+            template = self.resolve_template(key)
+            vars_map = self.enrich_template_data(inspection_data)
+            subject = self.format_template(template['subject'], vars_map)
+            body = self.format_template(template['body'], vars_map)
             return self.send_email(inspection_data.get('email'), subject, body)
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending templated inspection created email: {e}")
             return {
                 "success": False,
                 "error": f"Failed to send inspection created email: {str(e)}",
-                "message": "Error in send_inspection_created_email_with_template"
+                "message": "Error in send_inspection_created_email_with_template",
             }
-    
+
     def send_password_reset_email(self, reset_data: Dict[str, Any]) -> bool:
-        """
-        Send password reset email with template
-        
-        Args:
-            reset_data: Dictionary containing:
-                - email: User's email address
-                - full_name: User's full name (optional)
-                - reset_link: Password reset link
-                - token: Reset token (for logging)
-        
-        Returns:
-            bool: True if email sent successfully, False otherwise
-        """
+        """Send password reset email with branded template"""
         try:
             print(f"🔧 EMAIL DEBUG: Sending password reset email to {reset_data.get('email')}")
-            
-            # Get templates and find password reset template
-            templates = self.get_templates()
-            template = templates.get('password_reset', self.default_templates.get('password_reset'))
-            
+            template = self.resolve_template('password_reset')
             if not template:
                 print("❌ EMAIL DEBUG: Password reset template not found")
                 return False
-            
-            # Prepare template variables
-            template_vars = {
+            template_vars = self.enrich_template_data({
                 'full_name': reset_data.get('full_name', 'User'),
                 'reset_link': reset_data.get('reset_link', ''),
-                'email': reset_data.get('email', '')
-            }
-            
-            # Format subject and body
-            subject = template['subject'].format(**template_vars)
-            body = template['body'].format(**template_vars)
-            
-            # Send email
+                'email': reset_data.get('email', ''),
+            })
+            subject = self.format_template(template['subject'], template_vars)
+            body = self.format_template(template['body'], template_vars)
             result = self.send_email(
                 to_email=reset_data['email'],
                 subject=subject,
-                body=body
+                body=body,
             )
-            
             if result.get('success'):
                 print(f"✅ EMAIL DEBUG: Password reset email sent successfully to {reset_data.get('email')}")
                 return True
-            else:
-                print(f"❌ EMAIL DEBUG: Failed to send password reset email: {result.get('error')}")
-                return False
-                
+            print(f"❌ EMAIL DEBUG: Failed to send password reset email: {result.get('error')}")
+            return False
         except Exception as e:
             print(f"❌ EMAIL DEBUG: Error sending password reset email: {e}")
             return False
