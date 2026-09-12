@@ -7,15 +7,8 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Package, Plus, ArrowLeft, RefreshCw, Loader2, ExternalLink, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 const PACKAGE_ORDER = ["spot_check", "extended", "full_house"];
 
@@ -71,7 +64,8 @@ export default function StartNewInspection() {
   const [waitingForPurchase, setWaitingForPurchase] = useState(false);
   const [newPurchase, setNewPurchase] = useState(null);
   const [selectedPackageName, setSelectedPackageName] = useState("");
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [selectedPackageType, setSelectedPackageType] = useState("");
+  const [checkoutExpanded, setCheckoutExpanded] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
@@ -82,6 +76,7 @@ export default function StartNewInspection() {
   const pollTimerRef = useRef(null);
   const embeddedCheckoutRef = useRef(null);
   const checkoutMountRef = useRef(null);
+  const checkoutPanelRef = useRef(null);
 
   const stopPolling = () => {
     if (pollTimerRef.current) {
@@ -127,7 +122,8 @@ export default function StartNewInspection() {
         setWaitingForPurchase(false);
         setMessage("New COC and shipping label are ready.");
         stopPolling();
-        setCheckoutOpen(false);
+        setCheckoutExpanded(false);
+        setEmbeddedSession(null);
         destroyEmbeddedCheckout();
         return true;
       }
@@ -209,9 +205,9 @@ export default function StartNewInspection() {
     return () => window.removeEventListener("focus", onFocus);
   }, [waitingForPurchase, user?.email]);
 
-  // Mount Stripe Embedded Checkout once the modal + session are ready
+  // Mount Stripe Embedded Checkout once the expanded panel + session are ready
   useEffect(() => {
-    if (!checkoutOpen || !embeddedSession?.client_secret || !embeddedSession?.publishable_key) {
+    if (!checkoutExpanded || !embeddedSession?.client_secret || !embeddedSession?.publishable_key) {
       return undefined;
     }
     let cancelled = false;
@@ -235,6 +231,7 @@ export default function StartNewInspection() {
           el.innerHTML = "";
           checkout.mount(el);
         }
+        checkoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (e) {
         if (!cancelled) {
           console.warn("Stripe mount failed:", e);
@@ -246,7 +243,7 @@ export default function StartNewInspection() {
     return () => {
       cancelled = true;
     };
-  }, [checkoutOpen, embeddedSession]);
+  }, [checkoutExpanded, embeddedSession]);
 
   if (!user) {
     return (
@@ -276,12 +273,16 @@ export default function StartNewInspection() {
     setCheckoutError(
       "Embedded checkout is unavailable. Use the secure Stripe link below (opens in a new tab)."
     );
-    setCheckoutOpen(true);
+    setCheckoutExpanded(true);
     startPolling();
+    requestAnimationFrame(() => {
+      checkoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
   };
 
   const openKitCheckout = async (pkg) => {
     setSelectedPackageName(pkg.display_name || pkg.package_type);
+    setSelectedPackageType(pkg.package_type);
     setNewPurchase(null);
     setMessage("");
     setCheckoutError("");
@@ -289,8 +290,11 @@ export default function StartNewInspection() {
     setEmbeddedSession(null);
     checkoutStartedAtRef.current = new Date().toISOString();
     destroyEmbeddedCheckout();
-    setCheckoutOpen(true);
+    setCheckoutExpanded(true);
     setCheckoutLoading(true);
+    requestAnimationFrame(() => {
+      checkoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
 
     const paymentUrl = buildPaymentUrl(pkg);
 
@@ -316,15 +320,12 @@ export default function StartNewInspection() {
     }
   };
 
-  const closeCheckoutModal = (open) => {
-    if (!open) {
-      destroyEmbeddedCheckout();
-      setEmbeddedSession(null);
-      setCheckoutOpen(false);
-      // Keep polling if payment may still complete
-    } else {
-      setCheckoutOpen(true);
-    }
+  const collapseCheckout = () => {
+    destroyEmbeddedCheckout();
+    setEmbeddedSession(null);
+    setCheckoutExpanded(false);
+    setCheckoutError("");
+    setFallbackUrl("");
   };
 
   const packages = sortPackages(kitPackages.length ? kitPackages : PACKAGE_FALLBACKS);
@@ -366,8 +367,8 @@ export default function StartNewInspection() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-slate-900">Purchase a kit</h3>
                   <p className="text-sm text-slate-600 mt-1 mb-3">
-                    Checkout opens in an embedded window on this page. Keep this tab open — your new COC/label
-                    appears in step 2 automatically (emailed to <strong>{user.email}</strong>).
+                    Choose a package — checkout expands below. Keep this page open; your new COC/label appears in
+                    step 2 automatically (emailed to <strong>{user.email}</strong>).
                   </p>
                   {packagesLoading ? (
                     <p className="text-sm text-slate-500 flex items-center gap-2">
@@ -376,20 +377,27 @@ export default function StartNewInspection() {
                     </p>
                   ) : (
                     <div className="grid sm:grid-cols-3 gap-3">
-                      {packages.map((pkg) => (
-                        <Button
-                          key={pkg.package_type}
-                          disabled={
-                            (!pkg.stripe_payment_link_url && !pkg.stripe_payment_link_id) ||
-                            checkoutLoading
-                          }
-                          onClick={() => openKitCheckout(pkg)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white h-auto py-3"
-                        >
-                          <Package className="w-4 h-4 mr-2" />
-                          {pkg.display_name}
-                        </Button>
-                      ))}
+                      {packages.map((pkg) => {
+                        const selected = selectedPackageType === pkg.package_type && checkoutExpanded;
+                        return (
+                          <Button
+                            key={pkg.package_type}
+                            disabled={
+                              (!pkg.stripe_payment_link_url && !pkg.stripe_payment_link_id) ||
+                              checkoutLoading
+                            }
+                            onClick={() => openKitCheckout(pkg)}
+                            className={`h-auto py-3 text-white ${
+                              selected
+                                ? "bg-blue-800 hover:bg-blue-800 ring-2 ring-blue-300 ring-offset-2"
+                                : "bg-blue-600 hover:bg-blue-700"
+                            }`}
+                          >
+                            <Package className="w-4 h-4 mr-2" />
+                            {pkg.display_name}
+                          </Button>
+                        );
+                      })}
                     </div>
                   )}
                   {!packagesLoading &&
@@ -398,6 +406,76 @@ export default function StartNewInspection() {
                         Package buy links are not configured yet (Admin → Kit Fulfillment).
                       </p>
                     )}
+
+                  <AnimatePresence initial={false}>
+                    {checkoutExpanded && (
+                      <motion.div
+                        ref={checkoutPanelRef}
+                        key="checkout-panel"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                Checkout — {selectedPackageName || "Kit"}
+                              </p>
+                              <p className="text-sm text-slate-600 mt-0.5">
+                                Complete payment below. Step 2 updates when your new COC and label are ready.
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="shrink-0 text-slate-500"
+                              onClick={collapseCheckout}
+                            >
+                              <X className="w-4 h-4 mr-1" />
+                              Close
+                            </Button>
+                          </div>
+
+                          {checkoutLoading && (
+                            <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-600">
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              Loading secure checkout…
+                            </div>
+                          )}
+
+                          {checkoutError && (
+                            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                              {checkoutError}
+                              {fallbackUrl && (
+                                <div className="mt-3">
+                                  <Button
+                                    type="button"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={() =>
+                                      window.open(fallbackUrl, "_blank", "noopener,noreferrer")
+                                    }
+                                  >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    Open Stripe checkout
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div
+                            ref={checkoutMountRef}
+                            id="tt-embedded-checkout"
+                            className={checkoutLoading ? "hidden" : "min-h-[380px]"}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
@@ -473,8 +551,8 @@ export default function StartNewInspection() {
                         Waiting for your {selectedPackageName || "kit"} checkout to finish…
                       </div>
                       <p className="mt-1 text-blue-800">
-                        Complete payment in the checkout window. This box updates automatically when the new COC and
-                        label are ready.
+                        Complete payment in the checkout section above. This box updates automatically when the new
+                        COC and label are ready.
                       </p>
                       <Button
                         type="button"
@@ -551,53 +629,6 @@ export default function StartNewInspection() {
           </CardContent>
         </Card>
       </motion.div>
-
-      <Dialog open={checkoutOpen} onOpenChange={closeCheckoutModal}>
-        <DialogContent className="max-w-lg sm:max-w-xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle>Checkout — {selectedPackageName || "Kit"}</DialogTitle>
-            <DialogDescription>
-              Complete payment below. When Stripe finishes, this page updates with your new COC and shipping label.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-6 pb-6">
-            {checkoutLoading && (
-              <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-600">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Loading secure checkout…
-              </div>
-            )}
-            {checkoutError && (
-              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                {checkoutError}
-                {fallbackUrl && (
-                  <div className="mt-3">
-                    <Button
-                      type="button"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => window.open(fallbackUrl, "_blank", "noopener,noreferrer")}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Open Stripe checkout
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-            <div ref={checkoutMountRef} id="tt-embedded-checkout" className="min-h-[420px]" />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="mt-3 w-full text-slate-500"
-              onClick={() => closeCheckoutModal(false)}
-            >
-              <X className="w-3.5 h-3.5 mr-1" />
-              Close checkout
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
