@@ -907,56 +907,6 @@ export default function MyInspections() {
           </Button>
         </div>
 
-        {kitDownloads.length > 0 && (
-          <Card className="mb-8 border-green-100">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="w-5 h-5" />
-                Your COC &amp; shipping labels
-              </CardTitle>
-              <p className="text-sm text-slate-600 font-normal">
-                Newest purchases appear first. Linked to {currentUser?.email || user?.email}.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {kitDownloads.map((d, index) => (
-                <div
-                  key={d.id}
-                  className={`rounded-lg border p-4 ${index === 0 ? "border-green-300 bg-green-50/50" : "border-slate-200"}`}
-                >
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <div className="font-medium text-slate-900">{d.package_name}</div>
-                    {index === 0 && (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Newest</Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mb-2">
-                    Purchased {formatPurchaseDate(d.created_at)}
-                    {d.shipping_label_name ? ` · Label file: ${d.shipping_label_name}` : ""}
-                  </p>
-                  <div className="flex flex-wrap gap-3 text-sm">
-                    {d.coc_url && (
-                      <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download COC
-                      </a>
-                    )}
-                    {d.shipping_label_url && (
-                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download shipping label
-                      </a>
-                    )}
-                    {d.instructions_url && (
-                      <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
-                        Download instructions
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
         {inspections.length === 0 ? (
           <div className="text-center py-12 rounded-xl border border-dashed border-slate-200 bg-white/70 mb-8">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -1082,6 +1032,56 @@ export default function MyInspections() {
               );
             })}
           </div>
+        )}
+
+        {kitDownloads.length > 0 && (
+          <Card className="mb-8 border-green-100">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Package className="w-5 h-5" />
+                Your COC &amp; shipping labels
+              </CardTitle>
+              <p className="text-sm text-slate-600 font-normal">
+                Newest purchases appear first. Linked to {currentUser?.email || user?.email}.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {kitDownloads.map((d, index) => (
+                <div
+                  key={d.id}
+                  className={`rounded-lg border p-4 ${index === 0 ? "border-green-300 bg-green-50/50" : "border-slate-200"}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <div className="font-medium text-slate-900">{d.package_name}</div>
+                    {index === 0 && (
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Newest</Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Purchased {formatPurchaseDate(d.created_at)}
+                    {d.shipping_label_name ? ` · Label file: ${d.shipping_label_name}` : ""}
+                  </p>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {d.coc_url && (
+                      <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download COC
+                      </a>
+                    )}
+                    {d.shipping_label_url && (
+                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download shipping label
+                      </a>
+                    )}
+                    {d.instructions_url && (
+                      <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                        Download instructions
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         )}
 
         <div className="mt-4 mb-8 flex justify-center">
