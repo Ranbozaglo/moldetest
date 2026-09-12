@@ -898,13 +898,6 @@ export default function MyInspections() {
               Here you can see your current inspections, status, and COC / shipping labels.
             </p>
           </div>
-          <Button
-            onClick={goStartNew}
-            className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Start new inspection
-          </Button>
         </div>
 
         {inspections.length === 0 ? (
@@ -913,13 +906,10 @@ export default function MyInspections() {
               <FlaskConical className="w-8 h-8 text-slate-400" />
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No inspections yet</h3>
-            <p className="text-slate-600 mb-6 max-w-md mx-auto">
-              Start a new inspection to buy a kit, get your COC and shipping label, then submit your job details.
+            <p className="text-slate-600 mb-2 max-w-md mx-auto">
+              Use <strong>New inspection</strong> in the menu to buy a kit, get your COC and shipping label, then submit
+              your job details.
             </p>
-            <Button onClick={goStartNew} className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Start new inspection
-            </Button>
           </div>
         ) : (
           <div className="space-y-6 mb-8">
@@ -1095,7 +1085,8 @@ export default function MyInspections() {
           <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
           <ul className="text-amber-800 text-sm space-y-2">
             <li>
-              • <strong>New COC / shipping label:</strong> Use Start new inspection to purchase a kit — not from submitting the form alone.
+              • <strong>New COC / shipping label:</strong> Use <strong>New inspection</strong> in the menu to purchase a
+                kit — not from submitting the form alone.
             </li>
             <li>• <strong>Sample Collection:</strong> Use a new swab for each sample location and place it in a Ziploc bag</li>
             <li>
