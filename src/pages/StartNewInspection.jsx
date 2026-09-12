@@ -681,33 +681,12 @@ export default function StartNewInspection() {
 
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-300 text-sm font-bold text-white">
-                  3
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-slate-900">Collect samples</h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    Follow the sampling guide, complete the COC, pack samples, and apply the prepaid label.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="mt-3"
-                    onClick={() => navigate(createPageUrl("SamplingGuide"))}
-                  >
-                    Open sampling guide
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
-              <div className="flex items-start gap-3">
                 <div
                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
                     hasNewPurchase ? "bg-blue-600" : "bg-slate-300"
                   }`}
                 >
-                  4
+                  3
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-slate-900">Submit the inspection form</h3>
