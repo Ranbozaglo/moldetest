@@ -70,10 +70,6 @@ export default function StartNewInspection() {
   const [checkoutError, setCheckoutError] = useState("");
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [embeddedSession, setEmbeddedSession] = useState(null);
-  const [couponInput, setCouponInput] = useState("");
-  const [couponApplied, setCouponApplied] = useState("");
-  const [couponMessage, setCouponMessage] = useState("");
-  const [activePackage, setActivePackage] = useState(null);
 
   const baselineIdsRef = useRef(new Set());
   const checkoutStartedAtRef = useRef(null);
@@ -284,7 +280,7 @@ export default function StartNewInspection() {
     });
   };
 
-  const startEmbeddedCheckout = async (pkg, promotionCode = "") => {
+  const startEmbeddedCheckout = async (pkg) => {
     const paymentUrl = buildPaymentUrl(pkg);
     setCheckoutLoading(true);
     setCheckoutError("");
@@ -296,30 +292,15 @@ export default function StartNewInspection() {
       const res = await KitService.createEmbeddedCheckout({
         packageType: pkg.package_type,
         email: user.email,
-        promotionCode: promotionCode || "",
       });
       setEmbeddedSession({
         client_secret: res.client_secret,
         publishable_key: res.publishable_key,
       });
-      if (res.promotion_applied && promotionCode) {
-        setCouponApplied(promotionCode.trim());
-        setCouponMessage(`Coupon “${promotionCode.trim()}” applied.`);
-      } else if (!promotionCode) {
-        setCouponApplied("");
-        setCouponMessage("");
-      }
       startPolling();
       return true;
     } catch (e) {
       console.warn("Embedded checkout failed:", e);
-      // Invalid coupon — stay expanded and show error (don't open Stripe tab)
-      if (promotionCode) {
-        setCheckoutError(e.message || "Could not apply that coupon code.");
-        setCouponMessage("");
-        setCouponApplied("");
-        return false;
-      }
       if (paymentUrl) {
         openFallbackCheckout(paymentUrl);
       } else {
@@ -334,41 +315,15 @@ export default function StartNewInspection() {
   const openKitCheckout = async (pkg) => {
     setSelectedPackageName(pkg.display_name || pkg.package_type);
     setSelectedPackageType(pkg.package_type);
-    setActivePackage(pkg);
     setNewPurchase(null);
     setMessage("");
     setCheckoutError("");
-    setCouponMessage("");
     checkoutStartedAtRef.current = new Date().toISOString();
     setCheckoutExpanded(true);
     requestAnimationFrame(() => {
       checkoutPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
-    await startEmbeddedCheckout(pkg, couponInput.trim());
-  };
-
-  const applyCoupon = async () => {
-    if (!activePackage) {
-      setCheckoutError("Choose a kit package first, then apply your coupon.");
-      return;
-    }
-    const code = couponInput.trim();
-    if (!code) {
-      setCheckoutError("Enter a coupon code first.");
-      return;
-    }
-    checkoutStartedAtRef.current = new Date().toISOString();
-    await startEmbeddedCheckout(activePackage, code);
-  };
-
-  const clearCoupon = async () => {
-    setCouponInput("");
-    setCouponApplied("");
-    setCouponMessage("");
-    setCheckoutError("");
-    if (activePackage) {
-      await startEmbeddedCheckout(activePackage, "");
-    }
+    await startEmbeddedCheckout(pkg);
   };
 
   const collapseCheckout = () => {
@@ -489,60 +444,6 @@ export default function StartNewInspection() {
                               <X className="w-4 h-4 mr-1" />
                               Close
                             </Button>
-                          </div>
-
-                          <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <label
-                              htmlFor="kit-coupon-code"
-                              className="block text-sm font-medium text-slate-800 mb-1.5"
-                            >
-                              Coupon / promo code
-                            </label>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <input
-                                id="kit-coupon-code"
-                                type="text"
-                                value={couponInput}
-                                onChange={(e) => setCouponInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    applyCoupon();
-                                  }
-                                }}
-                                placeholder="Enter code"
-                                className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                autoComplete="off"
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                                  disabled={checkoutLoading || !couponInput.trim()}
-                                  onClick={applyCoupon}
-                                >
-                                  Apply
-                                </Button>
-                                {couponApplied && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={checkoutLoading}
-                                    onClick={clearCoupon}
-                                  >
-                                    Remove
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {couponMessage && (
-                              <p className="mt-2 text-sm text-green-700">{couponMessage}</p>
-                            )}
-                            {!couponApplied && (
-                              <p className="mt-2 text-xs text-slate-500">
-                                Enter your code and click Apply — the total updates in checkout below.
-                              </p>
-                            )}
                           </div>
 
                           {checkoutLoading && (
