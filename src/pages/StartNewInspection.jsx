@@ -17,11 +17,21 @@ import {
 import { Package, Plus, ArrowLeft, RefreshCw, Loader2, ExternalLink, X } from "lucide-react";
 import { motion } from "framer-motion";
 
+const PACKAGE_ORDER = ["spot_check", "extended", "full_house"];
+
 const PACKAGE_FALLBACKS = [
   { package_type: "spot_check", display_name: "Spot Check", stripe_payment_link_url: "" },
   { package_type: "extended", display_name: "Extended", stripe_payment_link_url: "" },
   { package_type: "full_house", display_name: "Full House", stripe_payment_link_url: "" },
 ];
+
+function sortPackages(list) {
+  return [...(list || [])].sort((a, b) => {
+    const ai = PACKAGE_ORDER.indexOf(a.package_type);
+    const bi = PACKAGE_ORDER.indexOf(b.package_type);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+}
 
 function formatPurchaseDate(value) {
   if (!value) return "Date unavailable";
@@ -317,7 +327,7 @@ export default function StartNewInspection() {
     }
   };
 
-  const packages = kitPackages.length ? kitPackages : PACKAGE_FALLBACKS;
+  const packages = sortPackages(kitPackages.length ? kitPackages : PACKAGE_FALLBACKS);
   const hasNewPurchase = Boolean(newPurchase);
 
   return (

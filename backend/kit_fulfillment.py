@@ -129,6 +129,9 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             row["coc_url"] = _public_url(row.get("coc_storage_path") or "")
             row["instructions_url"] = _public_url(row.get("instructions_storage_path") or "")
             row["display_name"] = row.get("display_name") or PACKAGE_LABELS.get(key, key)
+        # Spot Check → Extended → Full House (not alphabetical)
+        order_index = {key: i for i, key in enumerate(PACKAGE_TYPES)}
+        rows.sort(key=lambda r: order_index.get(r.get("package_type"), 99))
         return rows
 
     def _extract_buy_slug(url: str) -> str:
