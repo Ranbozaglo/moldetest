@@ -907,7 +907,7 @@ export default function MyInspections() {
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No inspections yet</h3>
             <p className="text-slate-600 mb-2 max-w-md mx-auto">
-              Use <strong>New inspection</strong> in the menu to buy a kit, get your COC and shipping label, then submit
+              Use <strong>New inspection</strong> in the menu to buy a package, get your COC and shipping label, then submit
               your job details.
             </p>
           </div>
@@ -1086,7 +1086,7 @@ export default function MyInspections() {
           <ul className="text-amber-800 text-sm space-y-2">
             <li>
               • <strong>New COC / shipping label:</strong> Use <strong>New inspection</strong> in the menu to purchase a
-                kit — not from submitting the form alone.
+                package — not from submitting the form alone.
             </li>
             <li>• <strong>Sample Collection:</strong> Use a new swab for each sample location and place it in a Ziploc bag</li>
             <li>

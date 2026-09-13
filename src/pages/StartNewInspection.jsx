@@ -168,7 +168,7 @@ export default function StartNewInspection() {
         baselineIdsRef.current = new Set(downloads.map((d) => d.id));
         setNewPurchase(null);
       } catch (e) {
-        if (!cancelled) setMessage(e.message || "Could not load kit packages");
+        if (!cancelled) setMessage(e.message || "Could not load packages");
       } finally {
         if (!cancelled) setPackagesLoading(false);
       }
@@ -350,7 +350,7 @@ export default function StartNewInspection() {
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Start new inspection</h1>
           <p className="text-slate-600 mt-2 text-sm sm:text-base">
-            Buy a kit to get a new COC and unique prepaid shipping label, then submit the inspection form for this job.
+            Buy a package to get a new COC and unique prepaid shipping label, then submit the inspection form for this job.
           </p>
         </div>
 
@@ -371,7 +371,7 @@ export default function StartNewInspection() {
                   1
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900">Purchase a kit</h3>
+                  <h3 className="font-semibold text-slate-900">Purchase a package</h3>
                   <p className="text-sm text-slate-600 mt-1 mb-3">
                     Choose a package — checkout expands below. Keep this page open; your new COC/label appears in
                     step 2 automatically (emailed to <strong>{user.email}</strong>).
@@ -409,7 +409,7 @@ export default function StartNewInspection() {
                   {!packagesLoading &&
                     !packages.some((p) => p.stripe_payment_link_url || p.stripe_payment_link_id) && (
                       <p className="text-xs text-slate-500 mt-2">
-                        Package buy links are not configured yet (Admin → Kit Fulfillment).
+                        Package buy links are not configured yet (Admin → Package Fulfillment).
                       </p>
                     )}
 
@@ -428,7 +428,7 @@ export default function StartNewInspection() {
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div>
                               <p className="font-semibold text-slate-900">
-                                Checkout — {selectedPackageName || "Kit"}
+                                Checkout — {selectedPackageName || "Package"}
                               </p>
                               <p className="text-sm text-slate-600 mt-0.5">
                                 Complete payment below. Step 2 updates when your new COC and label are ready.
@@ -554,7 +554,7 @@ export default function StartNewInspection() {
                     <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
                       <div className="flex items-center gap-2 font-medium">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        Waiting for your {selectedPackageName || "kit"} checkout to finish…
+                        Waiting for your {selectedPackageName || "package"} checkout to finish…
                       </div>
                       <p className="mt-1 text-blue-800">
                         Complete payment in the checkout section above. This box updates automatically when the new
@@ -573,7 +573,7 @@ export default function StartNewInspection() {
                     </div>
                   ) : (
                     <p className="text-sm text-slate-500 mt-2">
-                      No new purchase for this job yet. Buy a kit in step 1 first.
+                      No new purchase for this job yet. Buy a package in step 1 first.
                     </p>
                   )}
                 </div>

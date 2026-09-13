@@ -491,7 +491,7 @@ export default function Inspection() {
                     to={createPageUrl("StartNewInspection")}
                     className="font-medium text-blue-700 underline whitespace-nowrap"
                   >
-                    Buy kit / new COC
+                    Buy package / new COC
                   </Link>
                 </div>
               </div>
