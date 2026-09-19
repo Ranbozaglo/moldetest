@@ -18,6 +18,19 @@ const PACKAGE_FALLBACKS = [
   { package_type: "full_house", display_name: "Full House", stripe_payment_link_url: "" },
 ];
 
+function getAnalyticsSid() {
+  try {
+    let sid = localStorage.getItem("tt_sid");
+    if (!sid) {
+      sid = (crypto.randomUUID && crypto.randomUUID()) || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      localStorage.setItem("tt_sid", sid);
+    }
+    return sid;
+  } catch {
+    return "";
+  }
+}
+
 function sortPackages(list) {
   return [...(list || [])].sort((a, b) => {
     const ai = PACKAGE_ORDER.indexOf(a.package_type);
@@ -260,6 +273,8 @@ export default function StartNewInspection() {
     try {
       const u = new URL(paymentUrl);
       if (user.email) u.searchParams.set("prefilled_email", user.email);
+      const sid = getAnalyticsSid();
+      if (sid) u.searchParams.set("client_reference_id", sid);
       return u.toString();
     } catch {
       return paymentUrl;
@@ -292,6 +307,7 @@ export default function StartNewInspection() {
       const res = await KitService.createEmbeddedCheckout({
         packageType: pkg.package_type,
         email: user.email,
+        analyticsSid: getAnalyticsSid(),
       });
       setEmbeddedSession({
         client_secret: res.client_secret,

@@ -22,11 +22,44 @@ PACKAGE_LABELS = {
     "full_house": "Full House",
 }
 
+PACKAGE_PRICES_CENTS = {
+    "spot_check": 18900,
+    "extended": 21500,
+    "full_house": 27000,
+}
+
 LABEL_STATUSES = ("available", "assigned", "void")
 
 
 def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _notify_wp_purchase(payload: Dict[str, Any]) -> None:
+    """Best-effort: never fail kit fulfillment if analytics is down."""
+    url = (
+        os.getenv("TT_ANALYTICS_PURCHASE_URL")
+        or "https://total-testing.com/wp-json/tt-analytics/v1/purchase"
+    )
+    key = os.getenv("TT_ANALYTICS_KEY") or "tt_ld_7f3c9e2a1b84d6f0"
+    try:
+        import json as _json
+        from urllib.request import Request, urlopen
+
+        req = Request(
+            url,
+            data=_json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "X-TT-Analytics-Key": key,
+                "User-Agent": "TotalTesting-Kit/1.0",
+            },
+            method="POST",
+        )
+        with urlopen(req, timeout=8) as resp:
+            resp.read()
+    except Exception as e:
+        print(f"⚠️ KIT: WP purchase analytics notify failed: {e}")
 
 
 def _natural_sort_key(name: str):
@@ -398,6 +431,14 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         stripe_session_id: str = "",
         stripe_payment_link_id: str = "",
         stripe_payment_intent_id: str = "",
+        analytics_sid: str = "",
+        amount_cents: Optional[int] = None,
+        utm_source: str = "",
+        utm_medium: str = "",
+        utm_campaign: str = "",
+        utm_content: str = "",
+        first_source: str = "",
+        last_source: str = "",
     ) -> Dict[str, Any]:
         if package_type not in PACKAGE_TYPES:
             return {"success": False, "error": f"Unknown package_type: {package_type}"}
@@ -457,7 +498,22 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             "email_status": "pending",
             "created_at": _utcnow(),
         }
-        inserted = supabase.table("kit_fulfillments").insert(fulfillment_row).execute()
+        analytics_fields = {
+            "analytics_sid": (analytics_sid or "")[:64] or None,
+            "amount_cents": int(amount_cents) if amount_cents is not None else PACKAGE_PRICES_CENTS.get(package_type),
+            "utm_source": (utm_source or "")[:80] or None,
+            "utm_medium": (utm_medium or "")[:80] or None,
+            "utm_campaign": (utm_campaign or "")[:80] or None,
+            "utm_content": (utm_content or "")[:80] or None,
+            "first_source": (first_source or "")[:80] or None,
+            "last_source": (last_source or "")[:80] or None,
+        }
+        inserted = None
+        try:
+            inserted = supabase.table("kit_fulfillments").insert({**fulfillment_row, **analytics_fields}).execute()
+        except Exception as e:
+            print(f"⚠️ KIT: analytics columns missing or insert failed ({e}); inserting fulfillment without them")
+            inserted = supabase.table("kit_fulfillments").insert(fulfillment_row).execute()
         fulfillment = (inserted.data or [fulfillment_row])[0]
 
         supabase.table("shipping_labels").update(
@@ -466,6 +522,21 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
 
         emailed = _email_existing_fulfillment(fulfillment)
         emailed["label_id"] = label.get("id")
+        if emailed.get("success") or emailed.get("duplicate"):
+            _notify_wp_purchase(
+                {
+                    "sid": analytics_sid,
+                    "amount_cents": analytics_fields.get("amount_cents") or 0,
+                    "package_type": package_type,
+                    "stripe_session_id": stripe_session_id,
+                    "utm_source": utm_source,
+                    "utm_medium": utm_medium,
+                    "utm_campaign": utm_campaign,
+                    "utm_content": utm_content,
+                    "first_source": first_source,
+                    "path": "/checkout/purchase",
+                }
+            )
         return emailed
 
     @app.route("/api/kit/packages", methods=["GET"])
@@ -565,8 +636,19 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 "line_items": [{"price": price_id, "quantity": 1}],
                 "return_url": return_url,
                 "allow_promotion_codes": True,
-                "metadata": {"package_type": package_type},
+                "metadata": {
+                    "package_type": package_type,
+                    "tt_sid": str(data.get("analytics_sid") or "")[:64],
+                    "utm_source": str(data.get("utm_source") or "")[:80],
+                    "utm_medium": str(data.get("utm_medium") or "")[:80],
+                    "utm_campaign": str(data.get("utm_campaign") or "")[:80],
+                    "utm_content": str(data.get("utm_content") or "")[:80],
+                    "first_source": str(data.get("first_source") or "")[:80],
+                },
             }
+            sid = str(data.get("analytics_sid") or "").strip()
+            if sid:
+                session_params["client_reference_id"] = sid[:64]
             if customer_email:
                 session_params["customer_email"] = customer_email
 
@@ -1102,6 +1184,71 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/kit/analytics/purchases", methods=["GET"])
+    def kit_analytics_purchases():
+        """Aggregated fulfillments for the Growth dashboard. No customer emails."""
+        if not _require_admin():
+            return jsonify({"error": "Unauthorized"}), 401
+        from_s = (request.args.get("from") or "").strip()
+        to_s = (request.args.get("to") or "").strip()
+        try:
+            rows = []
+            try:
+                query = supabase.table("kit_fulfillments").select(
+                    "package_type,created_at,amount_cents,analytics_sid"
+                )
+                if from_s:
+                    query = query.gte("created_at", from_s)
+                if to_s:
+                    query = query.lt("created_at", to_s)
+                result = query.limit(2000).execute()
+                rows = result.data or []
+            except Exception:
+                query = supabase.table("kit_fulfillments").select("package_type,created_at")
+                if from_s:
+                    query = query.gte("created_at", from_s)
+                if to_s:
+                    query = query.lt("created_at", to_s)
+                result = query.limit(2000).execute()
+                rows = result.data or []
+            orders = len(rows)
+            attributed = 0
+            revenue_cents = 0
+            estimated = 0
+            by_package: Dict[str, Dict[str, Any]] = {}
+            for row in rows:
+                pkg = row.get("package_type") or "unknown"
+                cents = row.get("amount_cents")
+                if cents is None:
+                    cents = PACKAGE_PRICES_CENTS.get(pkg, 0)
+                    estimated += 1
+                revenue_cents += int(cents or 0)
+                if row.get("analytics_sid"):
+                    attributed += 1
+                bucket = by_package.setdefault(
+                    pkg,
+                    {"package_type": pkg, "label": PACKAGE_LABELS.get(pkg, pkg), "orders": 0, "revenue_cents": 0},
+                )
+                bucket["orders"] += 1
+                bucket["revenue_cents"] += int(cents or 0)
+            return jsonify(
+                {
+                    "orders": orders,
+                    "attributed_orders": attributed,
+                    "unattributed_orders": orders - attributed,
+                    "revenue": round(revenue_cents / 100, 2),
+                    "estimated_orders": estimated,
+                    "aov": round((revenue_cents / 100) / orders, 2) if orders else 0,
+                    "by_package": list(by_package.values()),
+                    "note": (
+                        "Orders come from Stripe fulfillments. Revenue uses Stripe amount_total when stored; "
+                        "older rows without amount use package list price and are counted in estimated_orders."
+                    ),
+                }
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/stripe/webhook", methods=["POST"])
     def stripe_webhook():
         payload = request.get_data()
@@ -1155,15 +1302,32 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if hasattr(payment_intent, "id"):
             payment_intent = payment_intent.id
 
+        amount_total = _g(session, "amount_total")
+        try:
+            amount_cents = int(amount_total) if amount_total is not None else None
+        except (TypeError, ValueError):
+            amount_cents = None
+
+        meta = _g(session, "metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        analytics_sid = (
+            str(_g(session, "client_reference_id") or meta.get("tt_sid") or meta.get("analytics_sid") or "")
+            .strip()
+        )
+        utm_source = str(meta.get("utm_source") or "")
+        utm_medium = str(meta.get("utm_medium") or "")
+        utm_campaign = str(meta.get("utm_campaign") or "")
+        utm_content = str(meta.get("utm_content") or "")
+        first_source = str(meta.get("first_source") or "")
+        last_source = utm_source or first_source
+
         package_type = _resolve_package_type(
             payment_link_id=str(payment_link or ""),
             session_obj=session,
         )
         if not package_type:
-            # Try metadata
-            meta = _g(session, "metadata") or {}
-            if isinstance(meta, dict):
-                package_type = meta.get("package_type") or meta.get("package")
+            package_type = meta.get("package_type") or meta.get("package")
         if not package_type:
             print(
                 f"❌ KIT: could not resolve package for payment_link={payment_link} "
@@ -1178,6 +1342,14 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             stripe_session_id=str(session_id or ""),
             stripe_payment_link_id=str(payment_link or ""),
             stripe_payment_intent_id=str(payment_intent or ""),
+            analytics_sid=analytics_sid,
+            amount_cents=amount_cents,
+            utm_source=utm_source,
+            utm_medium=utm_medium,
+            utm_campaign=utm_campaign,
+            utm_content=utm_content,
+            first_source=first_source,
+            last_source=last_source,
         )
         # Only ack Stripe when email actually succeeded (or already sent earlier).
         # Returning 500 lets Stripe retry, which now re-attempts failed emails.

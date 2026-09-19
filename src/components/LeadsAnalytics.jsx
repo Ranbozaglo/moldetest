@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from "recharts";
+import { KitService } from "@/api/entities";
 
 const SUMMARY_URL = "https://total-testing.com/wp-json/tt-analytics/v1/summary";
 const ANALYTICS_KEY = "tt_ld_7f3c9e2a1b84d6f0";
@@ -55,6 +56,8 @@ const TREND_METRICS = [
   { key: "pageviews", label: "Page Views" },
   { key: "checkout_clicks", label: "Checkout Clicks" },
   { key: "checkout_click_rate", label: "Checkout Click Rate" },
+  { key: "orders", label: "Orders" },
+  { key: "revenue", label: "Revenue" },
 ];
 
 const TERM_HELP = {
@@ -67,6 +70,14 @@ const TERM_HELP = {
   entrances: "Sessions whose first page was this path.",
   exit_rate: "Share of sessions that viewed this page and also ended there. An exit is not automatically a problem.",
   exits: "Sessions whose last page was this path. People often leave after they found what they needed.",
+  orders: "Stripe purchases joined to a visit id after checkout. Older fulfillments without a visit id are listed on the Revenue tab, not counted as attributed conversion.",
+  revenue: "Attributed purchase revenue from Stripe amount_total. $0 until a purchase is joined to a visit.",
+  purchase_conversion_rate: "Attributed purchases divided by sessions. Not checkout click rate.",
+  aov: "Average order value of attributed purchases.",
+  revenue_per_visitor: "Attributed revenue divided by unique visitors.",
+  first_touch: "Source stored on the visitor's first marketing-site landing (local first-touch). Direct is used if no source was stored.",
+  last_touch: "Last non-direct source in the session.",
+  scroll_depth: "Deepest scroll band recorded for the session. New events only; older visits have no scroll data.",
 };
 
 const formatDuration = (seconds) => {
@@ -87,6 +98,11 @@ const formatPct = (value, digits = 1) => {
 const formatInt = (value) => {
   if (value == null) return "—";
   return Number(value).toLocaleString();
+};
+
+const formatMoney = (value) => {
+  if (value == null || value === "") return "—";
+  return `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const Help = ({ term }) => (
@@ -157,23 +173,6 @@ function Empty({ children }) {
   return <p className="text-sm text-slate-500">{children}</p>;
 }
 
-function LaterPhase({ title, phase }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          Reserved for Phase {phase}. The dashboard contract already includes these fields, but they are not live data yet.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="text-sm text-slate-600 space-y-2">
-        <p>Nothing is estimated here. This tab stays empty until the matching data exists.</p>
-        <p className="text-xs text-slate-400">Reserved contract fields: {FUTURE_METRIC_KEYS.join(", ")}.</p>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function LeadsAnalytics() {
   const [preset, setPreset] = useState("30");
   const [customFrom, setCustomFrom] = useState("");
@@ -182,6 +181,7 @@ export default function LeadsAnalytics() {
   const [trendMetric, setTrendMetric] = useState("visitors");
   const [section, setSection] = useState("overview");
   const [data, setData] = useState(null);
+  const [stripePurchases, setStripePurchases] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [openRaw, setOpenRaw] = useState("");
@@ -214,6 +214,15 @@ export default function LeadsAnalytics() {
         throw new Error(json.message || json.error || `Could not load analytics (${res.status})`);
       }
       setData(json);
+      try {
+        const purchases = await KitService.getAnalyticsPurchases({
+          from: json.range?.from,
+          to: json.range?.to,
+        });
+        setStripePurchases(purchases);
+      } catch {
+        setStripePurchases(null);
+      }
     } catch (err) {
       setData(null);
       setError(err?.message || "Could not load analytics");
@@ -267,6 +276,13 @@ export default function LeadsAnalytics() {
     { key: "checkout_clicks", label: "Checkout Clicks", format: (k) => formatInt(k?.value), term: "checkout_clicks" },
     { key: "checkout_click_rate", label: "Checkout Click Rate", format: (k) => formatPct(k?.value), term: "checkout_click_rate" },
   ];
+  const revenueCards = [
+    { key: "orders", label: "Attributed Orders", format: (k) => formatInt(k?.value), term: "orders" },
+    { key: "revenue", label: "Attributed Revenue", format: (k) => formatMoney(k?.value), term: "revenue" },
+    { key: "purchase_conversion_rate", label: "Purchase Conversion", format: (k) => formatPct(k?.value), term: "purchase_conversion_rate" },
+    { key: "aov", label: "AOV", format: (k) => formatMoney(k?.value), term: "aov" },
+    { key: "revenue_per_visitor", label: "Revenue / Visitor", format: (k) => formatMoney(k?.value), term: "revenue_per_visitor" },
+  ];
 
   const chartData = trendPoints.map((row) => ({
     ...row,
@@ -274,6 +290,7 @@ export default function LeadsAnalytics() {
   }));
   const chartKey = trendMetric === "checkout_click_rate" ? "checkout_click_rate_pct" : trendMetric;
   const chartIsRate = trendMetric === "checkout_click_rate";
+  const chartIsMoney = trendMetric === "revenue";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -283,7 +300,7 @@ export default function LeadsAnalytics() {
             <div>
               <CardTitle className="text-xl text-slate-900">Leads Analytics / Growth Analytics</CardTitle>
               <CardDescription>
-                Marketing site visits, aggregated on the server. Checkout click is not a purchase. Comparison is the immediately preceding equivalent period.
+                Marketing site visits, aggregated on the server. Attributed orders require a Stripe visit id. Comparison is the immediately preceding equivalent period.
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-end gap-2">
@@ -327,6 +344,7 @@ export default function LeadsAnalytics() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="attribution">Attribution</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
+            <TabsTrigger value="creatives">Creatives</TabsTrigger>
             <TabsTrigger value="insights">Insights</TabsTrigger>
           </TabsList>
 
@@ -340,6 +358,19 @@ export default function LeadsAnalytics() {
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               {kpiCards.map((card) => (
                 <div key={card.key} className="rounded-xl border border-slate-200 bg-white p-4 border-t-2" style={{ borderTopColor: ACCENT }}>
+                  <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                    {card.label}
+                    <Help term={card.term} />
+                  </div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "—" : card.format(kpis[card.key])}</div>
+                  {!loading ? <Delta kpi={kpis[card.key]} /> : <p className="text-xs text-slate-400">Loading</p>}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+              {revenueCards.map((card) => (
+                <div key={card.key} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
                     {card.label}
                     <Help term={card.term} />
@@ -382,11 +413,13 @@ export default function LeadsAnalytics() {
                         <XAxis dataKey="t" tick={{ fontSize: 11, fill: "#64748b" }} minTickGap={24} />
                         <YAxis
                           tick={{ fontSize: 11, fill: "#64748b" }}
-                          tickFormatter={(v) => (chartIsRate ? `${v}%` : v)}
-                          width={48}
+                          tickFormatter={(v) => (chartIsRate ? `${v}%` : chartIsMoney ? `$${v}` : v)}
+                          width={56}
                         />
                         <ChartTooltip
-                          formatter={(value) => (chartIsRate ? `${Number(value).toFixed(1)}%` : formatInt(value))}
+                          formatter={(value) =>
+                            chartIsRate ? `${Number(value).toFixed(1)}%` : chartIsMoney ? formatMoney(value) : formatInt(value)
+                          }
                         />
                         <Line type="monotone" dataKey={chartKey} stroke={ACCENT} strokeWidth={2} dot={false} />
                       </LineChart>
@@ -417,6 +450,7 @@ export default function LeadsAnalytics() {
                           <SortHead label="Avg Engaged Time" column="avg_engaged_sec" sort={sorts.acquisition} onSort={(k) => setSort("acquisition", k)} align="right" />
                           <SortHead label="Checkout Clicks" column="checkout_clicks" sort={sorts.acquisition} onSort={(k) => setSort("acquisition", k)} align="right" />
                           <SortHead label="Checkout Click Rate" column="checkout_click_rate" sort={sorts.acquisition} onSort={(k) => setSort("acquisition", k)} align="right" term="checkout_click_rate" />
+                          <SortHead label="Orders" column="purchases" sort={sorts.acquisition} onSort={(k) => setSort("acquisition", k)} align="right" term="orders" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -445,10 +479,11 @@ export default function LeadsAnalytics() {
                               <TableCell className="text-right">{formatDuration(row.avg_engaged_sec)}</TableCell>
                               <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
                               <TableCell className="text-right">{formatPct(row.checkout_click_rate)}</TableCell>
+                              <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
                             </TableRow>
                             {openRaw === row.source ? (
                               <TableRow>
-                                <TableCell colSpan={6} className="bg-slate-50 text-xs text-slate-600">
+                                <TableCell colSpan={7} className="bg-slate-50 text-xs text-slate-600">
                                   Stored values:{" "}
                                   {(row.raw_sources || []).map((raw) => `${raw.value} (${raw.sessions})`).join(" · ") || "none"}
                                 </TableCell>
@@ -555,6 +590,7 @@ export default function LeadsAnalytics() {
                         <SortHead label="Avg Engaged Time" column="avg_engaged_sec" sort={sorts.content} onSort={(k) => setSort("content", k)} align="right" />
                         <SortHead label="Checkout Clicks" column="checkout_clicks" sort={sorts.content} onSort={(k) => setSort("content", k)} align="right" />
                         <SortHead label="Checkout Click Rate" column="checkout_click_rate" sort={sorts.content} onSort={(k) => setSort("content", k)} align="right" term="checkout_click_rate" />
+                        <SortHead label="Orders" column="purchases" sort={sorts.content} onSort={(k) => setSort("content", k)} align="right" term="orders" />
                         <SortHead label="Exits" column="exits" sort={sorts.content} onSort={(k) => setSort("content", k)} align="right" term="exits" />
                       </TableRow>
                     </TableHeader>
@@ -569,6 +605,7 @@ export default function LeadsAnalytics() {
                           <TableCell className="text-right">{formatDuration(row.avg_engaged_sec)}</TableCell>
                           <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
                           <TableCell className="text-right">{formatPct(row.checkout_click_rate)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
                           <TableCell className="text-right">{formatInt(row.exits)}</TableCell>
                         </TableRow>
                       ))}
@@ -661,7 +698,7 @@ export default function LeadsAnalytics() {
                     {(data?.opportunities || []).map((row, idx) => (
                       <li key={`${row.text}-${idx}`} className="rounded-lg border border-slate-200 px-4 py-3">
                         <p className="text-sm text-slate-800">{row.text}</p>
-                        <p className="mt-1 text-xs text-slate-500">Observation · {row.based_on}</p>
+                        <p className="mt-1 text-xs text-slate-500">{row.kind || "observation"} · {row.based_on}</p>
                       </li>
                     ))}
                   </ul>
@@ -670,14 +707,351 @@ export default function LeadsAnalytics() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="attribution" className="mt-4">
-            <LaterPhase title="Attribution" phase="5" />
+          <TabsContent value="attribution" className="space-y-6 mt-4">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>First touch</CardTitle>
+                  <CardDescription>Source stored from the visitor’s first landing.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Source</TableHead>
+                        <TableHead className="text-right">Sessions</TableHead>
+                        <TableHead className="text-right">Checkout Clicks</TableHead>
+                        <TableHead className="text-right">Orders</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.first_touch || []).map((row) => (
+                        <TableRow key={row.source || row.label}>
+                          <TableCell>{row.source || row.label}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Last touch</CardTitle>
+                  <CardDescription>Last non-direct source in the session.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Source</TableHead>
+                        <TableHead className="text-right">Sessions</TableHead>
+                        <TableHead className="text-right">Checkout Clicks</TableHead>
+                        <TableHead className="text-right">Orders</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.last_touch || []).map((row) => (
+                        <TableRow key={row.source || row.label}>
+                          <TableCell>{row.source || row.label}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Channel</CardTitle>
+                  <CardDescription>Paid uses utm_medium. Google, Bing, and AI sources without paid medium are organic.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Channel</TableHead>
+                        <TableHead className="text-right">Sessions</TableHead>
+                        <TableHead className="text-right">Checkout Clicks</TableHead>
+                        <TableHead className="text-right">Orders</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.channels || []).map((row) => (
+                        <TableRow key={row.channel || row.label}>
+                          <TableCell>{row.channel || row.label}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Device</CardTitle>
+                  <CardDescription>From viewport/user agent on new hits. Older rows show unknown.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Device</TableHead>
+                        <TableHead className="text-right">Sessions</TableHead>
+                        <TableHead className="text-right">Checkout Clicks</TableHead>
+                        <TableHead className="text-right">Orders</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.devices || []).map((row) => (
+                        <TableRow key={row.device || row.label}>
+                          <TableCell>{row.device || row.label}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.checkout_clicks)}</TableCell>
+                          <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
-          <TabsContent value="revenue" className="mt-4">
-            <LaterPhase title="Orders and revenue" phase="3" />
+
+          <TabsContent value="revenue" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Stripe fulfillments</CardTitle>
+                <CardDescription>
+                  {stripePurchases?.note || "All kit fulfillments in this date range, including purchases not joined to a website visit."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500">Orders</p>
+                  <p className="text-2xl font-semibold">{formatInt(stripePurchases?.orders)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Revenue</p>
+                  <p className="text-2xl font-semibold">{stripePurchases ? formatMoney(stripePurchases.revenue) : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Attributed to a visit</p>
+                  <p className="text-2xl font-semibold">{formatInt(stripePurchases?.attributed_orders)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Estimated list-price rows</p>
+                  <p className="text-2xl font-semibold">{formatInt(stripePurchases?.estimated_orders)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>By package</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Package</TableHead>
+                      <TableHead className="text-right">Orders</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(stripePurchases?.by_package || []).map((row) => (
+                      <TableRow key={row.package_type}>
+                        <TableCell>{row.label}</TableCell>
+                        <TableCell className="text-right">{formatInt(row.orders)}</TableCell>
+                        <TableCell className="text-right">{formatMoney((row.revenue_cents || 0) / 100)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {!stripePurchases ? <Empty>Sign in as admin to load fulfillment totals. Attributed visit orders still appear on Overview.</Empty> : null}
+              </CardContent>
+            </Card>
           </TabsContent>
-          <TabsContent value="insights" className="mt-4">
-            <LaterPhase title="AI insights" phase="6" />
+
+          <TabsContent value="creatives" className="space-y-6 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>UTM contract</CardTitle>
+                <CardDescription>Use these parameters on ads and UGC links. Historical visits without utm_content still appear by campaign only.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parameter</TableHead>
+                      <TableHead>Meaning</TableHead>
+                      <TableHead>Example</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(data?.utm_contract || []).map((row) => (
+                      <TableRow key={row.param}>
+                        <TableCell className="font-medium">{row.param}</TableCell>
+                        <TableCell>{row.meaning}</TableCell>
+                        <TableCell className="text-slate-600">{row.example}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {[
+                ["Campaigns", data?.campaigns, "campaign"],
+                ["Creators", data?.creators, "creator"],
+                ["Creatives", data?.creatives, "creative"],
+              ].map(([title, rows, key]) => (
+                <Card key={title}>
+                  <CardHeader>
+                    <CardTitle>{title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {!(rows || []).length ? (
+                      <Empty>No {title.toLowerCase()} in this range. New UTMs start recording after this deploy.</Empty>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead className="text-right">Sessions</TableHead>
+                            <TableHead className="text-right">Orders</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(rows || []).map((row) => (
+                            <TableRow key={row[key] || row.label}>
+                              <TableCell>{row[key] || row.label}</TableCell>
+                              <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                              <TableCell className="text-right">{formatInt(row.purchases)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>CTA clicks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!(data?.ctas || []).length ? (
+                    <Empty>CTA names start recording after this deploy.</Empty>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>CTA</TableHead>
+                          <TableHead className="text-right">Clicks</TableHead>
+                          <TableHead className="text-right">Sessions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(data?.ctas || []).map((row) => (
+                          <TableRow key={row.cta}>
+                            <TableCell>{row.cta}</TableCell>
+                            <TableCell className="text-right">{formatInt(row.clicks)}</TableCell>
+                            <TableCell className="text-right">{formatInt(row.sessions)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>FAQ opens</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!(data?.faqs || []).length ? (
+                    <Empty>FAQ opens start recording after this deploy.</Empty>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>FAQ</TableHead>
+                          <TableHead className="text-right">Opens</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(data?.faqs || []).map((row) => (
+                          <TableRow key={row.faq}>
+                            <TableCell>{row.faq}</TableCell>
+                            <TableCell className="text-right">{formatInt(row.opens)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-xs text-slate-500">Live events (5 min)</p>
+                <p className="text-2xl font-semibold">{formatInt(data?.live?.events)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-xs text-slate-500">Live visitors (5 min)</p>
+                <p className="text-2xl font-semibold">{formatInt(data?.live?.visitors)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-xs text-slate-500">Scroll 90%+ sessions</p>
+                <p className="text-2xl font-semibold">{formatInt((data?.scroll || []).find((r) => r.depth === "90%+")?.sessions)}</p>
+              </div>
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Insights</CardTitle>
+                <CardDescription>
+                  Facts, observations, and possible opportunities from thresholds only. No AI. Winner/problem labels need ≥ {thresholds.min_sessions_winner || 50} sessions (or 10 checkout clicks).
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(data?.opportunities || []).length === 0 && !loading ? (
+                  <Empty>No insights met the sample-size rules for this range.</Empty>
+                ) : (
+                  <ul className="space-y-3">
+                    {(data?.opportunities || []).map((row, idx) => (
+                      <li key={`ins-${idx}`} className="rounded-lg border border-slate-200 px-4 py-3">
+                        <Badge variant="outline" className="mb-2">{row.kind}</Badge>
+                        <p className="text-sm text-slate-800">{row.text}</p>
+                        <p className="mt-1 text-xs text-slate-500">{row.based_on}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Search Console</CardTitle>
+                <CardDescription>{data?.gsc?.note}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Empty>Not connected. Impressions will never be mixed into onsite visitor counts.</Empty>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>

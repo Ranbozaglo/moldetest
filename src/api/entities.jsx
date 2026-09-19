@@ -58,7 +58,9 @@ const apiCall = async (endpoint, options = {}) => {
 
         // Reload the page to trigger authentication flow
         setTimeout(() => {
-          if (window.location.pathname !== '/SignIn' && window.location.pathname !== '/SignUp') {
+          const path = window.location.pathname;
+          const publicPaths = ['/SignIn', '/SignUp', '/ForgotPassword', '/ResetPassword', '/blog', '/ten-signs-you-may-have-mold-in-your-home'];
+          if (!publicPaths.includes(path)) {
             window.location.href = '/SignIn';
           }
         }, 1000);
@@ -699,13 +701,30 @@ export const EmailService = {
 export const KitService = {
   getPackages: async () => apiCall('/kit/packages'),
 
-  createEmbeddedCheckout: async ({ packageType, email }) =>
+  getAnalyticsPurchases: async ({ from, to } = {}) => {
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const q = params.toString();
+    return apiCall(`/kit/analytics/purchases${q ? `?${q}` : ""}`, {
+      headers: { Authorization: token ? `Bearer ${token}` : "" },
+    });
+  },
+
+  createEmbeddedCheckout: async ({ packageType, email, analyticsSid, utmSource, utmMedium, utmCampaign, utmContent, firstSource }) =>
     apiCall('/kit/checkout/embedded', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         package_type: packageType,
         email: email || '',
+        analytics_sid: analyticsSid || '',
+        utm_source: utmSource || '',
+        utm_medium: utmMedium || '',
+        utm_campaign: utmCampaign || '',
+        utm_content: utmContent || '',
+        first_source: firstSource || '',
       }),
       skipAuthRedirect: true,
     }),

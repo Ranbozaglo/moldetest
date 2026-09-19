@@ -31,6 +31,8 @@ Events:
 - `checkout.session.completed`
 - `checkout.session.async_payment_succeeded`
 
+Optional analytics columns: run `backend/sql/kit_fulfillment_analytics.sql`. The webhook still fulfills kits if those columns are missing. Payment Link URLs on the marketing site append `client_reference_id` so purchases can join to a visit.
+
 ## 5. Admin setup
 Admin Dashboard → **Kit Fulfillment**
 1. Paste each package’s Payment Link ID + buy URL

@@ -32,6 +32,12 @@ function tt_analytics_install() {
 		utm_medium varchar(80) NOT NULL DEFAULT '',
 		utm_campaign varchar(80) NOT NULL DEFAULT '',
 		search_query varchar(190) NOT NULL DEFAULT '',
+		utm_content varchar(80) NOT NULL DEFAULT '',
+		device varchar(20) NOT NULL DEFAULT '',
+		viewport varchar(20) NOT NULL DEFAULT '',
+		meta varchar(190) NOT NULL DEFAULT '',
+		first_source varchar(80) NOT NULL DEFAULT '',
+		amount_cents int(10) unsigned NOT NULL DEFAULT 0,
 		duration_ms int(10) unsigned NOT NULL DEFAULT 0,
 		created_at datetime NOT NULL,
 		PRIMARY KEY  (id),
@@ -41,10 +47,35 @@ function tt_analytics_install() {
 	) {$charset};";
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 	dbDelta( $sql );
-	$col = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'search_query' ) );
-	if ( ! $col ) {
-		$wpdb->query( "ALTER TABLE {$table} ADD search_query varchar(190) NOT NULL DEFAULT '' AFTER utm_campaign" );
+	$add = array(
+		'search_query' => "varchar(190) NOT NULL DEFAULT ''",
+		'utm_content'  => "varchar(80) NOT NULL DEFAULT ''",
+		'device'       => "varchar(20) NOT NULL DEFAULT ''",
+		'viewport'     => "varchar(20) NOT NULL DEFAULT ''",
+		'meta'         => "varchar(190) NOT NULL DEFAULT ''",
+		'first_source' => "varchar(80) NOT NULL DEFAULT ''",
+		'amount_cents' => "int(10) unsigned NOT NULL DEFAULT 0",
+	);
+	foreach ( $add as $name => $def ) {
+		$col = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", $name ) );
+		if ( ! $col ) {
+			$wpdb->query( "ALTER TABLE {$table} ADD {$name} {$def}" );
+		}
 	}
+}
+
+function tt_analytics_columns() {
+	static $cols = null;
+	if ( is_array( $cols ) ) {
+		return $cols;
+	}
+	global $wpdb;
+	$rows = $wpdb->get_results( 'SHOW COLUMNS FROM ' . tt_analytics_table(), ARRAY_A );
+	$cols = array();
+	foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+		$cols[ $row['Field'] ] = true;
+	}
+	return $cols;
 }
 add_action( 'init', 'tt_analytics_install', 1 );
 
@@ -210,6 +241,15 @@ add_action(
 				'callback'            => 'tt_analytics_summary',
 			)
 		);
+		register_rest_route(
+			'tt-analytics/v1',
+			'/purchase',
+			array(
+				'methods'             => array( 'POST', 'OPTIONS' ),
+				'permission_callback' => '__return_true',
+				'callback'            => 'tt_analytics_purchase',
+			)
+		);
 	}
 );
 
@@ -251,12 +291,14 @@ function tt_analytics_hit( WP_REST_Request $request ) {
 	}
 
 	$event = sanitize_key( (string) ( $body['event'] ?? 'pageview' ) );
-	if ( ! in_array( $event, array( 'pageview', 'leave', 'checkout' ), true ) ) {
+	$allowed_events = array( 'pageview', 'leave', 'checkout', 'cta_click', 'scroll', 'faq_open', 'session_start' );
+	if ( ! in_array( $event, $allowed_events, true ) ) {
 		$event = 'pageview';
 	}
 
 	global $wpdb;
 	$table = tt_analytics_table();
+	$cols  = tt_analytics_columns();
 	$hour  = gmdate( 'Y-m-d H:00:00' );
 	$count = (int) $wpdb->get_var(
 		$wpdb->prepare(
@@ -265,31 +307,56 @@ function tt_analytics_hit( WP_REST_Request $request ) {
 			$hour
 		)
 	);
-	if ( $count > 80 ) {
+	if ( $count > 200 ) {
 		return array( 'ok' => true, 'ignored' => 'rate' );
 	}
 
 	$referrer = esc_url_raw( (string) ( $body['referrer'] ?? '' ) );
 	$utm_term = substr( sanitize_text_field( (string) ( $body['utm_term'] ?? $body['search_query'] ?? '' ) ), 0, 190 );
-	$wpdb->insert(
-		$table,
-		array(
-			'sid'          => $sid,
-			'event'        => $event,
-			'path'         => tt_analytics_clean_path( $body['path'] ?? '/' ),
-			'title'        => substr( sanitize_text_field( (string) ( $body['title'] ?? '' ) ), 0, 190 ),
-			'referrer'     => substr( $referrer, 0, 500 ),
-			'utm_source'   => substr( sanitize_text_field( (string) ( $body['utm_source'] ?? '' ) ), 0, 80 ),
-			'utm_medium'   => substr( sanitize_text_field( (string) ( $body['utm_medium'] ?? '' ) ), 0, 80 ),
-			'utm_campaign' => substr( sanitize_text_field( (string) ( $body['utm_campaign'] ?? '' ) ), 0, 80 ),
-			'search_query' => tt_analytics_extract_query( $referrer, $utm_term ),
-			'duration_ms'  => max( 0, min( 86400000, intval( $body['duration_ms'] ?? 0 ) ) ),
-			'created_at'   => current_time( 'mysql', true ),
-		),
-		array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+	$row      = array(
+		'sid'          => $sid,
+		'event'        => $event,
+		'path'         => tt_analytics_clean_path( $body['path'] ?? '/' ),
+		'title'        => substr( sanitize_text_field( (string) ( $body['title'] ?? '' ) ), 0, 190 ),
+		'referrer'     => substr( $referrer, 0, 500 ),
+		'utm_source'   => substr( sanitize_text_field( (string) ( $body['utm_source'] ?? '' ) ), 0, 80 ),
+		'utm_medium'   => substr( sanitize_text_field( (string) ( $body['utm_medium'] ?? '' ) ), 0, 80 ),
+		'utm_campaign' => substr( sanitize_text_field( (string) ( $body['utm_campaign'] ?? '' ) ), 0, 80 ),
+		'search_query' => tt_analytics_extract_query( $referrer, $utm_term ),
+		'duration_ms'  => max( 0, min( 86400000, intval( $body['duration_ms'] ?? 0 ) ) ),
+		'created_at'   => current_time( 'mysql', true ),
 	);
+	if ( isset( $cols['utm_content'] ) ) {
+		$row['utm_content'] = substr( sanitize_text_field( (string) ( $body['utm_content'] ?? '' ) ), 0, 80 );
+	}
+	if ( isset( $cols['device'] ) ) {
+		$device = sanitize_key( (string) ( $body['device'] ?? '' ) );
+		$row['device'] = in_array( $device, array( 'mobile', 'tablet', 'desktop' ), true ) ? $device : tt_analytics_device_from_ua();
+	}
+	if ( isset( $cols['viewport'] ) ) {
+		$vp = sanitize_key( (string) ( $body['viewport'] ?? '' ) );
+		$row['viewport'] = in_array( $vp, array( 'mobile', 'tablet', 'desktop' ), true ) ? $vp : '';
+	}
+	if ( isset( $cols['meta'] ) ) {
+		$row['meta'] = substr( sanitize_text_field( (string) ( $body['meta'] ?? $body['cta'] ?? '' ) ), 0, 190 );
+	}
+	if ( isset( $cols['first_source'] ) ) {
+		$row['first_source'] = substr( sanitize_text_field( (string) ( $body['first_source'] ?? '' ) ), 0, 80 );
+	}
 
+	$wpdb->insert( $table, $row );
 	return array( 'ok' => true );
+}
+
+function tt_analytics_device_from_ua() {
+	$ua = strtolower( (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
+	if ( preg_match( '/tablet|ipad/', $ua ) ) {
+		return 'tablet';
+	}
+	if ( preg_match( '/mobi|android|iphone/', $ua ) ) {
+		return 'mobile';
+	}
+	return 'desktop';
 }
 
 function tt_analytics_require_key( WP_REST_Request $request ) {
@@ -301,6 +368,92 @@ function tt_analytics_require_key( WP_REST_Request $request ) {
 		return false;
 	}
 	return true;
+}
+
+function tt_analytics_purchase( WP_REST_Request $request ) {
+	if ( 'OPTIONS' === $request->get_method() ) {
+		tt_analytics_cors();
+		return new WP_REST_Response( null, 204 );
+	}
+	if ( ! tt_analytics_require_key( $request ) ) {
+		return new WP_Error( 'forbidden', 'Invalid analytics key', array( 'status' => 403 ) );
+	}
+	$body = $request->get_json_params();
+	if ( ! is_array( $body ) ) {
+		$body = $request->get_params();
+	}
+	$sid = sanitize_text_field( (string) ( $body['sid'] ?? '' ) );
+	if ( ! preg_match( '/^[a-zA-Z0-9\-]{8,64}$/', $sid ) ) {
+		$sid = 'ord-' . substr( sanitize_key( (string) ( $body['stripe_session_id'] ?? wp_generate_uuid4() ) ), 0, 40 );
+	}
+	global $wpdb;
+	$table = tt_analytics_table();
+	$cols  = tt_analytics_columns();
+	$row   = array(
+		'sid'          => $sid,
+		'event'        => 'purchase',
+		'path'         => tt_analytics_clean_path( $body['path'] ?? '/checkout/purchase' ),
+		'title'        => substr( sanitize_text_field( (string) ( $body['package_type'] ?? 'purchase' ) ), 0, 190 ),
+		'referrer'     => '',
+		'utm_source'   => substr( sanitize_text_field( (string) ( $body['utm_source'] ?? '' ) ), 0, 80 ),
+		'utm_medium'   => substr( sanitize_text_field( (string) ( $body['utm_medium'] ?? '' ) ), 0, 80 ),
+		'utm_campaign' => substr( sanitize_text_field( (string) ( $body['utm_campaign'] ?? '' ) ), 0, 80 ),
+		'search_query' => '',
+		'duration_ms'  => 0,
+		'created_at'   => current_time( 'mysql', true ),
+	);
+	if ( isset( $cols['utm_content'] ) ) {
+		$row['utm_content'] = substr( sanitize_text_field( (string) ( $body['utm_content'] ?? '' ) ), 0, 80 );
+	}
+	if ( isset( $cols['meta'] ) ) {
+		$row['meta'] = substr( sanitize_text_field( (string) ( $body['package_type'] ?? '' ) ), 0, 190 );
+	}
+	if ( isset( $cols['first_source'] ) ) {
+		$row['first_source'] = substr( sanitize_text_field( (string) ( $body['first_source'] ?? '' ) ), 0, 80 );
+	}
+	if ( isset( $cols['amount_cents'] ) ) {
+		$row['amount_cents'] = max( 0, intval( $body['amount_cents'] ?? 0 ) );
+	}
+	if ( isset( $cols['device'] ) ) {
+		$row['device'] = substr( sanitize_text_field( (string) ( $body['device'] ?? '' ) ), 0, 20 );
+	}
+	$wpdb->insert( $table, $row );
+	return array( 'ok' => true );
+}
+
+function tt_analytics_channel( $medium, $source_label ) {
+	$m = strtolower( trim( (string) $medium ) );
+	if ( in_array( $m, array( 'paid', 'cpc', 'ppc', 'cpm', 'paid_social', 'ads', 'paidsocial' ), true ) ) {
+		return 'paid';
+	}
+	if ( 'email' === $m ) {
+		return 'email';
+	}
+	if ( 'ugc' === $m ) {
+		return 'ugc';
+	}
+	if ( in_array( $source_label, array( 'Google', 'Bing', 'ChatGPT', 'Perplexity', 'Gemini', 'Copilot', 'Claude', 'AI search' ), true ) ) {
+		return 'organic';
+	}
+	if ( 'Direct' === $source_label ) {
+		return 'direct';
+	}
+	return $m ? $m : 'referral';
+}
+
+function tt_analytics_split_content( $content ) {
+	$content = trim( (string) $content );
+	if ( '' === $content ) {
+		return array( 'creator' => '', 'creative' => '' );
+	}
+	if ( false === strpos( $content, '|' ) ) {
+		return array( 'creator' => '', 'creative' => $content );
+	}
+	$parts = explode( '|', $content, 2 );
+	return array(
+		'creator'  => trim( $parts[0] ),
+		'creative' => trim( $parts[1] ),
+	);
 }
 
 function tt_analytics_raw_source( $utm_source, $referrer ) {
@@ -431,19 +584,50 @@ function tt_analytics_sessionize( $rows ) {
 					'exit_page'       => $row['path'],
 					'referrer'        => $row['referrer'],
 					'utm_source'      => $row['utm_source'],
+					'utm_medium'      => $row['utm_medium'] ?? '',
+					'utm_campaign'    => $row['utm_campaign'] ?? '',
+					'utm_content'     => $row['utm_content'] ?? '',
 					'raw_source'      => tt_analytics_raw_source( $row['utm_source'], $row['referrer'] ),
 					'source'          => tt_analytics_source_label( $row['utm_source'], $row['referrer'] ),
+					'first_source'    => $row['first_source'] ?? '',
+					'device'          => $row['device'] ?? '',
+					'viewport'        => $row['viewport'] ?? '',
 					'pageviews'       => 0,
 					'checkout_clicks' => 0,
 					'duration_ms'     => 0,
 					'paths'           => array(),
 					'saw_package'     => false,
+					'cta_clicks'      => 0,
+					'faq_opens'       => 0,
+					'scroll_max'      => 0,
+					'purchases'       => 0,
+					'revenue_cents'   => 0,
+					'ctas'            => array(),
+					'faqs'            => array(),
 				);
 			}
 			$current['last_ts']     = $ts;
 			$current['ended']       = $row['created_at'];
-			$current['exit_page']   = $row['path'];
+			if ( 'purchase' !== $row['event'] ) {
+				$current['exit_page'] = $row['path'];
+			}
 			$current['duration_ms'] = max( $current['duration_ms'], intval( $row['duration_ms'] ) );
+			if ( empty( $current['device'] ) && ! empty( $row['device'] ) ) {
+				$current['device'] = $row['device'];
+			}
+			if ( empty( $current['utm_content'] ) && ! empty( $row['utm_content'] ) ) {
+				$current['utm_content'] = $row['utm_content'];
+			}
+			if ( empty( $current['utm_campaign'] ) && ! empty( $row['utm_campaign'] ) ) {
+				$current['utm_campaign'] = $row['utm_campaign'];
+			}
+			if ( empty( $current['utm_medium'] ) && ! empty( $row['utm_medium'] ) ) {
+				$current['utm_medium'] = $row['utm_medium'];
+			}
+			$labeled = tt_analytics_source_label( $row['utm_source'] ?? '', $row['referrer'] ?? '' );
+			if ( $labeled && 'Direct' !== $labeled ) {
+				$current['last_touch'] = $labeled;
+			}
 			if ( 'pageview' === $row['event'] ) {
 				$current['pageviews']++;
 				$current['paths'][] = $row['path'];
@@ -454,14 +638,54 @@ function tt_analytics_sessionize( $rows ) {
 			if ( 'checkout' === $row['event'] ) {
 				$current['checkout_clicks']++;
 			}
+			if ( 'cta_click' === $row['event'] ) {
+				$current['cta_clicks']++;
+				$name = ( $row['meta'] ?? '' ) ? $row['meta'] : 'CTA';
+				$current['ctas'][ $name ] = ( $current['ctas'][ $name ] ?? 0 ) + 1;
+			}
+			if ( 'faq_open' === $row['event'] ) {
+				$current['faq_opens']++;
+				$name = ( $row['meta'] ?? '' ) ? $row['meta'] : 'FAQ';
+				$current['faqs'][ $name ] = ( $current['faqs'][ $name ] ?? 0 ) + 1;
+			}
+			if ( 'scroll' === $row['event'] ) {
+				$current['scroll_max'] = max( $current['scroll_max'], intval( $row['meta'] ?? 0 ) );
+			}
+			if ( 'purchase' === $row['event'] ) {
+				$current['purchases']++;
+				$current['revenue_cents'] += intval( $row['amount_cents'] ?? 0 );
+			}
 		}
 		if ( $current ) {
 			$sessions[] = $current;
 		}
 	}
+	$folded   = array();
+	$last_idx = array();
+	foreach ( $sessions as $s ) {
+		if ( $s['purchases'] > 0 && $s['pageviews'] === 0 && isset( $last_idx[ $s['sid'] ] ) ) {
+			$i = $last_idx[ $s['sid'] ];
+			$folded[ $i ]['purchases']     += $s['purchases'];
+			$folded[ $i ]['revenue_cents'] += $s['revenue_cents'];
+			continue;
+		}
+		$last_idx[ $s['sid'] ] = count( $folded );
+		$folded[]              = $s;
+	}
+	$sessions = $folded;
 	foreach ( $sessions as &$s ) {
-		$span           = max( 0, $s['last_ts'] - $s['start_ts'] );
+		$span              = max( 0, $s['last_ts'] - $s['start_ts'] );
 		$s['duration_sec'] = max( intval( $s['duration_ms'] / 1000 ), $span );
+		$first_label       = $s['first_source'] ? tt_analytics_source_label( $s['first_source'], '' ) : $s['source'];
+		if ( ! $first_label ) {
+			$first_label = $s['source'];
+		}
+		$s['first_touch'] = $first_label;
+		$s['last_touch']  = $s['last_touch'] ?? $s['source'];
+		$s['channel']     = tt_analytics_channel( $s['utm_medium'], $s['source'] );
+		$split            = tt_analytics_split_content( $s['utm_content'] );
+		$s['creator']     = $split['creator'];
+		$s['creative']    = $split['creative'];
 	}
 	unset( $s );
 	return $sessions;
@@ -506,10 +730,24 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 	$click_sess   = 0;
 	$dur_sum      = 0;
 	$pkg          = 0;
+	$purchases    = 0;
+	$revenue      = 0;
+	$cta_clicks   = 0;
+	$faq_opens    = 0;
 	$acq      = array();
 	$pages    = array();
 	$exits    = array();
 	$journeys = array();
+	$devices  = array();
+	$channels = array();
+	$first_t  = array();
+	$last_t   = array();
+	$campaigns = array();
+	$creators  = array();
+	$creatives = array();
+	$cta_map   = array();
+	$faq_map   = array();
+	$scrolls   = array( 0 => 0, 25 => 0, 50 => 0, 75 => 0, 90 => 0 );
 
 	$init_page = static function ( $path, $topic = '' ) {
 		return array(
@@ -522,6 +760,8 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 			'checkout_clicks' => 0,
 			'checkout_sess'   => 0,
 			'exits'           => 0,
+			'purchases'       => 0,
+			'revenue_cents'   => 0,
 		);
 	};
 
@@ -536,6 +776,10 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 		if ( $s['saw_package'] ) {
 			$pkg++;
 		}
+		$purchases  += intval( $s['purchases'] ?? 0 );
+		$revenue    += intval( $s['revenue_cents'] ?? 0 );
+		$cta_clicks += intval( $s['cta_clicks'] ?? 0 );
+		$faq_opens  += intval( $s['faq_opens'] ?? 0 );
 		$src = $s['source'];
 		if ( ! isset( $acq[ $src ] ) ) {
 			$acq[ $src ] = array(
@@ -546,12 +790,16 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 				'duration_sec'    => 0,
 				'checkout_clicks' => 0,
 				'checkout_sess'   => 0,
+				'purchases'       => 0,
+				'revenue_cents'   => 0,
 			);
 		}
 		$acq[ $src ]['sessions']++;
 		$acq[ $src ]['pageviews']       += $s['pageviews'];
 		$acq[ $src ]['duration_sec']    += $s['duration_sec'];
 		$acq[ $src ]['checkout_clicks'] += $s['checkout_clicks'];
+		$acq[ $src ]['purchases']       += intval( $s['purchases'] ?? 0 );
+		$acq[ $src ]['revenue_cents']   += intval( $s['revenue_cents'] ?? 0 );
 		if ( $s['checkout_clicks'] > 0 ) {
 			$acq[ $src ]['checkout_sess']++;
 		}
@@ -571,6 +819,8 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 			$pages[ $p ]['sessions']++;
 			$pages[ $p ]['duration_sec']    += $s['duration_sec'];
 			$pages[ $p ]['checkout_clicks'] += $s['checkout_clicks'];
+			$pages[ $p ]['purchases']       += intval( $s['purchases'] ?? 0 );
+			$pages[ $p ]['revenue_cents']   += intval( $s['revenue_cents'] ?? 0 );
 			if ( $s['checkout_clicks'] > 0 ) {
 				$pages[ $p ]['checkout_sess']++;
 			}
@@ -608,6 +858,72 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 			);
 		}
 		$journeys[ $jk ]['sessions']++;
+
+		$bump = static function ( &$map, $key, $s ) {
+			if ( '' === (string) $key ) {
+				$key = '(none)';
+			}
+			if ( ! isset( $map[ $key ] ) ) {
+				$map[ $key ] = array(
+					'label'           => $key,
+					'sessions'        => 0,
+					'checkout_clicks' => 0,
+					'purchases'       => 0,
+					'revenue_cents'   => 0,
+				);
+			}
+			$map[ $key ]['sessions']++;
+			$map[ $key ]['checkout_clicks'] += intval( $s['checkout_clicks'] );
+			$map[ $key ]['purchases']       += intval( $s['purchases'] ?? 0 );
+			$map[ $key ]['revenue_cents']   += intval( $s['revenue_cents'] ?? 0 );
+		};
+		$bump( $devices, $s['device'] ? $s['device'] : 'unknown', $s );
+		$bump( $channels, $s['channel'] ?? 'referral', $s );
+		$bump( $first_t, $s['first_touch'] ?? $s['source'], $s );
+		$bump( $last_t, $s['last_touch'] ?? $s['source'], $s );
+		if ( ! empty( $s['utm_campaign'] ) ) {
+			$bump( $campaigns, $s['utm_campaign'], $s );
+		}
+		if ( ! empty( $s['creator'] ) ) {
+			$bump( $creators, $s['creator'], $s );
+		}
+		if ( ! empty( $s['creative'] ) ) {
+			$bump( $creatives, $s['creative'], $s );
+		}
+		foreach ( $s['ctas'] ?? array() as $name => $cnt ) {
+			if ( ! isset( $cta_map[ $name ] ) ) {
+				$cta_map[ $name ] = array(
+					'cta'      => $name,
+					'clicks'   => 0,
+					'sessions' => 0,
+				);
+			}
+			$cta_map[ $name ]['clicks'] += $cnt;
+			$cta_map[ $name ]['sessions']++;
+		}
+		foreach ( $s['faqs'] ?? array() as $name => $cnt ) {
+			if ( ! isset( $faq_map[ $name ] ) ) {
+				$faq_map[ $name ] = array(
+					'faq'      => $name,
+					'opens'    => 0,
+					'sessions' => 0,
+				);
+			}
+			$faq_map[ $name ]['opens'] += $cnt;
+			$faq_map[ $name ]['sessions']++;
+		}
+		$mx = intval( $s['scroll_max'] ?? 0 );
+		if ( $mx >= 90 ) {
+			$scrolls[90]++;
+		} elseif ( $mx >= 75 ) {
+			$scrolls[75]++;
+		} elseif ( $mx >= 50 ) {
+			$scrolls[50]++;
+		} elseif ( $mx >= 25 ) {
+			$scrolls[25]++;
+		} else {
+			$scrolls[0]++;
+		}
 	}
 
 	$finish = static function ( $rows ) {
@@ -617,7 +933,11 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 			$row['avg_engaged_sec']     = round( intval( $row['duration_sec'] ) / $den );
 			$row['checkout_click_rate'] = round( intval( $row['checkout_sess'] ) / $den, 4 );
 			if ( isset( $row['exits'] ) ) {
-				$row['exit_rate'] = round( intval( $row['exits'] ) / max( 1, intval( $row['sessions'] ?? $row['entrances'] ) ), 4 );
+				$row['exit_rate'] = round( intval( $row['exits'] ) / $den, 4 );
+			}
+			if ( isset( $row['purchases'] ) ) {
+				$row['purchase_conversion_rate'] = round( intval( $row['purchases'] ) / $den, 4 );
+				$row['revenue']                  = round( intval( $row['revenue_cents'] ?? 0 ) / 100, 2 );
 			}
 			if ( isset( $row['raw_sources'] ) && is_array( $row['raw_sources'] ) ) {
 				arsort( $row['raw_sources'] );
@@ -698,20 +1018,78 @@ function tt_analytics_aggregate_sessions( $sessions ) {
 		}
 	);
 
+	$pack_labeled = static function ( $map, $key_name = 'label' ) {
+		$rows = array_values( $map );
+		usort(
+			$rows,
+			static function ( $a, $b ) {
+				return $b['sessions'] <=> $a['sessions'];
+			}
+		);
+		foreach ( $rows as &$row ) {
+			$row['checkout_click_rate']     = round( $row['checkout_clicks'] / max( 1, $row['sessions'] ), 4 );
+			$row['purchase_conversion_rate'] = round( intval( $row['purchases'] ) / max( 1, $row['sessions'] ), 4 );
+			$row['revenue']                 = round( intval( $row['revenue_cents'] ) / 100, 2 );
+			if ( $key_name !== 'label' && isset( $row['label'] ) ) {
+				$row[ $key_name ] = $row['label'];
+			}
+		}
+		unset( $row );
+		return array_slice( $rows, 0, 40 );
+	};
+	$cta_rows = array_values( $cta_map );
+	usort(
+		$cta_rows,
+		static function ( $a, $b ) {
+			return $b['clicks'] <=> $a['clicks'];
+		}
+	);
+	$faq_rows = array_values( $faq_map );
+	usort(
+		$faq_rows,
+		static function ( $a, $b ) {
+			return $b['opens'] <=> $a['opens'];
+		}
+	);
+
 	return array(
-		'visitors'         => count( $visitors ),
-		'sessions'         => $n,
-		'pageviews'        => $pageviews,
-		'avg_engaged_sec'  => $n ? round( $dur_sum / $n ) : 0,
-		'checkout_clicks'  => $clicks,
-		'checkout_sess'    => $click_sess,
+		'visitors'            => count( $visitors ),
+		'sessions'            => $n,
+		'pageviews'           => $pageviews,
+		'avg_engaged_sec'     => $n ? round( $dur_sum / $n ) : 0,
+		'checkout_clicks'     => $clicks,
+		'checkout_sess'       => $click_sess,
 		'checkout_click_rate' => $n ? round( $click_sess / $n, 4 ) : 0,
-		'package_viewed'   => $pkg,
-		'acquisition'      => array_slice( $acq_rows, 0, 40 ),
-		'landings'         => array_slice( $land_rows, 0, 40 ),
-		'content'          => array_slice( $content_rows, 0, 40 ),
-		'exits'            => array_slice( $exit_rows, 0, 30 ),
-		'journeys'         => array_slice( $journey_rows, 0, 25 ),
+		'package_viewed'      => $pkg,
+		'orders'              => $purchases,
+		'revenue_cents'       => $revenue,
+		'revenue'             => round( $revenue / 100, 2 ),
+		'aov'                 => $purchases ? round( ( $revenue / 100 ) / $purchases, 2 ) : 0,
+		'purchase_conversion_rate' => $n ? round( $purchases / $n, 4 ) : 0,
+		'revenue_per_visitor' => count( $visitors ) ? round( ( $revenue / 100 ) / count( $visitors ), 2 ) : 0,
+		'cta_clicks'          => $cta_clicks,
+		'faq_opens'           => $faq_opens,
+		'acquisition'         => array_slice( $acq_rows, 0, 40 ),
+		'landings'            => array_slice( $land_rows, 0, 40 ),
+		'content'             => array_slice( $content_rows, 0, 40 ),
+		'exits'               => array_slice( $exit_rows, 0, 30 ),
+		'journeys'            => array_slice( $journey_rows, 0, 25 ),
+		'devices'             => $pack_labeled( $devices, 'device' ),
+		'channels'            => $pack_labeled( $channels, 'channel' ),
+		'first_touch'         => $pack_labeled( $first_t, 'source' ),
+		'last_touch'          => $pack_labeled( $last_t, 'source' ),
+		'campaigns'           => $pack_labeled( $campaigns, 'campaign' ),
+		'creators'            => $pack_labeled( $creators, 'creator' ),
+		'creatives'           => $pack_labeled( $creatives, 'creative' ),
+		'ctas'                => array_slice( $cta_rows, 0, 30 ),
+		'faqs'                => array_slice( $faq_rows, 0, 30 ),
+		'scroll'              => array(
+			array( 'depth' => '0-24%', 'sessions' => $scrolls[0] ),
+			array( 'depth' => '25-49%', 'sessions' => $scrolls[25] ),
+			array( 'depth' => '50-74%', 'sessions' => $scrolls[50] ),
+			array( 'depth' => '75-89%', 'sessions' => $scrolls[75] ),
+			array( 'depth' => '90%+', 'sessions' => $scrolls[90] ),
+		),
 	);
 }
 
@@ -719,6 +1097,7 @@ function tt_analytics_opportunities( $cur, $prev, $thresholds ) {
 	$out     = array();
 	$min_all = $thresholds['min_sessions_period'];
 	$min_seg = $thresholds['min_sessions_segment'];
+	$min_win = $thresholds['min_sessions_winner'];
 	if ( $cur['sessions'] >= $min_all && $prev['sessions'] >= $min_all ) {
 		$pct = $prev['sessions'] ? round( ( ( $cur['sessions'] - $prev['sessions'] ) / $prev['sessions'] ) * 100 ) : 0;
 		if ( abs( $pct ) >= 15 ) {
@@ -729,6 +1108,13 @@ function tt_analytics_opportunities( $cur, $prev, $thresholds ) {
 				'based_on' => 'sessions vs previous equivalent period',
 			);
 		}
+	}
+	if ( $cur['orders'] > 0 ) {
+		$out[] = array(
+			'kind'     => 'fact',
+			'text'     => $cur['orders'] . ' attributed purchase' . ( $cur['orders'] === 1 ? '' : 's' ) . ' in this period, totaling $' . number_format( $cur['revenue'], 2 ) . '.',
+			'based_on' => 'Stripe purchase events joined to a visit id',
+		);
 	}
 	$total_s = max( 1, $cur['sessions'] );
 	$total_c = max( 1, $cur['checkout_sess'] );
@@ -744,6 +1130,13 @@ function tt_analytics_opportunities( $cur, $prev, $thresholds ) {
 				'kind'     => 'observation',
 				'text'     => $row['source'] . ' generated ' . round( $sess_share * 100 ) . '% of sessions but ' . round( $click_share * 100 ) . '% of checkout-click sessions.',
 				'based_on' => 'source share vs checkout-click share',
+			);
+		}
+		if ( $row['sessions'] >= $min_win && $row['purchases'] > 0 ) {
+			$out[] = array(
+				'kind'     => 'fact',
+				'text'     => $row['source'] . ' had ' . intval( $row['purchases'] ) . ' attributed purchase' . ( $row['purchases'] === 1 ? '' : 's' ) . ' from ' . intval( $row['sessions'] ) . ' sessions.',
+				'based_on' => 'source sessions vs attributed purchases; min ' . $min_win . ' sessions',
 			);
 		}
 	}
@@ -769,8 +1162,16 @@ function tt_analytics_opportunities( $cur, $prev, $thresholds ) {
 				'based_on' => 'engagement vs checkout click rate; min ' . $min_seg . ' sessions',
 			);
 		}
+		if ( $entr >= $min_win && $site_rate > 0 && $rate >= ( $site_rate * 1.5 ) && intval( $row['checkout_clicks'] ) >= 3 ) {
+			$seen[ $key ] = true;
+			$out[]        = array(
+				'kind'     => 'possible_opportunity',
+				'text'     => ( $row['path'] ?? '' ) . ' has a higher checkout click rate than the site average. This is a rate difference, not proof of cause.',
+				'based_on' => 'checkout click rate vs site average; min ' . $min_win . ' sessions and 3 checkout clicks',
+			);
+		}
 	}
-	return array_slice( $out, 0, 6 );
+	return array_slice( $out, 0, 8 );
 }
 
 function tt_analytics_future_fields() {
@@ -793,14 +1194,11 @@ function tt_analytics_future_fields() {
 function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 	global $wpdb;
 	$table = tt_analytics_table();
-	$has_q = (bool) $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'search_query' ) );
-	$qcol  = $has_q ? 'search_query' : "'' AS search_query";
 	$from  = gmdate( 'Y-m-d H:i:s', $range['prev_from'] );
 	$to    = gmdate( 'Y-m-d H:i:s', $range['to'] );
 	$rows  = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT sid, event, path, title, referrer, utm_source, {$qcol}, duration_ms, created_at
-			 FROM {$table}
+			"SELECT * FROM {$table}
 			 WHERE created_at >= %s AND created_at < %s
 			 ORDER BY sid ASC, created_at ASC",
 			$from,
@@ -838,12 +1236,16 @@ function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 				'pageviews'       => 0,
 				'checkout_clicks' => 0,
 				'checkout_sess'   => 0,
+				'orders'          => 0,
+				'revenue'         => 0,
 			);
 		}
 		$trend_map[ $key ]['visitors'][ $s['sid'] ] = true;
 		$trend_map[ $key ]['sessions']++;
 		$trend_map[ $key ]['pageviews']       += $s['pageviews'];
 		$trend_map[ $key ]['checkout_clicks'] += $s['checkout_clicks'];
+		$trend_map[ $key ]['orders']          += intval( $s['purchases'] ?? 0 );
+		$trend_map[ $key ]['revenue']         += round( intval( $s['revenue_cents'] ?? 0 ) / 100, 2 );
 		if ( $s['checkout_clicks'] > 0 ) {
 			$trend_map[ $key ]['checkout_sess']++;
 		}
@@ -858,6 +1260,8 @@ function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 			'pageviews'           => $row['pageviews'],
 			'checkout_clicks'     => $row['checkout_clicks'],
 			'checkout_click_rate' => round( $row['checkout_sess'] / $sess, 4 ),
+			'orders'              => $row['orders'],
+			'revenue'             => $row['revenue'],
 		);
 	}
 
@@ -883,27 +1287,48 @@ function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 			'pct_prev'   => $cur['package_viewed'] ? min( 1, round( $cur['checkout_sess'] / $cur['package_viewed'], 4 ) ) : 0,
 			'drop_prev'  => $cur['package_viewed'] ? max( 0, round( 1 - ( $cur['checkout_sess'] / $cur['package_viewed'] ), 4 ) ) : 0,
 		),
+		array(
+			'step'       => 'Purchase',
+			'sessions'   => $cur['orders'],
+			'pct_total'  => $cur['sessions'] ? round( $cur['orders'] / $cur['sessions'], 4 ) : 0,
+			'pct_prev'   => $cur['checkout_sess'] ? min( 1, round( $cur['orders'] / $cur['checkout_sess'], 4 ) ) : 0,
+			'drop_prev'  => $cur['checkout_sess'] ? max( 0, round( 1 - ( $cur['orders'] / $cur['checkout_sess'] ), 4 ) ) : 0,
+		),
 	);
 
 	$thresholds = array(
 		'min_sessions_period'  => 20,
 		'min_sessions_segment' => 15,
+		'min_sessions_winner'  => 50,
+		'min_checkouts_winner' => 10,
 		'session_timeout_min'  => 30,
 	);
 
 	$kpis = array(
-		'visitors'            => tt_analytics_kpi_pair( $cur['visitors'], $prev['visitors'] ),
-		'sessions'            => tt_analytics_kpi_pair( $cur['sessions'], $prev['sessions'] ),
-		'pageviews'           => tt_analytics_kpi_pair( $cur['pageviews'], $prev['pageviews'] ),
-		'avg_engaged_sec'     => tt_analytics_kpi_pair( $cur['avg_engaged_sec'], $prev['avg_engaged_sec'] ),
-		'checkout_clicks'     => tt_analytics_kpi_pair( $cur['checkout_clicks'], $prev['checkout_clicks'] ),
-		'checkout_click_rate' => tt_analytics_kpi_pair( $cur['checkout_click_rate'], $prev['checkout_click_rate'], true ),
+		'visitors'                 => tt_analytics_kpi_pair( $cur['visitors'], $prev['visitors'] ),
+		'sessions'                 => tt_analytics_kpi_pair( $cur['sessions'], $prev['sessions'] ),
+		'pageviews'                => tt_analytics_kpi_pair( $cur['pageviews'], $prev['pageviews'] ),
+		'avg_engaged_sec'          => tt_analytics_kpi_pair( $cur['avg_engaged_sec'], $prev['avg_engaged_sec'] ),
+		'checkout_clicks'          => tt_analytics_kpi_pair( $cur['checkout_clicks'], $prev['checkout_clicks'] ),
+		'checkout_click_rate'      => tt_analytics_kpi_pair( $cur['checkout_click_rate'], $prev['checkout_click_rate'], true ),
+		'orders'                   => tt_analytics_kpi_pair( $cur['orders'], $prev['orders'] ),
+		'revenue'                  => tt_analytics_kpi_pair( $cur['revenue'], $prev['revenue'] ),
+		'purchase_conversion_rate' => tt_analytics_kpi_pair( $cur['purchase_conversion_rate'], $prev['purchase_conversion_rate'], true ),
+		'aov'                      => tt_analytics_kpi_pair( $cur['aov'], $prev['aov'] ),
+		'revenue_per_visitor'      => tt_analytics_kpi_pair( $cur['revenue_per_visitor'], $prev['revenue_per_visitor'] ),
+	);
+
+	$live_from = gmdate( 'Y-m-d H:i:s', time() - 300 );
+	$live      = array(
+		'window_sec' => 300,
+		'events'     => (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE created_at >= %s", $live_from ) ),
+		'visitors'   => (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(DISTINCT sid) FROM {$table} WHERE created_at >= %s", $live_from ) ),
 	);
 
 	return array(
-		'phase'         => 1,
+		'phase'         => 6,
 		'contract'      => array(
-			'version'  => 1,
+			'version'  => 2,
 			'reserved' => array_keys( tt_analytics_future_fields() ),
 		),
 		'range'         => array(
@@ -917,7 +1342,20 @@ function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 		),
 		'thresholds'    => $thresholds,
 		'kpis'          => $kpis,
-		'future'        => tt_analytics_future_fields(),
+		'future'        => array(
+			'orders'                   => $cur['orders'],
+			'revenue'                  => $cur['revenue'],
+			'purchase_conversion_rate' => $cur['purchase_conversion_rate'],
+			'revenue_per_visitor'      => $cur['revenue_per_visitor'],
+			'utm_content'              => $cur['creatives'],
+			'utm_term'                 => null,
+			'creator'                  => $cur['creators'],
+			'creative'                 => $cur['creatives'],
+			'device'                   => $cur['devices'],
+			'scroll_depth'             => $cur['scroll'],
+			'first_touch'              => $cur['first_touch'],
+			'last_touch'               => $cur['last_touch'],
+		),
 		'trend'         => array(
 			'bucket' => $range['bucket'],
 			'points' => $trend,
@@ -928,12 +1366,36 @@ function tt_analytics_build_summary_range( $range, $source_filter = '' ) {
 		'funnel'        => $funnel,
 		'exits'         => $cur['exits'],
 		'journeys'      => $cur['journeys'],
+		'devices'       => $cur['devices'],
+		'channels'      => $cur['channels'],
+		'first_touch'   => $cur['first_touch'],
+		'last_touch'    => $cur['last_touch'],
+		'campaigns'     => $cur['campaigns'],
+		'creators'      => $cur['creators'],
+		'creatives'     => $cur['creatives'],
+		'ctas'          => $cur['ctas'],
+		'faqs'          => $cur['faqs'],
+		'scroll'        => $cur['scroll'],
+		'live'          => $live,
+		'gsc'           => array(
+			'connected' => false,
+			'note'      => 'Search Console is not connected. Clicks and impressions will stay in a separate block and will not be mixed with onsite visitors.',
+		),
+		'utm_contract'  => array(
+			array( 'param' => 'utm_source', 'meaning' => 'Platform', 'example' => 'instagram' ),
+			array( 'param' => 'utm_medium', 'meaning' => 'paid | organic | ugc | email', 'example' => 'paid' ),
+			array( 'param' => 'utm_campaign', 'meaning' => 'Campaign', 'example' => 'ugc-september' ),
+			array( 'param' => 'utm_content', 'meaning' => 'creator|creative', 'example' => 'sarah|mold-under-sink' ),
+			array( 'param' => 'utm_term', 'meaning' => 'Hook short code', 'example' => 'weird-spot' ),
+		),
 		'opportunities' => tt_analytics_opportunities( $cur, $prev, $thresholds ),
 		'totals'        => array(
 			'sessions'         => $cur['sessions'],
 			'pageviews'        => $cur['pageviews'],
 			'avg_duration_sec' => $cur['avg_engaged_sec'],
 			'checkouts'        => $cur['checkout_clicks'],
+			'orders'           => $cur['orders'],
+			'revenue'          => $cur['revenue'],
 		),
 		'sources'       => array_map(
 			static function ( $row ) {
@@ -1040,6 +1502,8 @@ add_action(
 		?>
 <script>
 (function () {
+  if (/[?&]tt_analytics=0(?:&|$)/.test(location.search)) return;
+  if (document.cookie.indexOf('wordpress_logged_in_') !== -1) return;
   var KEY = 'tt_sid';
   var sid = localStorage.getItem(KEY);
   if (!sid) {
@@ -1047,33 +1511,65 @@ add_action(
     localStorage.setItem(KEY, sid);
   }
   var params = new URLSearchParams(location.search);
-  var started = Date.now();
+  function readJson(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  }
+  function writeJson(key, val) {
+    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+  var incoming = {};
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function (k) {
+    var v = params.get(k);
+    if (v) incoming[k] = v;
+  });
+  if (Object.keys(incoming).length) {
+    writeJson('tt_utm', incoming);
+    if (!readJson('tt_first')) writeJson('tt_first', Object.assign({ path: location.pathname, t: Date.now() }, incoming));
+  }
+  var utm = readJson('tt_utm') || incoming || {};
+  var first = readJson('tt_first') || {};
+  var w = window.innerWidth || 0;
+  var viewport = w < 768 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
+  var ua = navigator.userAgent || '';
+  var device = /Mobi|Android/i.test(ua) ? 'mobile' : /iPad|Tablet/i.test(ua) ? 'tablet' : 'desktop';
   var visibleStarted = Date.now();
   var engaged = 0;
-  function payload(event) {
+  function payload(event, extra) {
+    extra = extra || {};
     return {
       sid: sid,
       event: event,
       path: location.pathname,
       title: document.title || '',
       referrer: document.referrer || '',
-      utm_source: params.get('utm_source') || '',
-      utm_medium: params.get('utm_medium') || '',
-      utm_campaign: params.get('utm_campaign') || '',
-      utm_term: params.get('utm_term') || params.get('q') || '',
+      utm_source: utm.utm_source || '',
+      utm_medium: utm.utm_medium || '',
+      utm_campaign: utm.utm_campaign || '',
+      utm_content: utm.utm_content || '',
+      utm_term: utm.utm_term || params.get('q') || '',
+      first_source: first.utm_source || '',
+      device: device,
+      viewport: viewport,
+      meta: extra.meta || '',
       duration_ms: engaged + (document.hidden ? 0 : (Date.now() - visibleStarted))
     };
   }
-  function send(event) {
+  function send(event, extra) {
     try {
       fetch('/wp-json/tt-analytics/v1/hit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload(event)),
+        body: JSON.stringify(payload(event, extra)),
         keepalive: true
       });
+      localStorage.setItem('tt_last', String(Date.now()));
     } catch (e) {}
   }
+  var last = parseInt(localStorage.getItem('tt_last') || '0', 10);
+  var now = Date.now();
+  var newDay = false;
+  try { newDay = last ? (new Date(last).toDateString() !== new Date().toDateString()) : true; } catch (e) {}
+  if (!last || now - last > 30 * 60 * 1000 || newDay) send('session_start');
   send('pageview');
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
@@ -1084,11 +1580,73 @@ add_action(
     }
   });
   window.addEventListener('pagehide', function () { send('leave'); });
+  function decorateStripe(a) {
+    try {
+      var u = new URL(a.href, location.origin);
+      if (u.hostname.indexOf('buy.stripe.com') === -1) return;
+      u.searchParams.set('client_reference_id', sid);
+      ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function (k) {
+        if (utm[k] && !u.searchParams.get(k)) u.searchParams.set(k, utm[k]);
+      });
+      a.href = u.toString();
+    } catch (e) {}
+  }
+  function ctaName(el) {
+    if (!el) return '';
+    var named = el.getAttribute && el.getAttribute('data-tt-cta');
+    if (named) return named.slice(0, 80);
+    var href = (el.getAttribute && el.getAttribute('href')) || el.href || '';
+    var id = el.id || '';
+    var cls = String(el.className || '');
+    if (id === 'sp2CtaB' || id === 'sp2Cta' || cls.indexOf('sp2InlineCta') !== -1 || cls.indexOf('sp2Cta') !== -1) {
+      return ((el.textContent || 'Order').replace(/\s+/g, ' ').trim() || 'Order').slice(0, 80);
+    }
+    if (/\/packages\//.test(href)) return ('Package ' + href.replace(/^https?:\/\/[^/]+/, '')).slice(0, 80);
+    if (/how-it-works/.test(href)) return 'How It Works';
+    if (/\/pricing\/?$/.test(href) || /\/pricing/.test(href)) return 'Pricing';
+    var t = ((el.textContent || '')).replace(/\s+/g, ' ').trim();
+    if (/^(test now|order now|get started|buy now|order )/i.test(t)) return t.slice(0, 80);
+    return '';
+  }
   document.addEventListener('click', function (e) {
-    var a = e.target && e.target.closest ? e.target.closest('a') : null;
-    if (!a || !a.href) return;
-    if (a.href.indexOf('buy.stripe.com') !== -1) send('checkout');
+    var a = e.target && e.target.closest ? e.target.closest('a,button') : null;
+    if (!a) return;
+    if (a.href && a.href.indexOf('buy.stripe.com') !== -1) {
+      decorateStripe(a);
+      send('checkout');
+      return;
+    }
+    var name = ctaName(a);
+    if (name) send('cta_click', { meta: name });
   }, true);
+  document.addEventListener('toggle', function (e) {
+    if (e.target && e.target.tagName === 'DETAILS' && e.target.open) {
+      var sum = e.target.querySelector('summary');
+      send('faq_open', { meta: ((sum && sum.textContent) || 'FAQ').replace(/\s+/g, ' ').trim().slice(0, 80) });
+    }
+  }, true);
+  document.addEventListener('click', function (e) {
+    var item = e.target && e.target.closest ? e.target.closest('.brxe-accordion-menu, .accordion-title, .faq-question, [data-faq]') : null;
+    if (!item) return;
+    send('faq_open', { meta: (item.textContent || 'FAQ').replace(/\s+/g, ' ').trim().slice(0, 80) });
+  }, true);
+  var marks = {};
+  var skey = 'tt_sc:' + location.pathname;
+  try { marks = JSON.parse(sessionStorage.getItem(skey) || '{}'); } catch (e) { marks = {}; }
+  function onScroll() {
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    if (max <= 0) return;
+    var pct = Math.round(100 * h.scrollTop / max);
+    [25, 50, 75, 90].forEach(function (n) {
+      if (pct >= n && !marks[n]) {
+        marks[n] = 1;
+        try { sessionStorage.setItem(skey, JSON.stringify(marks)); } catch (e) {}
+        send('scroll', { meta: String(n) });
+      }
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
 })();
 </script>
 		<?php
