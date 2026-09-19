@@ -20,8 +20,10 @@ import { resolveCoverAssets } from "@/utils/reportAssets";
 import { sanitizeReportText } from "@/utils/reportText";
 import EmailTemplateManager from "@/components/EmailTemplateManager";
 import KitFulfillmentManager from "@/components/KitFulfillmentManager";
+import SeoGeoDashboard from "@/components/SeoGeoDashboard";
+import LeadsAnalytics from "@/components/LeadsAnalytics";
 
-import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info} from "lucide-react";
+import { MoreHorizontal, Download, Trash2, Eye, FileText, Filter, Search, Calendar, User, MapPin, Home, AlertTriangle, Droplets, Thermometer, Package, CheckCircle, Clock, XCircle, Mail, Star, PlayCircle, PauseCircle, RefreshCw, BarChart3, FlaskConical, RotateCcw, File, Database, Zap, CheckCircle2, X, Loader2, Info, Globe, Users} from "lucide-react";
 import { usePopup } from "@/components/ui/popup";
 import { buildLabAnalysisFilesHtml, buildLabAnalysisIntroHtml, normalizeLabAnalysisImages } from "@/lib/labAnalysis.jsx";
 import {
@@ -2162,6 +2164,14 @@ export default function AdminDashboard() {
               <Mail className="w-4 h-4" />
               Email Settings
             </TabsTrigger>
+              <TabsTrigger value="leads" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <Users className="w-4 h-4" />
+              Leads Analytics
+            </TabsTrigger>
+              <TabsTrigger value="seo" className="flex-1 min-w-[120px] flex items-center justify-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200">
+              <Globe className="w-4 h-4" />
+              SEO & GEO
+            </TabsTrigger>
           </TabsList>
           </div>
 
@@ -2377,6 +2387,26 @@ export default function AdminDashboard() {
                     <RefreshCw className="w-8 h-8 text-orange-600" />
                     <span className="text-sm font-medium">Refresh Data</span>
                     <span className="text-xs text-slate-500">Update dashboard</span>
+                  </Button>
+
+                  <Button 
+                    onClick={() => setActiveTab("leads")} 
+                    variant="outline" 
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-violet-50 hover:border-violet-300 transition-all duration-200"
+                  >
+                    <Users className="w-8 h-8 text-violet-600" />
+                    <span className="text-sm font-medium">Leads Analytics</span>
+                    <span className="text-xs text-slate-500">Source, time, drop-off</span>
+                  </Button>
+
+                  <Button 
+                    onClick={() => setActiveTab("seo")} 
+                    variant="outline" 
+                    className="h-24 flex flex-col gap-3 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all duration-200"
+                  >
+                    <Globe className="w-8 h-8 text-indigo-600" />
+                    <span className="text-sm font-medium">SEO & GEO</span>
+                    <span className="text-xs text-slate-500">Rankings and blog ideas</span>
                   </Button>
                 </div>
               </CardContent>
@@ -3322,6 +3352,14 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="leads" className="space-y-6">
+            <LeadsAnalytics />
+          </TabsContent>
+
+          <TabsContent value="seo" className="space-y-6">
+            <SeoGeoDashboard />
           </TabsContent>
         </Tabs>
       </div>
