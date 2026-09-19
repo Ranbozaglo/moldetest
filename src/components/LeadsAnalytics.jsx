@@ -66,7 +66,7 @@ export default function LeadsAnalytics() {
               Leads analytics
             </CardTitle>
             <CardDescription>
-              Every visit on total-testing.com: where it came from, how long they stayed, and where they left.
+              Google, ChatGPT, Instagram, and other sources. Landing page is always stored. The exact Google or AI question is only shown when the provider sends it.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -227,6 +227,33 @@ export default function LeadsAnalytics() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Page or question they landed on</CardTitle>
+          <CardDescription>
+            Google and ChatGPT almost never send the typed query. This uses the page title, or the search terms when Bing or a UTM tag includes them.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Page / question</TableHead>
+                <TableHead className="text-right">Sessions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(data?.questions || []).map((row) => (
+                <TableRow key={row.question}>
+                  <TableCell className="font-medium">{row.question}</TableCell>
+                  <TableCell className="text-right">{row.sessions}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -236,14 +263,16 @@ export default function LeadsAnalytics() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>First page</TableHead>
+                  <TableHead>Page</TableHead>
+                  <TableHead>Path</TableHead>
                   <TableHead className="text-right">Sessions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {landings.map((row) => (
                   <TableRow key={row.path}>
-                    <TableCell>{row.path}</TableCell>
+                    <TableCell className="font-medium">{row.topic || row.path}</TableCell>
+                    <TableCell className="text-xs">{row.path}</TableCell>
                     <TableCell className="text-right">{row.sessions}</TableCell>
                   </TableRow>
                 ))}
@@ -262,7 +291,8 @@ export default function LeadsAnalytics() {
                 <TableRow>
                   <TableHead>When</TableHead>
                   <TableHead>Source</TableHead>
-                  <TableHead>Landed</TableHead>
+                  <TableHead>Page / question</TableHead>
+                  <TableHead>Search query</TableHead>
                   <TableHead>Left</TableHead>
                   <TableHead className="text-right">Time</TableHead>
                 </TableRow>
@@ -274,7 +304,8 @@ export default function LeadsAnalytics() {
                     <TableCell>
                       <Badge variant="outline">{row.source}</Badge>
                     </TableCell>
-                    <TableCell className="text-xs">{row.landing}</TableCell>
+                    <TableCell className="text-xs">{row.topic || row.landing}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{row.query || "Not sent"}</TableCell>
                     <TableCell className="text-xs">{row.exit_page}</TableCell>
                     <TableCell className="text-right text-xs">{formatDuration(row.duration_sec)}</TableCell>
                   </TableRow>
