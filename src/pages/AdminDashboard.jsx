@@ -2396,7 +2396,7 @@ export default function AdminDashboard() {
                   >
                     <Users className="w-8 h-8 text-violet-600" />
                     <span className="text-sm font-medium">Leads Analytics</span>
-                    <span className="text-xs text-slate-500">Source, time, drop-off</span>
+                    <span className="text-xs text-slate-500">Growth overview</span>
                   </Button>
 
                   <Button 
