@@ -51,6 +51,68 @@ const DATE_PRESETS = [
   { value: "custom", label: "Custom" },
 ];
 
+const PACKAGE_PRICES = { spot_check: 189, extended: 215, full_house: 270 };
+const PACKAGE_LABELS = { spot_check: "Spot Check", extended: "Extended", full_house: "Full House" };
+
+const toZ = (iso) => String(iso || "").replace(/\+00:00$/, "Z");
+
+const inRange = (iso, fromIso, toIso) => {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return false;
+  const from = Date.parse(fromIso);
+  const to = Date.parse(toIso);
+  if (Number.isFinite(from) && t < from) return false;
+  if (Number.isFinite(to) && t >= to) return false;
+  return true;
+};
+
+const aggregateFulfillments = (rows, fromIso, toIso) => {
+  const matched = (rows || []).filter((row) => inRange(row.created_at || row.email_sent_at, fromIso, toIso));
+  const byPackage = {};
+  let revenue = 0;
+  let estimated = 0;
+  let attributed = 0;
+  const recent = [];
+  matched.forEach((row) => {
+    const pkg = row.package_type || "unknown";
+    const stored = Number(row.amount_cents);
+    const usedList = !Number.isFinite(stored) || stored <= 0;
+    const cents = usedList ? Math.round((PACKAGE_PRICES[pkg] || 0) * 100) : stored;
+    if (usedList) estimated += 1;
+    revenue += cents / 100;
+    if (row.analytics_sid) attributed += 1;
+    if (!byPackage[pkg]) {
+      byPackage[pkg] = { package_type: pkg, label: PACKAGE_LABELS[pkg] || pkg, orders: 0, revenue_cents: 0 };
+    }
+    byPackage[pkg].orders += 1;
+    byPackage[pkg].revenue_cents += cents;
+    recent.push({
+      package_type: pkg,
+      label: PACKAGE_LABELS[pkg] || pkg,
+      created_at: row.created_at || row.email_sent_at || "",
+      amount: cents / 100,
+      attributed: Boolean(row.analytics_sid),
+      list_price: usedList,
+    });
+  });
+  recent.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const orders = matched.length;
+  return {
+    orders,
+    purchases: orders,
+    attributed_orders: attributed,
+    unattributed_orders: orders - attributed,
+    revenue: Math.round(revenue * 100) / 100,
+    estimated_orders: estimated,
+    aov: orders ? Math.round((revenue / orders) * 100) / 100 : 0,
+    by_package: Object.values(byPackage),
+    recent: recent.slice(0, 50),
+    note: "Purchases are kit fulfillments in this date range, including orders that never got a website visit id.",
+  };
+};
+
+const stripeOrderCount = (payload) => Number(payload?.orders ?? payload?.purchases ?? 0) || 0;
+
 const TREND_METRICS = [
   { key: "visitors", label: "Visitors" },
   { key: "pageviews", label: "Page Views" },
@@ -70,11 +132,11 @@ const TERM_HELP = {
   entrances: "Sessions whose first page was this path.",
   exit_rate: "Share of sessions that viewed this page and also ended there. An exit is not automatically a problem.",
   exits: "Sessions whose last page was this path. People often leave after they found what they needed.",
-  orders: "Stripe purchases joined to a visit id after checkout. Older fulfillments without a visit id are listed on the Revenue tab, not counted as attributed conversion.",
-  revenue: "Attributed purchase revenue from Stripe amount_total. $0 until a purchase is joined to a visit.",
-  purchase_conversion_rate: "Attributed purchases divided by sessions. Not checkout click rate.",
-  aov: "Average order value of attributed purchases.",
-  revenue_per_visitor: "Attributed revenue divided by unique visitors.",
+  orders: "All Stripe kit fulfillments in this date range. A purchase does not need a website visit id to count here.",
+  revenue: "Sum of those purchases. Uses Stripe amount_total when stored, otherwise the package list price ($189 / $215 / $270).",
+  purchase_conversion_rate: "Stripe purchases divided by sessions.",
+  aov: "Average order value of Stripe purchases in this date range.",
+  revenue_per_visitor: "Stripe purchase revenue divided by unique visitors.",
   first_touch: "Source stored on the visitor's first marketing-site landing (local first-touch). Direct is used if no source was stored.",
   last_touch: "Last non-direct source in the session.",
   scroll_depth: "Deepest scroll band recorded for the session. New events only; older visits have no scroll data.",
@@ -214,15 +276,30 @@ export default function LeadsAnalytics() {
         throw new Error(json.message || json.error || `Could not load analytics (${res.status})`);
       }
       setData(json);
+      const fromIso = toZ(json.range?.from);
+      const toIso = toZ(json.range?.to);
+      let purchases = null;
       try {
-        const purchases = await KitService.getAnalyticsPurchases({
-          from: json.range?.from,
-          to: json.range?.to,
+        purchases = await KitService.getAnalyticsPurchases({
+          from: fromIso,
+          to: toIso,
         });
-        setStripePurchases(purchases);
       } catch {
-        setStripePurchases(null);
+        purchases = null;
       }
+      const apiOrders = stripeOrderCount(purchases);
+      if (!purchases || apiOrders === 0) {
+        try {
+          const ful = await KitService.listFulfillments();
+          const fallback = aggregateFulfillments(ful?.fulfillments, json.range?.from, json.range?.to);
+          if (!purchases || fallback.orders > apiOrders) {
+            purchases = { ...(purchases || {}), ...fallback };
+          }
+        } catch {
+          /* keep purchases */
+        }
+      }
+      setStripePurchases(purchases);
     } catch (err) {
       setData(null);
       setError(err?.message || "Could not load analytics");
@@ -276,12 +353,51 @@ export default function LeadsAnalytics() {
     { key: "checkout_clicks", label: "Checkout Clicks", format: (k) => formatInt(k?.value), term: "checkout_clicks" },
     { key: "checkout_click_rate", label: "Checkout Click Rate", format: (k) => formatPct(k?.value), term: "checkout_click_rate" },
   ];
+  const stripeOrders = stripeOrderCount(stripePurchases);
+  const stripeRevenue = stripePurchases?.revenue;
+  const sessionsForRate = Number(kpis.sessions?.value || 0);
   const revenueCards = [
-    { key: "orders", label: "Attributed Orders", format: (k) => formatInt(k?.value), term: "orders" },
-    { key: "revenue", label: "Attributed Revenue", format: (k) => formatMoney(k?.value), term: "revenue" },
-    { key: "purchase_conversion_rate", label: "Purchase Conversion", format: (k) => formatPct(k?.value), term: "purchase_conversion_rate" },
-    { key: "aov", label: "AOV", format: (k) => formatMoney(k?.value), term: "aov" },
-    { key: "revenue_per_visitor", label: "Revenue / Visitor", format: (k) => formatMoney(k?.value), term: "revenue_per_visitor" },
+    {
+      key: "orders",
+      label: "Orders",
+      format: () => formatInt(stripePurchases ? stripeOrders : kpis.orders?.value),
+      term: "orders",
+      kpi: stripePurchases ? { value: stripeOrders } : kpis.orders,
+    },
+    {
+      key: "revenue",
+      label: "Revenue",
+      format: () => formatMoney(stripePurchases ? stripeRevenue : kpis.revenue?.value),
+      term: "revenue",
+      kpi: stripePurchases ? { value: stripeRevenue } : kpis.revenue,
+    },
+    {
+      key: "purchase_conversion_rate",
+      label: "Purchase Conversion",
+      format: () => formatPct(stripePurchases && sessionsForRate ? stripeOrders / sessionsForRate : kpis.purchase_conversion_rate?.value),
+      term: "purchase_conversion_rate",
+      kpi: stripePurchases ? { value: sessionsForRate ? stripeOrders / sessionsForRate : 0 } : kpis.purchase_conversion_rate,
+    },
+    {
+      key: "aov",
+      label: "AOV",
+      format: () => formatMoney(stripePurchases ? stripePurchases.aov : kpis.aov?.value),
+      term: "aov",
+      kpi: stripePurchases ? { value: stripePurchases.aov } : kpis.aov,
+    },
+    {
+      key: "revenue_per_visitor",
+      label: "Revenue / Visitor",
+      format: () => {
+        const visitors = Number(kpis.visitors?.value || 0);
+        if (stripePurchases) return formatMoney(visitors ? stripeRevenue / visitors : 0);
+        return formatMoney(kpis.revenue_per_visitor?.value);
+      },
+      term: "revenue_per_visitor",
+      kpi: stripePurchases
+        ? { value: Number(kpis.visitors?.value || 0) ? stripeRevenue / Number(kpis.visitors.value) : 0 }
+        : kpis.revenue_per_visitor,
+    },
   ];
 
   const chartData = trendPoints.map((row) => ({
@@ -375,8 +491,8 @@ export default function LeadsAnalytics() {
                     {card.label}
                     <Help term={card.term} />
                   </div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "—" : card.format(kpis[card.key])}</div>
-                  {!loading ? <Delta kpi={kpis[card.key]} /> : <p className="text-xs text-slate-400">Loading</p>}
+                  <div className="mt-1 text-2xl font-semibold text-slate-900">{loading ? "—" : card.format()}</div>
+                  {!loading ? <Delta kpi={card.kpi} /> : <p className="text-xs text-slate-400">Loading</p>}
                 </div>
               ))}
             </div>
@@ -829,27 +945,27 @@ export default function LeadsAnalytics() {
           <TabsContent value="revenue" className="space-y-6 mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Stripe fulfillments</CardTitle>
+                <CardTitle>Purchases in this date range</CardTitle>
                 <CardDescription>
-                  {stripePurchases?.note || "All kit fulfillments in this date range, including purchases not joined to a website visit."}
+                  {stripePurchases?.note || "Every kit fulfillment is a purchase, including orders that never got a website visit id."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-xs text-slate-500">Orders</p>
-                  <p className="text-2xl font-semibold">{formatInt(stripePurchases?.orders)}</p>
+                  <p className="text-xs text-slate-500">Purchases</p>
+                  <p className="text-2xl font-semibold">{stripePurchases ? formatInt(stripeOrders) : "—"}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Revenue</p>
                   <p className="text-2xl font-semibold">{stripePurchases ? formatMoney(stripePurchases.revenue) : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Attributed to a visit</p>
+                  <p className="text-xs text-slate-500">With a visit id</p>
                   <p className="text-2xl font-semibold">{formatInt(stripePurchases?.attributed_orders)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Estimated list-price rows</p>
-                  <p className="text-2xl font-semibold">{formatInt(stripePurchases?.estimated_orders)}</p>
+                  <p className="text-xs text-slate-500">AOV</p>
+                  <p className="text-2xl font-semibold">{stripePurchases ? formatMoney(stripePurchases.aov) : "—"}</p>
                 </div>
               </CardContent>
             </Card>
@@ -862,7 +978,7 @@ export default function LeadsAnalytics() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Package</TableHead>
-                      <TableHead className="text-right">Orders</TableHead>
+                      <TableHead className="text-right">Purchases</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -876,7 +992,37 @@ export default function LeadsAnalytics() {
                     ))}
                   </TableBody>
                 </Table>
-                {!stripePurchases ? <Empty>Sign in as admin to load fulfillment totals. Attributed visit orders still appear on Overview.</Empty> : null}
+                {stripePurchases && stripeOrders === 0 ? <Empty>No kit purchases in this date range.</Empty> : null}
+                {!stripePurchases ? <Empty>Sign in as admin to load fulfillment totals.</Empty> : null}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent purchases</CardTitle>
+                <CardDescription>Package, date, and amount only. Customer emails are not shown.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Package</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Visit id</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(stripePurchases?.recent || []).map((row, idx) => (
+                      <TableRow key={`${row.created_at}-${row.package_type}-${idx}`}>
+                        <TableCell>{row.created_at ? new Date(row.created_at).toLocaleString() : "—"}</TableCell>
+                        <TableCell>{row.label}</TableCell>
+                        <TableCell className="text-right">{formatMoney(row.amount)}</TableCell>
+                        <TableCell>{row.attributed ? "Yes" : "No"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {stripePurchases && !(stripePurchases.recent || []).length ? <Empty>No purchases to list for this range.</Empty> : null}
               </CardContent>
             </Card>
           </TabsContent>

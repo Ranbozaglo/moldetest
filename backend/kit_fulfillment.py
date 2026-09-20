@@ -35,6 +35,135 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parse_iso_dt(value: Any) -> Optional[datetime]:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    # Query strings sometimes decode +00:00 as a space: "...26 00:00"
+    if re.search(r"\d{2}:\d{2}:\d{2} 00:00$", raw):
+        raw = raw[:-6] + "+00:00"
+    raw = raw.replace(" ", "T", 1)
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        raw = raw + "T00:00:00+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _fulfillment_when(row: Dict[str, Any]) -> Optional[datetime]:
+    return _parse_iso_dt(row.get("created_at")) or _parse_iso_dt(row.get("email_sent_at"))
+
+
+def _row_amount_cents(row: Dict[str, Any]) -> Tuple[int, bool]:
+    pkg = row.get("package_type") or "unknown"
+    raw = row.get("amount_cents")
+    try:
+        cents = int(raw) if raw is not None and str(raw) != "" else 0
+    except (TypeError, ValueError):
+        cents = 0
+    if cents > 0:
+        return cents, False
+    return int(PACKAGE_PRICES_CENTS.get(pkg, 0) or 0), True
+
+
+def _load_fulfillment_rows(supabase, limit: int = 1000) -> List[Dict[str, Any]]:
+    column_sets = (
+        "package_type,created_at,email_sent_at,amount_cents,analytics_sid",
+        "package_type,created_at,email_sent_at,analytics_sid",
+        "package_type,created_at,email_sent_at",
+        "package_type,created_at",
+        "*",
+    )
+    last_error = None
+    for cols in column_sets:
+        try:
+            result = (
+                supabase.table("kit_fulfillments")
+                .select(cols)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return result.data or []
+        except Exception as e:
+            last_error = e
+            continue
+    if last_error:
+        print(f"⚠️ KIT: fulfillment analytics select failed: {last_error}")
+    return []
+
+
+def _aggregate_fulfillments(
+    rows: List[Dict[str, Any]],
+    from_dt: Optional[datetime],
+    to_dt: Optional[datetime],
+) -> Dict[str, Any]:
+    matched: List[Dict[str, Any]] = []
+    for row in rows:
+        when = _fulfillment_when(row)
+        if from_dt and when and when < from_dt:
+            continue
+        if to_dt and when and when >= to_dt:
+            continue
+        if (from_dt or to_dt) and when is None:
+            continue
+        matched.append(row)
+
+    orders = len(matched)
+    attributed = 0
+    revenue_cents = 0
+    estimated = 0
+    by_package: Dict[str, Dict[str, Any]] = {}
+    recent = []
+    for row in matched:
+        pkg = row.get("package_type") or "unknown"
+        cents, used_list = _row_amount_cents(row)
+        if used_list:
+            estimated += 1
+        revenue_cents += cents
+        if row.get("analytics_sid"):
+            attributed += 1
+        bucket = by_package.setdefault(
+            pkg,
+            {"package_type": pkg, "label": PACKAGE_LABELS.get(pkg, pkg), "orders": 0, "revenue_cents": 0},
+        )
+        bucket["orders"] += 1
+        bucket["revenue_cents"] += cents
+        when = _fulfillment_when(row)
+        recent.append(
+            {
+                "package_type": pkg,
+                "label": PACKAGE_LABELS.get(pkg, pkg),
+                "created_at": when.isoformat() if when else (row.get("created_at") or ""),
+                "amount": round(cents / 100, 2),
+                "attributed": bool(row.get("analytics_sid")),
+                "list_price": used_list,
+            }
+        )
+    recent.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+    return {
+        "orders": orders,
+        "purchases": orders,
+        "attributed_orders": attributed,
+        "unattributed_orders": orders - attributed,
+        "revenue": round(revenue_cents / 100, 2),
+        "estimated_orders": estimated,
+        "aov": round((revenue_cents / 100) / orders, 2) if orders else 0,
+        "by_package": list(by_package.values()),
+        "recent": recent[:50],
+        "note": (
+            "Every Stripe kit fulfillment in this date range is a purchase, even without a website visit id. "
+            "Revenue uses Stripe amount_total when stored; otherwise the package list price."
+        ),
+    }
+
+
 def _notify_wp_purchase(payload: Dict[str, Any]) -> None:
     """Best-effort: never fail kit fulfillment if analytics is down."""
     url = (
@@ -1192,60 +1321,10 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         from_s = (request.args.get("from") or "").strip()
         to_s = (request.args.get("to") or "").strip()
         try:
-            rows = []
-            try:
-                query = supabase.table("kit_fulfillments").select(
-                    "package_type,created_at,amount_cents,analytics_sid"
-                )
-                if from_s:
-                    query = query.gte("created_at", from_s)
-                if to_s:
-                    query = query.lt("created_at", to_s)
-                result = query.limit(2000).execute()
-                rows = result.data or []
-            except Exception:
-                query = supabase.table("kit_fulfillments").select("package_type,created_at")
-                if from_s:
-                    query = query.gte("created_at", from_s)
-                if to_s:
-                    query = query.lt("created_at", to_s)
-                result = query.limit(2000).execute()
-                rows = result.data or []
-            orders = len(rows)
-            attributed = 0
-            revenue_cents = 0
-            estimated = 0
-            by_package: Dict[str, Dict[str, Any]] = {}
-            for row in rows:
-                pkg = row.get("package_type") or "unknown"
-                cents = row.get("amount_cents")
-                if cents is None:
-                    cents = PACKAGE_PRICES_CENTS.get(pkg, 0)
-                    estimated += 1
-                revenue_cents += int(cents or 0)
-                if row.get("analytics_sid"):
-                    attributed += 1
-                bucket = by_package.setdefault(
-                    pkg,
-                    {"package_type": pkg, "label": PACKAGE_LABELS.get(pkg, pkg), "orders": 0, "revenue_cents": 0},
-                )
-                bucket["orders"] += 1
-                bucket["revenue_cents"] += int(cents or 0)
-            return jsonify(
-                {
-                    "orders": orders,
-                    "attributed_orders": attributed,
-                    "unattributed_orders": orders - attributed,
-                    "revenue": round(revenue_cents / 100, 2),
-                    "estimated_orders": estimated,
-                    "aov": round((revenue_cents / 100) / orders, 2) if orders else 0,
-                    "by_package": list(by_package.values()),
-                    "note": (
-                        "Orders come from Stripe fulfillments. Revenue uses Stripe amount_total when stored; "
-                        "older rows without amount use package list price and are counted in estimated_orders."
-                    ),
-                }
-            )
+            rows = _load_fulfillment_rows(supabase)
+            payload = _aggregate_fulfillments(rows, _parse_iso_dt(from_s), _parse_iso_dt(to_s))
+            payload["range"] = {"from": from_s, "to": to_s}
+            return jsonify(payload)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
