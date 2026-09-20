@@ -31,7 +31,7 @@ import {
   researchedSnapshot,
 } from "@/data/seoGeoPlaybook";
 
-const STORAGE_KEY = "tt-seo-geo-dashboard-v2";
+const STORAGE_KEY = "tt-seo-geo-dashboard-v4";
 
 const loadSnapshot = () => {
   try {
@@ -109,7 +109,7 @@ export default function SeoGeoDashboard() {
       `Why this ranks: ${idea.why}`,
       "",
       "Outline:",
-      ...idea.outline.map((item, i) => `${i + 1}. ${item}`),
+      ...(idea.outline || []).map((item, i) => `${i + 1}. ${item}`),
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -137,12 +137,13 @@ export default function SeoGeoDashboard() {
           <div>
             <h2 className="text-lg md:text-2xl font-bold text-gray-900">SEO & GEO visibility</h2>
             <p className="text-sm md:text-base text-gray-600 mt-1">
-              Filled from a public audit of total-test.com, total-testing-mold.com, and search results ({AUDIT_DATE}).
+              Recrawl of total-testing.com, leftover total-test.com / total-testing-mold.com URLs, and public search ({AUDIT_DATE}).
+              Package pages, no-kit landing, and 25 posts are live. Google still ranks the old domains.
               Start with <span className="font-semibold">Do this next</span>.
             </p>
             <p className="text-xs text-slate-500 mt-2">
-              Rankings are page-1 checks, not Search Console. Visitors are estimated because GA4 is not connected.
-              Trustpilot is public; no Google Maps listing was found.
+              Rankings are page-1 checks, not Search Console. Visitors come from first-party tracking on
+              total-testing.com (~9 sessions / 16 pageviews in 30 days). Trustpilot is public; no Google Maps listing was found.
             </p>
           </div>
         </div>
@@ -159,8 +160,8 @@ export default function SeoGeoDashboard() {
         />
         <KpiCard
           title="Organic visitors"
-          value="<500/mo"
-          hint="Estimate — not ranking for kit keywords"
+          value="~10 / 30d"
+          hint="First-party sessions — almost none from kit keywords"
           icon={Users}
           color="from-blue-50 to-blue-100 border-blue-200"
           iconBg="bg-blue-500"
@@ -168,7 +169,7 @@ export default function SeoGeoDashboard() {
         <KpiCard
           title="Keywords in top 10"
           value={`${topTenCount}/${TRACKED_KEYWORDS.length}`}
-          hint="Only brand + “no kit” show up"
+          hint="Brand + no-kit still on old domains, not total-testing.com"
           icon={TrendingUp}
           color="from-green-50 to-green-100 border-green-200"
           iconBg="bg-green-500"
@@ -176,7 +177,7 @@ export default function SeoGeoDashboard() {
         <KpiCard
           title="AI mentioned"
           value={`${aiMentionCount}/${AI_PROMPTS.length}`}
-          hint="Not cited on generic mold-test prompts"
+          hint="New posts exist; models still cite MycoTest / EPA"
           icon={Bot}
           color="from-violet-50 to-violet-100 border-violet-200"
           iconBg="bg-violet-500"
@@ -184,7 +185,7 @@ export default function SeoGeoDashboard() {
         <KpiCard
           title="Write next"
           value={`${snapshot.queuedBlogs.length} posts`}
-          hint="Priority articles queued for you"
+          hint={`${BLOG_IDEAS.filter((b) => b.published).length} already live — Houston, bathroom, lab stats left`}
           icon={Lightbulb}
           color="from-orange-50 to-orange-100 border-orange-200"
           iconBg="bg-orange-500"
@@ -229,7 +230,7 @@ export default function SeoGeoDashboard() {
                 What to improve next
               </CardTitle>
               <CardDescription>
-                Ordered by impact. Do 1–4 this month; that is enough to start ranking and getting mentioned.
+                Content is no longer the bottleneck. Finish 301s, get the new URLs indexed, then GBP and the no-kit landing page.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -259,14 +260,14 @@ export default function SeoGeoDashboard() {
                   <Users className="w-5 h-5 text-blue-600" />
                   Visitors
                 </CardTitle>
-                <CardDescription>Organic search — public estimate, not Google Analytics.</CardDescription>
+                <CardDescription>First-party tracking on total-testing.com, not Search Console.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-4xl font-bold text-slate-900">&lt;500 / month</div>
+                <div className="text-4xl font-bold text-slate-900">~10 sessions / 30 days</div>
                 <p className="text-sm text-slate-600">{snapshot.visitorsNote}</p>
                 <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-900">
-                  Indexed marketing URLs are essentially Home, Products, Our Story, Contact, and Terms. No blog.
-                  Until that changes, traffic cannot scale.
+                  Yoast lists the package URLs, /diy-mold-test-no-kit/, and 25 blog posts. Public search is still
+                  returning the old total-test.com URLs. Most visits in the tracker are Instagram, not organic.
                 </div>
               </CardContent>
             </Card>
@@ -331,8 +332,8 @@ export default function SeoGeoDashboard() {
               <div className="rounded-lg border p-4">
                 <p className="font-medium text-slate-900">What you actually sell</p>
                 <p className="text-slate-600 mt-1">
-                  Mail-in surface swab. Household cotton swab + zip bag. No physical kit. Lab report in 48 business hours.
-                  Packages $149 / $215 / $270.
+                  Mail-in surface swab. Household cotton swab + zip bag. No physical kit. Inspector-reviewed lab report
+                  in 24–48 business hours after the lab receives it. Packages $189 / $215 / $270.
                 </p>
               </div>
               <div className="rounded-lg border p-4">
@@ -344,7 +345,8 @@ export default function SeoGeoDashboard() {
               <div className="rounded-lg border p-4">
                 <p className="font-medium text-slate-900">Your open wedge</p>
                 <p className="text-slate-600 mt-1">
-                  “No kit, swab today, inspector-reviewed lab report.” Own that URL and the first three blog posts before someone else does.
+                  “No kit, swab today, inspector-reviewed lab report.” You still need one dedicated no-kit URL on
+                  total-testing.com. MycoTest owns that SERP today.
                 </p>
               </div>
             </CardContent>
@@ -359,7 +361,8 @@ export default function SeoGeoDashboard() {
                 Keyword ranking (page-1 audit)
               </CardTitle>
               <CardDescription>
-                “Not ranking” means Total Testing was not on page 1 in public search. Sorted by opportunity if you create content.
+                “Not ranking” means total-testing.com was not on page 1. Brand and no-kit ranks that do appear are still
+                the old total-test.com / total-testing-mold.com URLs. Sorted by opportunity.
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
@@ -408,7 +411,8 @@ export default function SeoGeoDashboard() {
                 AI mention audit
               </CardTitle>
               <CardDescription>
-                Checked against who Google already ranks (AI Overviews cite those pages). None of these prompts currently surface Total Testing.
+                Checked against who Google already ranks (AI Overviews cite those pages). None of these prompts currently
+                surface Total Testing — even though several matching articles are now live.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -455,7 +459,9 @@ export default function SeoGeoDashboard() {
                 Blog ideas, in ranking order
               </CardTitle>
               <CardDescription>
-                #1–#3 are queued. Write those first on total-test.com and link each to /products/.
+                Ten of these URLs are already live. Remaining queue is original lab stats (needs real numbers, not
+                invented percentages). Link published posts to /packages/spot-check/, /extended/, /full-house/, and
+                /diy-mold-test-no-kit/.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -471,7 +477,12 @@ export default function SeoGeoDashboard() {
                           <Badge className={impactClass(idea.difficulty)} variant="secondary">
                             {idea.difficulty} competition
                           </Badge>
-                          {queued && (
+                          {idea.published && (
+                            <Badge className="bg-emerald-100 text-emerald-800" variant="secondary">
+                              Published
+                            </Badge>
+                          )}
+                          {queued && !idea.published && (
                             <Badge className="bg-green-100 text-green-800" variant="secondary">
                               Write next
                             </Badge>
@@ -479,30 +490,47 @@ export default function SeoGeoDashboard() {
                         </div>
                         <h3 className="text-base md:text-lg font-semibold text-slate-900">{idea.title}</h3>
                         <p className="text-sm text-slate-600 mt-1">{idea.why}</p>
+                        {idea.url && (
+                          <a
+                            href={idea.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center text-sm text-blue-700 hover:underline mt-2"
+                          >
+                            {idea.url.replace("https://", "")}
+                            <ExternalLink className="w-3.5 h-3.5 ml-1" />
+                          </a>
+                        )}
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => copyBlog(idea)}>
-                          {copiedId === idea.id ? (
-                            <CheckCircle2 className="w-4 h-4 mr-1 text-green-600" />
-                          ) : (
-                            <Copy className="w-4 h-4 mr-1" />
-                          )}
-                          {copiedId === idea.id ? "Copied" : "Copy outline"}
-                        </Button>
-                        <Button
-                          variant={queued ? "secondary" : "outline"}
-                          size="sm"
-                          onClick={() => toggleQueued(idea.id)}
-                        >
-                          {queued ? "Queued" : "Queue"}
-                        </Button>
+                        {idea.outline?.length > 0 && (
+                          <Button variant="outline" size="sm" onClick={() => copyBlog(idea)}>
+                            {copiedId === idea.id ? (
+                              <CheckCircle2 className="w-4 h-4 mr-1 text-green-600" />
+                            ) : (
+                              <Copy className="w-4 h-4 mr-1" />
+                            )}
+                            {copiedId === idea.id ? "Copied" : "Copy outline"}
+                          </Button>
+                        )}
+                        {!idea.published && (
+                          <Button
+                            variant={queued ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => toggleQueued(idea.id)}
+                          >
+                            {queued ? "Queued" : "Queue"}
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <ol className="mt-3 list-decimal pl-5 text-sm text-slate-700 space-y-1">
-                      {idea.outline.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ol>
+                    {idea.outline?.length > 0 && (
+                      <ol className="mt-3 list-decimal pl-5 text-sm text-slate-700 space-y-1">
+                        {idea.outline.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ol>
+                    )}
                   </div>
                 );
               })}
@@ -518,7 +546,8 @@ export default function SeoGeoDashboard() {
                 SEO findings
               </CardTitle>
               <CardDescription>
-                From the live marketing site at total-test.com, not from the logged-in app.
+                From the live marketing site at total-testing.com plus leftover indexation on total-test.com and
+                total-testing-mold.com — not from the logged-in DIY app.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
