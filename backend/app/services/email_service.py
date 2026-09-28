@@ -9,6 +9,21 @@ import json
 from datetime import datetime
 
 
+def _append_open_pixel(html: str, url: str) -> str:
+    """Insert a 1x1 tracking image before </body>. No-op if url is empty."""
+    pixel_url = (url or "").strip()
+    if not pixel_url or not html:
+        return html
+    pixel = (
+        f'<img src="{pixel_url}" width="1" height="1" alt="" '
+        'style="display:block;width:1px;height:1px;border:0;outline:none;" />'
+    )
+    close_at = html.lower().rfind("</body>")
+    if close_at >= 0:
+        return html[:close_at] + pixel + html[close_at:]
+    return html + pixel
+
+
 def _branded_email(
     *,
     eyebrow: str,
@@ -385,6 +400,7 @@ class EmailService:
         subject: str,
         body: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
+        open_pixel_url: str = "",
     ) -> Dict[str, Any]:
         """
         Send email using SMTP.
@@ -393,6 +409,7 @@ class EmailService:
         try:
             print(f"🔧 EMAIL DEBUG: Attempting to send email to {to_email}")
             print(f"🔧 EMAIL DEBUG: Subject: {subject}")
+            body = _append_open_pixel(body, open_pixel_url)
             
             # Validate email settings
             if not self.username or not self.password:
@@ -502,6 +519,7 @@ class EmailService:
         package_name: str,
         dashboard_url: str,
         attachments: Optional[List[Dict[str, Any]]] = None,
+        open_pixel_url: str = "",
     ) -> Dict[str, Any]:
         """Send post-purchase kit email with COC + prepaid label attachments."""
         templates = self.get_templates() if hasattr(self, 'get_templates') else self.default_templates
@@ -537,6 +555,7 @@ class EmailService:
             subject=subject,
             body=body,
             attachments=attachments or [],
+            open_pixel_url=open_pixel_url,
         )
     
     def send_lab_received_email(self, inspection_data: Dict[str, Any]) -> Dict[str, Any]:

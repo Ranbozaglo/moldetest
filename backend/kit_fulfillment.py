@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from flask import jsonify, request
+from flask import Response, jsonify, request
 
 KIT_BUCKET = os.getenv("KIT_STORAGE_BUCKET", "kit-fulfillment")
 
@@ -29,6 +29,14 @@ PACKAGE_PRICES_CENTS = {
 }
 
 LABEL_STATUSES = ("available", "assigned", "void")
+
+# 1x1 transparent GIF for kit-email open tracking.
+PIXEL_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff"
+    b"!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01"
+    b"\x00\x00\x02\x02D\x01\x00;"
+)
+_OPEN_TOKEN_RE = re.compile(r"^[a-f0-9]{32}$")
 
 
 def _utcnow() -> str:
@@ -204,6 +212,26 @@ def _normalize_label_filename(name: str) -> str:
 def _frontend_dashboard_url() -> str:
     base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
     return f"{base}/MyInspections"
+
+
+def _api_public_base() -> str:
+    return (
+        os.getenv("API_PUBLIC_URL")
+        or os.getenv("RENDER_EXTERNAL_URL")
+        or "https://moldetest-67e6.onrender.com"
+    ).rstrip("/")
+
+
+def _pixel_response() -> Response:
+    return Response(
+        PIXEL_GIF,
+        mimetype="image/gif",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 def _require_admin():
@@ -501,6 +529,68 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 )
         return attachments
 
+    def _open_pixel_url(fulfillment: Dict[str, Any]) -> str:
+        """Stable per-fulfillment pixel URL. Empty if the open-token column is missing."""
+        if not supabase or not fulfillment or not fulfillment.get("id"):
+            return ""
+        token = str(fulfillment.get("email_open_token") or "").strip().lower()
+        if token.endswith(".gif"):
+            token = token[:-4]
+        if not _OPEN_TOKEN_RE.fullmatch(token):
+            token = uuid.uuid4().hex
+            try:
+                supabase.table("kit_fulfillments").update({"email_open_token": token}).eq(
+                    "id", fulfillment["id"]
+                ).execute()
+                fulfillment["email_open_token"] = token
+            except Exception as e:
+                print(f"⚠️ KIT: could not store email_open_token ({e})")
+                return ""
+        return f"{_api_public_base()}/api/kit/email/open/{token}.gif"
+
+    def _record_email_open(token: str) -> None:
+        if not supabase or not _OPEN_TOKEN_RE.fullmatch(token or ""):
+            return
+        try:
+            found = (
+                supabase.table("kit_fulfillments")
+                .select("id,email_opened_at,email_open_count")
+                .eq("email_open_token", token)
+                .limit(1)
+                .execute()
+            )
+        except Exception as e:
+            print(f"⚠️ KIT: email open lookup failed ({e})")
+            return
+        if not found.data:
+            return
+        row = found.data[0]
+        first = not row.get("email_opened_at")
+        try:
+            count = int(row.get("email_open_count") or 0) + 1
+        except (TypeError, ValueError):
+            count = 1
+        update: Dict[str, Any] = {"email_open_count": count}
+        if first:
+            update["email_opened_at"] = _utcnow()
+        try:
+            supabase.table("kit_fulfillments").update(update).eq("id", row["id"]).execute()
+            print(
+                f"📬 KIT: email {'first open' if first else 'open'} "
+                f"count={count} fulfillment={row['id']}"
+            )
+        except Exception as e:
+            if first:
+                try:
+                    supabase.table("kit_fulfillments").update(
+                        {"email_opened_at": _utcnow()}
+                    ).eq("id", row["id"]).execute()
+                    print(f"📬 KIT: email first open fulfillment={row['id']}")
+                    return
+                except Exception as e2:
+                    print(f"⚠️ KIT: could not store email_opened_at ({e2})")
+            print(f"⚠️ KIT: email open update failed ({e})")
+
     def _email_existing_fulfillment(fulfillment: Dict[str, Any]) -> Dict[str, Any]:
         """Send/resend kit email for an existing fulfillment (does not claim a new label)."""
         if not fulfillment or not fulfillment.get("id"):
@@ -515,6 +605,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if not attachments:
             print(f"⚠️ KIT: fulfillment {fulfillment.get('id')} has no PDF attachments to email")
 
+        pixel_url = _open_pixel_url(fulfillment)
         email_result = {"success": False, "error": "Email service unavailable"}
         if email_service and hasattr(email_service, "send_kit_purchase_email"):
             email_result = email_service.send_kit_purchase_email(
@@ -523,6 +614,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 package_name=PACKAGE_LABELS.get(package_type, package_type),
                 dashboard_url=_frontend_dashboard_url(),
                 attachments=attachments,
+                open_pixel_url=pixel_url,
             )
         elif email_service:
             email_result = email_service.send_email(
@@ -530,6 +622,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 subject=f"Total Testing - Your {PACKAGE_LABELS.get(package_type)} Kit Materials",
                 body=f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p><p>Your kit materials are attached.</p>",
                 attachments=attachments,
+                open_pixel_url=pixel_url,
             )
 
         update = {
@@ -1251,6 +1344,17 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             return jsonify(result), status
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/kit/email/open/<token>", methods=["GET", "HEAD"])
+    @app.route("/api/kit/email/open/<token>.gif", methods=["GET", "HEAD"])
+    def kit_email_open_pixel(token):
+        """Public 1x1 GIF. Records first open on the matching kit fulfillment."""
+        raw = str(token or "").strip().lower()
+        if raw.endswith(".gif"):
+            raw = raw[:-4]
+        if request.method == "GET":
+            _record_email_open(raw)
+        return _pixel_response()
 
     @app.route("/api/kit/my-downloads", methods=["GET"])
     def kit_my_downloads():

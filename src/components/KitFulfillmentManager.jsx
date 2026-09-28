@@ -15,6 +15,19 @@ function naturalLabelSort(a, b) {
   return as.localeCompare(bs, undefined, { numeric: true, sensitivity: "base" });
 }
 
+function formatWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default function KitFulfillmentManager() {
   const [packages, setPackages] = useState([]);
   const [labels, setLabels] = useState([]);
@@ -462,6 +475,10 @@ export default function KitFulfillmentManager() {
       <Card>
         <CardHeader>
           <CardTitle>Recent fulfillments</CardTitle>
+          <CardDescription>
+            Opened means the tracking image in the kit email loaded. Emails sent before this was added stay at no
+            open until you resend.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {fulfillments.slice(0, 20).map((f) => (
@@ -470,6 +487,9 @@ export default function KitFulfillmentManager() {
                 <div>
                   {f.customer_email} · {f.package_type}
                 </div>
+                {f.email_sent_at && (
+                  <div className="mt-1 text-xs text-slate-500">Sent {formatWhen(f.email_sent_at)}</div>
+                )}
                 {f.email_error && (
                   <div className="mt-1 text-xs text-red-600 break-words">{f.email_error}</div>
                 )}
@@ -477,6 +497,13 @@ export default function KitFulfillmentManager() {
               <div className="flex items-center gap-2">
                 <Badge variant={f.email_status === "sent" ? "default" : "destructive"}>
                   {f.email_status || "unknown"}
+                </Badge>
+                <Badge variant={f.email_opened_at ? "default" : "outline"}>
+                  {f.email_opened_at
+                    ? `Opened${Number(f.email_open_count) > 1 ? ` ×${f.email_open_count}` : ""} ${formatWhen(f.email_opened_at)}`
+                    : f.email_status === "sent"
+                      ? "No open recorded"
+                      : "—"}
                 </Badge>
                 <Button
                   type="button"
