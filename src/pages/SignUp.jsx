@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getSafeNextPath, withNextParam } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,8 +17,9 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,7 +44,10 @@ export default function SignUp() {
         // Clear any existing inspection data for new users
         localStorage.removeItem('inspection_current_step');
         localStorage.removeItem('inspection_form_data');
-        navigate(createPageUrl('MyInspections'));
+        // Register does not return a session token — sign in so the inspection form can call the API.
+        await signIn(email, password);
+        const next = getSafeNextPath(location.search) || createPageUrl('Inspection');
+        navigate(next, { replace: true });
       } else {
         setError(result.error || 'Sign up failed');
       }
@@ -142,7 +147,7 @@ export default function SignUp() {
               <p className="text-slate-600 text-sm">
                 Already have an account?{' '}
                 <Link
-                  to={createPageUrl('SignIn')}
+                  to={withNextParam(createPageUrl('SignIn'), location.search)}
                   className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
                   Sign in here

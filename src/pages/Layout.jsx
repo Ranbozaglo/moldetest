@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { Home, FileText, LogOut, User, Menu, X, PlusCircle } from "lucide-react";
+import { FileText, LogOut, User, Menu, X, PlusCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Layout({ children, currentPageName }) {
@@ -10,6 +10,12 @@ export default function Layout({ children, currentPageName }) {
   const { user, signOut, loading } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef(null);
+  const isAdmin = !!(user && (user.role === "admin" || user.is_admin));
+  const homeLink = !user
+    ? "/blog"
+    : isAdmin
+      ? createPageUrl("AdminDashboard")
+      : createPageUrl("MyInspections");
 
   const handleSignOut = () => {
     setMobileMenuOpen(false);
@@ -64,15 +70,31 @@ export default function Layout({ children, currentPageName }) {
           <div className="flex items-center justify-between">
             {/* Logo/Brand - Left side */}
             <div className="flex items-center">
-              <img
-                src="/logos.png"
-                alt="Total Testing"
-                className="h-9 w-auto max-w-[180px] object-contain"
-              />
+              <Link to={homeLink} className="flex items-center">
+                <img
+                  src="/logos.png"
+                  alt="Total Testing"
+                  className="h-9 w-auto max-w-[180px] object-contain"
+                />
+              </Link>
             </div>
             
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6">
+              <Link
+                to="/blog"
+                className="px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+              >
+                Blog
+              </Link>
+              {!loading && !user && (
+                <Link
+                  to={createPageUrl("SignIn")}
+                  className="px-4 py-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                >
+                  Sign In
+                </Link>
+              )}
               {!loading && user && (
                 <>
                   {/* Only show navigation for non-admin users */}
@@ -112,31 +134,49 @@ export default function Layout({ children, currentPageName }) {
             </nav>
 
             {/* Mobile Menu Button */}
-            {!loading && user && (
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            )}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
 
-          {/* Mobile Navigation Menu */}
-          {!loading && user && mobileMenuOpen && (
+          {mobileMenuOpen && (
             <div className="md:hidden mt-4 pt-4 border-t border-blue-100/50">
               <div className="flex flex-col space-y-3">
-                {/* User Info */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
-                  <User className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">{user.name}</span>
-                  {(user.role === 'admin' || user.is_admin) && (
-                    <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">Admin</span>
-                  )}
-                </div>
+                {!loading && user && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
+                    <User className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">{user.name}</span>
+                    {(user.role === 'admin' || user.is_admin) && (
+                      <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">Admin</span>
+                    )}
+                  </div>
+                )}
+
+                <Link
+                  to="/blog"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                >
+                  <FileText className="w-5 h-5" />
+                  <span className="font-medium">Blog</span>
+                </Link>
+
+                {!loading && !user && (
+                  <Link
+                    to={createPageUrl("SignIn")}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                  >
+                    <User className="w-5 h-5" />
+                    <span className="font-medium">Sign In</span>
+                  </Link>
+                )}
 
                 {/* Navigation Links for non-admin users */}
-                {!(user.role === 'admin' || user.is_admin) && (
+                {!loading && user && !(user.role === 'admin' || user.is_admin) && (
                   <>
                     <Link 
                       to={createPageUrl("MyInspections")} 
@@ -157,14 +197,15 @@ export default function Layout({ children, currentPageName }) {
                   </>
                 )}
 
-                {/* Logout Button */}
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-600 hover:text-red-600 hover:bg-red-50 w-full text-left"
-                >
-                  <LogOut className="w-5 h-5" />
-                  <span className="font-medium">Sign Out</span>
-                </button>
+                {!loading && user && (
+                  <button
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-slate-600 hover:text-red-600 hover:bg-red-50 w-full text-left"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Sign Out</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

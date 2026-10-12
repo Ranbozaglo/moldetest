@@ -153,7 +153,7 @@ class EmailService:
                 <tr>
                   <td align="center" bgcolor="#004aac" style="border-radius:8px;">
                     <a href="{dashboard_url}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
-                      Open dashboard / downloads
+                      Create your inspection
                     </a>
                   </td>
                 </tr>
@@ -540,7 +540,7 @@ class EmailService:
         vars_map = {
             'full_name': full_name or 'Customer',
             'package_name': package_name or 'Mold Testing',
-            'dashboard_url': dashboard_url or f"{base}/MyInspections",
+            'dashboard_url': dashboard_url or f"{base}/Inspection",
             'logo_url': logo_url,
         }
         try:

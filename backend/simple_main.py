@@ -1626,13 +1626,14 @@ def get_inspections():
     try:
         # Get query parameters
         sort_by = request.args.get('sort', '-created_at')
-        limit = int(request.args.get('limit', 10))  # Default to 10, max 50
+        limit = int(request.args.get('limit', 10))  # Default to 10; max 200. Email-filtered lists use at least 100.
         email = request.args.get('email')
         detailed = request.args.get('detailed', 'false').lower() == 'true'
         
         # Limit the maximum number of inspections to prevent performance issues
-        if limit > 50:
-            limit = 50
+        max_limit = 200
+        if limit > max_limit:
+            limit = max_limit
         
         # Check if user is admin from database
         is_admin = False
@@ -1671,6 +1672,14 @@ def get_inspections():
                 query = query.order(field, desc=True)
             else:
                 query = query.order(sort_by)
+
+        # Filter by this customer BEFORE applying limit. Previously we took the
+        # newest N inspections globally, then filtered by email — so older
+        # customer jobs never appeared and could not be downloaded.
+        if email and not is_admin:
+            query = query.ilike('email', email.strip())
+            if limit < 100:
+                limit = 100
         
         # Apply limit
         query = query.limit(limit)
@@ -1682,7 +1691,11 @@ def get_inspections():
         
         # Filter by email if provided (for non-admin users)
         if email and not is_admin:
-            inspections = [i for i in inspections if i.get('email') == email]
+            needle = email.strip().lower()
+            inspections = [
+                i for i in inspections
+                if str(i.get('email') or '').strip().lower() == needle
+            ]
 
         # Convert to expected format
         result_list = []

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { MoldInspection } from '@/api/entities';
+import { getSafeNextPath, withNextParam } from '@/utils/urlUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +20,7 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,13 +60,21 @@ export default function SignIn() {
             window.location.href = '/AdminDashboard';
           }
         } else {
-          // Returning and new clients land on the dashboard hub
-          console.log('🔍 DEBUG: Redirecting user to MyInspections');
-          try {
-            navigate('/MyInspections', { replace: true });
-          } catch (navError) {
-            console.error('🔍 PROD DEBUG: SignIn - Navigation error to MyInspections:', navError);
-            window.location.href = '/MyInspections';
+          const next = getSafeNextPath(location.search);
+          if (next) {
+            navigate(next, { replace: true });
+          } else {
+            let dest = '/Inspection';
+            try {
+              const existing = await MoldInspection.findMany({ email: result.user.email });
+              const hasInspection = Array.isArray(existing) && existing.some(
+                (row) => String(row.email || '').trim().toLowerCase() === String(result.user.email || '').trim().toLowerCase()
+              );
+              if (hasInspection) dest = '/MyInspections';
+            } catch {
+              dest = '/Inspection';
+            }
+            navigate(dest, { replace: true });
           }
         }
       } else {
@@ -176,7 +187,7 @@ export default function SignIn() {
               <p className="text-slate-600 text-sm">
                 Don't have an account?{' '}
                 <Link
-                  to={createPageUrl('SignUp')}
+                  to={withNextParam(createPageUrl('SignUp'), location.search)}
                   className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
                 >
                   Sign up here

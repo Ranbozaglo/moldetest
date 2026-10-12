@@ -61,7 +61,7 @@ const apiCall = async (endpoint, options = {}) => {
           const path = window.location.pathname;
           const publicPaths = ['/SignIn', '/SignUp', '/ForgotPassword', '/ResetPassword', '/blog', '/ten-signs-you-may-have-mold-in-your-home'];
           if (!publicPaths.includes(path)) {
-            window.location.href = '/SignIn';
+            window.location.href = `/SignIn?next=${encodeURIComponent(path + (window.location.search || ''))}`;
           }
         }, 1000);
       }
@@ -171,6 +171,7 @@ export const MoldInspection = {
     // Admin users get ALL inspections without email filtering
     if (email && !isAdmin) {
       queryParams.append('email', email);
+      queryParams.append('limit', '100');
     }
     // Note: Admin users don't send email parameter to get ALL data
     

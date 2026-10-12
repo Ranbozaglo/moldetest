@@ -12,6 +12,8 @@ import SignIn from "./SignIn";
 import SignUp from "./SignUp";
 import ForgotPassword from "./ForgotPassword";
 import ResetPassword from "./ResetPassword";
+import Blog from "./Blog";
+import TenSignsMold from "./TenSignsMold";
 
 import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 // Protected Route Component - handles all authentication
 function ProtectedRoute({ children, requireAdmin = false, allowAdmin = true, redirectTo = "/SignIn" }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   const isProduction = window.location.hostname !== 'localhost';
   const logPrefix = isProduction ? '🔍 PROD DEBUG:' : '🔍 DEV DEBUG:';
   
@@ -34,8 +37,12 @@ function ProtectedRoute({ children, requireAdmin = false, allowAdmin = true, red
   
   // Check if user is authenticated
   if (!user) {
-    console.log(`${logPrefix} ProtectedRoute - no user found, redirecting to:`, redirectTo);
-    return <Navigate to={redirectTo} replace />;
+    const next = `${location.pathname}${location.search || ''}`;
+    const signInTo = next && next !== '/' && !next.startsWith('/SignIn') && !next.startsWith('/SignUp')
+      ? `${redirectTo}?next=${encodeURIComponent(next)}`
+      : redirectTo;
+    console.log(`${logPrefix} ProtectedRoute - no user found, redirecting to:`, signInTo);
+    return <Navigate to={signInTo} replace />;
   }
   
   const isAdmin = user.role === 'admin' || user.is_admin;
@@ -69,6 +76,8 @@ const PAGES = {
     SignUp: SignUp,
     ForgotPassword: ForgotPassword,
     ResetPassword: ResetPassword,
+    Blog: Blog,
+    TenSignsMold: TenSignsMold,
 }
 
 /**
@@ -99,6 +108,10 @@ function _getCurrentPage(url) {
     // Handle empty path (root)
     if (!urlLastPart) {
         return 'SignIn';
+    }
+
+    if (urlLastPart.toLowerCase() === 'ten-signs-you-may-have-mold-in-your-home') {
+        return 'TenSignsMold';
     }
 
     // Find matching page (case-insensitive)
@@ -133,6 +146,8 @@ function PagesContent() {
                 <Route path="/SignUp" element={<SignUp />} />
                 <Route path="/ForgotPassword" element={<ForgotPassword />} />
                 <Route path="/ResetPassword" element={<ResetPassword />} />
+                <Route path="/blog" element={<Blog />} />
+                <Route path="/ten-signs-you-may-have-mold-in-your-home" element={<TenSignsMold />} />
                 
                 {/* Protected Routes - Regular Users Only */}
                 <Route path="/Inspection" element={

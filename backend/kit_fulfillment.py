@@ -211,7 +211,7 @@ def _normalize_label_filename(name: str) -> str:
 
 def _frontend_dashboard_url() -> str:
     base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
-    return f"{base}/MyInspections"
+    return f"{base}/Inspection"
 
 
 def _api_public_base() -> str:

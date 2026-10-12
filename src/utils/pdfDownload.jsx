@@ -27,6 +27,66 @@ const waitForImages = (root, timeoutMs = 15000) => {
   ]);
 };
 
+const blobToDataUrl = (blob) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image'));
+    reader.readAsDataURL(blob);
+  });
+
+/** Convert remote images to data URLs so html2canvas does not taint the canvas. */
+const inlineImagesAsDataUrls = async (root) => {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(
+    images.map(async (img) => {
+      const src = img.getAttribute('src') || img.src || '';
+      if (!src || src.startsWith('data:')) return;
+      img.crossOrigin = 'anonymous';
+      try {
+        const response = await fetch(src, { mode: 'cors', cache: 'no-store' });
+        if (!response.ok) return;
+        const blob = await response.blob();
+        if (!blob || blob.size < 8) return;
+        img.src = await blobToDataUrl(blob);
+      } catch {
+        // Leave the original src; html2canvas will try CORS next.
+      }
+    })
+  );
+};
+
+const cleanupHtml2pdfOverlays = () => {
+  document.querySelectorAll('.html2pdf__overlay, #pdf-download-shield, #pdf-download-host').forEach((el) => {
+    if (el.parentNode) el.parentNode.removeChild(el);
+  });
+};
+
+const triggerFileDownload = (blob, fileName) => {
+  if (!blob) throw new Error('No file was generated');
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.rel = 'noopener';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  // Revoking immediately can cancel the download in Safari and some Chrome versions.
+  window.setTimeout(() => {
+    if (link.parentNode) link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, 4000);
+};
+
+const withTimeout = (promise, ms, message) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), ms);
+    })
+  ]);
+
 const wrapText = (text, font, fontSize, maxWidth) => {
   const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ');
   const lines = [];
@@ -170,7 +230,7 @@ const buildHtml2pdfOptions = (fileName) => ({
   html2canvas: {
     scale: 2,
     useCORS: true,
-    allowTaint: true,
+    allowTaint: false,
     logging: false,
     backgroundColor: '#ffffff',
     scrollX: 0,
@@ -212,6 +272,8 @@ const renderSegmentToPdfBlob = async (segment, styleText, html2pdfOptions) => {
   try {
     void segmentHost.offsetHeight;
     await waitForImages(segmentRoot);
+    await inlineImagesAsDataUrls(segmentRoot);
+    await waitForImages(segmentRoot, 8000);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const contentHeight = Math.max(segmentRoot.scrollHeight, cloned.scrollHeight, 1);
@@ -221,10 +283,11 @@ const renderSegmentToPdfBlob = async (segment, styleText, html2pdfOptions) => {
       cloned.classList.contains('disclaimer-page') ||
       !!cloned.querySelector?.('.cover-page');
 
-    const blob = await html2pdf()
-      .set(html2pdfOptions)
-      .from(segmentRoot)
-      .outputPdf('blob');
+    const blob = await withTimeout(
+      html2pdf().set(html2pdfOptions).from(segmentRoot).toPdf().output('blob'),
+      60000,
+      'PDF rendering timed out. Try Download HTML, or retry the PDF.'
+    );
 
     if (!blob || blob.size < 100) {
       throw new Error('Segment PDF looks empty');
@@ -247,6 +310,9 @@ const renderSegmentToPdfBlob = async (segment, styleText, html2pdfOptions) => {
     const cleaned = await doc.save();
     return new Blob([cleaned], { type: 'application/pdf' });
   } finally {
+    document.querySelectorAll('.html2pdf__overlay').forEach((el) => {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
     if (segmentHost.parentNode) {
       segmentHost.parentNode.removeChild(segmentHost);
     }
@@ -512,15 +578,7 @@ export const downloadPDF = async (
 
     const mergedBytes = await merged.save();
     const pdfBlob = new Blob([mergedBytes], { type: 'application/pdf' });
-
-    const downloadUrl = window.URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
+    triggerFileDownload(pdfBlob, fileName);
 
     setStatus({ type: 'success', message: `PDF downloaded for ${displayNum}` });
     setTimeout(() => setStatus(null), 4000);
@@ -549,14 +607,21 @@ export const downloadPDF = async (
     }
   } catch (error) {
     console.error('Error generating PDF:', error);
-    setStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
-    setTimeout(() => setStatus(null), 6000);
+    cleanupHtml2pdfOverlays();
+    setStatus({
+      type: 'error',
+      message: `Failed to generate PDF: ${error.message || 'Unknown error'}. You can try Download HTML instead.`
+    });
+    setTimeout(() => setStatus(null), 8000);
   } finally {
     const shield = document.getElementById('pdf-download-shield');
     if (shield && shield.parentNode) shield.parentNode.removeChild(shield);
     if (host && host.parentNode) {
       host.parentNode.removeChild(host);
     }
+    document.querySelectorAll('.html2pdf__overlay').forEach((el) => {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
   }
 };
 
@@ -600,18 +665,12 @@ export const downloadHTML = async (
     const reportHtml = await generateReportHtmlContent(detailedInspection, detailedSamples);
 
     const blob = new Blob([reportHtml], { type: 'text/html' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const reportType =
       inspection.inspection_type === 'asbestos' || inspection.app_id === 'asbestos'
         ? 'Asbestos_Assessment'
         : 'Mold_Inspection';
-    link.download = `${reportType}_Report_${String(displayNum).replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    const htmlName = `${reportType}_Report_${String(displayNum).replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
+    triggerFileDownload(blob, htmlName);
 
     setStatus({ type: 'success', message: `HTML report downloaded for ${displayNum}` });
     setTimeout(() => setStatus(null), 3000);

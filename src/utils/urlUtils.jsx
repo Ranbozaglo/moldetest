@@ -181,4 +181,35 @@ export const validateUrlParam = (value, type = 'string') => {
     default:
       return trimmedValue.length <= 1000; // Basic length check
   }
+};
+
+const ALLOWED_POST_AUTH_PATHS = new Set([
+  '/Inspection',
+  '/MyInspections',
+  '/StartNewInspection',
+  '/SamplingGuide',
+  '/ThankYou',
+]);
+
+/**
+ * Safe in-app redirect after sign-in / sign-up (blocks open redirects).
+ * @param {string} search location.search
+ * @returns {string|null}
+ */
+export const getSafeNextPath = (search) => {
+  try {
+    const next = new URLSearchParams(search || '').get('next') || '';
+    if (!next.startsWith('/') || next.startsWith('//')) return null;
+    const path = next.split('?')[0];
+    return ALLOWED_POST_AUTH_PATHS.has(path) ? next : null;
+  } catch {
+    return null;
+  }
+};
+
+export const withNextParam = (pageUrl, search) => {
+  const next = getSafeNextPath(search);
+  if (!next) return pageUrl;
+  const join = pageUrl.includes('?') ? '&' : '?';
+  return `${pageUrl}${join}next=${encodeURIComponent(next)}`;
 }; 

@@ -2673,7 +2673,7 @@ export default function AdminDashboard() {
                               </DropdownMenuItem>
                               
                               <DropdownMenuItem 
-                                onClick={() => handleDownloadPDF(inspection)}
+                                onSelect={() => { void handleDownloadPDF(inspection); }}
                                 className="flex items-center gap-2 hover:bg-green-50 text-green-700"
                               >
                                 <File className="w-4 h-4" />
@@ -2887,7 +2887,7 @@ export default function AdminDashboard() {
                                 </DropdownMenuItem>
                                 
                                 <DropdownMenuItem 
-                                  onClick={() => handleDownloadPDF(inspection)}
+                                  onSelect={() => { void handleDownloadPDF(inspection); }}
                                   className="flex items-center gap-2 hover:bg-green-50 text-green-700"
                                 >
                                   <File className="w-4 h-4" />

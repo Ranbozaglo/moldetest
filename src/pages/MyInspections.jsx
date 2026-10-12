@@ -30,9 +30,12 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from '@/contexts/AuthContext';
-import { downloadPDF } from "@/utils/pdfDownload";
+import { downloadPDF, downloadHTML } from "@/utils/pdfDownload";
 import { buildLabAnalysisFilesHtml, buildLabAnalysisIntroHtml } from "@/lib/labAnalysis.jsx";
 // Removed requireSupabaseSession - using Flask backend authentication
+
+const emailsMatch = (a, b) =>
+  String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 
 export default function MyInspections() {
   const [inspections, setInspections] = useState([]);
@@ -46,64 +49,41 @@ export default function MyInspections() {
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
 
-  // SECURITY: Early return if user is not authenticated
-  if (!currentUser) {
-    return (
-      <div className="max-w-4xl mx-auto py-12 px-6">
-        <div className="text-center">
-          <div className="text-lg text-slate-600">Please sign in to view your inspections.</div>
-          <Button 
-            onClick={() => navigate(createPageUrl("SignIn"))}
-            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            Sign In
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // SECURITY: Redirect admin users immediately
-  if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
-    navigate(createPageUrl("AdminDashboard"));
-    return null;
-  }
-
   useEffect(() => {
     (async () => {
       try {
-        // Skip Supabase session check - using Flask backend authentication
+        if (!currentUser) {
+          setLoading(false);
+          return;
+        }
+
+        if (currentUser.role === "admin" || currentUser.is_admin) {
+          navigate(createPageUrl("AdminDashboard"));
+          return;
+        }
+
         const fetchUserData = async () => {
           try {
             setUser(currentUser);
-            
-            // Redirect admin users to AdminDashboard
-            if (currentUser && (currentUser.role === 'admin' || currentUser.is_admin)) {
-              console.log("🔍 DEBUG: Admin user detected, redirecting to AdminDashboard");
-              navigate(createPageUrl("AdminDashboard"));
-              return;
-            }
-            
+
             if (currentUser && currentUser.email) {
               console.log("🔍 SECURITY: Fetching inspections for user:", currentUser.email);
-              
-              // SECURITY: Use findMany with proper user filtering (not list which is for admins)
+
               try {
                 const userInspections = await MoldInspection.findMany({
-                  email: currentUser.email // Explicitly filter by current user's email
+                  email: currentUser.email,
                 });
                 console.log("🔍 SECURITY: Found user-specific inspections:", userInspections?.length || 0);
-                
-                // SECURITY: Double-check that all returned inspections belong to current user
+
                 if (userInspections && Array.isArray(userInspections)) {
-                  const filteredInspections = userInspections.filter(inspection => 
-                    inspection.email === currentUser.email
+                  const filteredInspections = userInspections.filter((inspection) =>
+                    emailsMatch(inspection.email, currentUser.email)
                   );
-                  
+
                   if (filteredInspections.length !== userInspections.length) {
                     console.warn("🔍 SECURITY WARNING: Some inspections filtered out due to email mismatch");
                   }
-                  
+
                   setInspections(filteredInspections);
                   console.log("🔍 SECURITY: Set", filteredInspections.length, "verified user inspections");
                 } else {
@@ -122,9 +102,8 @@ export default function MyInspections() {
                 }
               } catch (inspectionError) {
                 console.error("🔍 SECURITY: Error fetching user inspections:", inspectionError);
-                
-                // Handle authentication errors
-                if (inspectionError.message.includes('401') || inspectionError.message.includes('403')) {
+
+                if (inspectionError.message.includes("401") || inspectionError.message.includes("403")) {
                   setError("Authentication failed. Please sign in again.");
                   navigate(createPageUrl("SignIn"));
                 } else {
@@ -146,18 +125,18 @@ export default function MyInspections() {
 
         fetchUserData();
       } catch (err) {
-        console.error('🔍 DEBUG: Auth check failed:', err);
-        setError('You must be logged in to view this page.');
+        console.error("🔍 DEBUG: Auth check failed:", err);
+        setError("You must be logged in to view this page.");
         setLoading(false);
       }
     })();
   }, [navigate, currentUser]);
 
-  // Refresh kit downloads when user returns to the tab (e.g. after Stripe checkout)
   useEffect(() => {
     const reloadKits = async () => {
       const email = currentUser?.email;
       if (!email) return;
+      if (currentUser?.role === "admin" || currentUser?.is_admin) return;
       try {
         const [pkgRes, dlRes] = await Promise.all([
           KitService.getPackages(),
@@ -172,7 +151,7 @@ export default function MyInspections() {
     const onFocus = () => reloadKits();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [currentUser?.email]);
+  }, [currentUser]);
 
   const getStatusInfo = (status) => {
     switch (status) {
@@ -192,7 +171,7 @@ export default function MyInspections() {
   const generateAndDownloadReport = async (inspection) => {
     try {
       // SECURITY: Verify inspection belongs to current user
-      if (inspection.email !== currentUser.email) {
+      if (!emailsMatch(inspection.email, currentUser.email)) {
         console.error("🔍 SECURITY: Unauthorized report generation attempt for inspection:", inspection.id);
         alert("Access denied. You can only generate reports for your own inspections.");
         return;
@@ -207,7 +186,7 @@ export default function MyInspections() {
         detailedInspection = await MoldInspection.getDetailed(inspection.id);
         
         // SECURITY: Double-check ownership after fetching detailed data
-        if (detailedInspection.email !== currentUser.email) {
+        if (!emailsMatch(detailedInspection.email, currentUser.email)) {
           console.error("🔍 SECURITY: Detailed inspection email mismatch in report generation");
           alert("Access denied. Inspection ownership verification failed.");
           return;
@@ -650,7 +629,7 @@ export default function MyInspections() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${inspection.full_name.replace(/\s+/g, '_')}.html`;
+      link.download = `Mold_Inspection_Report_${displayNum.replace(/[^a-zA-Z0-9]/g, '_')}_${(inspection.full_name || 'report').replace(/\s+/g, '_')}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -678,7 +657,7 @@ export default function MyInspections() {
   const handleViewReport = async (inspection) => {
     try {
       // SECURITY: Verify inspection belongs to current user
-      if (inspection.email !== currentUser.email) {
+      if (!emailsMatch(inspection.email, currentUser.email)) {
         console.error("🔍 SECURITY: Unauthorized access attempt to inspection:", inspection.id);
         alert("Access denied. You can only view your own inspection reports.");
         return;
@@ -692,7 +671,7 @@ export default function MyInspections() {
         detailedInspection = await MoldInspection.getDetailed(inspection.id);
         
         // SECURITY: Double-check ownership after fetching detailed data
-        if (detailedInspection.email !== currentUser.email) {
+        if (!emailsMatch(detailedInspection.email, currentUser.email)) {
           console.error("🔍 SECURITY: Detailed inspection email mismatch");
           alert("Access denied. Inspection ownership verification failed.");
           return;
@@ -805,39 +784,82 @@ export default function MyInspections() {
   };
 
   const handleDownloadPDF = async (inspection) => {
+    setDownloading((prev) => ({ ...prev, [inspection.id]: true }));
+    setDownloadStatus({ type: "info", message: "Preparing PDF download..." });
     try {
-      // SECURITY: Verify inspection belongs to current user
-      if (inspection.email !== currentUser.email) {
+      if (!emailsMatch(inspection.email, currentUser.email)) {
         console.error("🔍 SECURITY: Unauthorized PDF download attempt for inspection:", inspection.id);
         alert("Access denied. You can only download your own inspection reports.");
         return;
       }
 
-      console.log("🔍 SECURITY: Generating PDF for user's inspection:", inspection.id);
-      
-      // Use the existing generateReportHtmlContent function from MyInspections
       await downloadPDF(
         inspection,
-        [], // samples will be fetched inside downloadPDF
+        [],
         generateReportHtmlContent,
         getDisplayNumber,
         setDownloadStatus
       );
     } catch (error) {
       console.error("❌ Error in handleDownloadPDF:", error);
-      
-      // Handle authentication errors
-      if (error.message.includes('401') || error.message.includes('403')) {
-        setDownloadStatus({ type: 'error', message: 'Authentication failed. Please sign in again.' });
+
+      if (error.message.includes("401") || error.message.includes("403")) {
+        setDownloadStatus({ type: "error", message: "Authentication failed. Please sign in again." });
         setTimeout(() => navigate(createPageUrl("SignIn")), 2000);
       } else {
-        setDownloadStatus({ type: 'error', message: `Failed to generate PDF: ${error.message}` });
+        setDownloadStatus({ type: "error", message: `Failed to generate PDF: ${error.message}` });
       }
-      setTimeout(() => setDownloadStatus(null), 5000);
+      setTimeout(() => setDownloadStatus(null), 8000);
+    } finally {
+      setDownloading((prev) => ({ ...prev, [inspection.id]: false }));
+    }
+  };
+
+  const handleDownloadHTML = async (inspection) => {
+    setDownloading((prev) => ({ ...prev, [`html-${inspection.id}`]: true }));
+    setDownloadStatus({ type: "info", message: "Preparing HTML download..." });
+    try {
+      if (!emailsMatch(inspection.email, currentUser.email)) {
+        alert("Access denied. You can only download your own inspection reports.");
+        return;
+      }
+      await downloadHTML(
+        inspection,
+        [],
+        generateReportHtmlContent,
+        getDisplayNumber,
+        setDownloadStatus
+      );
+    } catch (error) {
+      console.error("❌ Error in handleDownloadHTML:", error);
+      setDownloadStatus({ type: "error", message: `Failed to download HTML: ${error.message}` });
+      setTimeout(() => setDownloadStatus(null), 8000);
+    } finally {
+      setDownloading((prev) => ({ ...prev, [`html-${inspection.id}`]: false }));
     }
   };
 
 
+
+  if (!currentUser) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6">
+        <div className="text-center">
+          <div className="text-lg text-slate-600">Please sign in to view your inspections.</div>
+          <Button
+            onClick={() => navigate(createPageUrl("SignIn"))}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser.role === "admin" || currentUser.is_admin) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -900,16 +922,37 @@ export default function MyInspections() {
           </div>
         </div>
 
+        {downloadStatus && (
+          <div
+            className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
+              downloadStatus.type === "error"
+                ? "border-red-200 bg-red-50 text-red-800"
+                : downloadStatus.type === "success"
+                  ? "border-green-200 bg-green-50 text-green-800"
+                  : "border-blue-200 bg-blue-50 text-blue-800"
+            }`}
+          >
+            {downloadStatus.type === "info" && (
+              <Loader2 className="inline w-4 h-4 mr-2 animate-spin" />
+            )}
+            {downloadStatus.message}
+          </div>
+        )}
+
         {inspections.length === 0 ? (
           <div className="text-center py-12 rounded-xl border border-dashed border-slate-200 bg-white/70 mb-8">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <FlaskConical className="w-8 h-8 text-slate-400" />
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No inspections yet</h3>
-            <p className="text-slate-600 mb-2 max-w-md mx-auto">
-              Use <strong>New inspection</strong> in the menu to buy a package, get your COC and shipping label, then submit
-              your job details.
+            <p className="text-slate-600 mb-4 max-w-md mx-auto">
+              {kitDownloads.length > 0
+                ? "Your kit is ready. Create the inspection so we have your property and sample details."
+                : "Create your inspection to submit property and sample details. If you still need a COC and shipping label, use New inspection to purchase a package."}
             </p>
+            <Button onClick={() => navigate(createPageUrl("Inspection"))} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Create inspection
+            </Button>
           </div>
         ) : (
           <div className="space-y-6 mb-8">
@@ -981,10 +1024,28 @@ export default function MyInspections() {
                               </Button>
                               <Button
                                 onClick={() => handleDownloadPDF(inspection)}
+                                disabled={!!downloading[inspection.id]}
                                 className="bg-blue-600 hover:bg-blue-700 text-white"
                               >
-                                <Download className="w-4 h-4 mr-2" />
-                                Download PDF
+                                {downloading[inspection.id] ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4 mr-2" />
+                                )}
+                                {downloading[inspection.id] ? "Generating PDF…" : "Download PDF"}
+                              </Button>
+                              <Button
+                                onClick={() => handleDownloadHTML(inspection)}
+                                disabled={!!downloading[`html-${inspection.id}`]}
+                                variant="outline"
+                                className="border-slate-300 text-slate-700 hover:bg-slate-50"
+                              >
+                                {downloading[`html-${inspection.id}`] ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <FileText className="w-4 h-4 mr-2" />
+                                )}
+                                Download HTML
                               </Button>
                             </>
                           ) : (
@@ -1053,17 +1114,17 @@ export default function MyInspections() {
                   </p>
                   <div className="flex flex-wrap gap-3 text-sm">
                     {d.coc_url && (
-                      <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                      <a href={d.coc_url} target="_blank" rel="noreferrer" download className="text-blue-700 underline">
                         Download COC
                       </a>
                     )}
                     {d.shipping_label_url && (
-                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                      <a href={d.shipping_label_url} target="_blank" rel="noreferrer" download className="text-blue-700 underline">
                         Download shipping label
                       </a>
                     )}
                     {d.instructions_url && (
-                      <a href={d.instructions_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                      <a href={d.instructions_url} target="_blank" rel="noreferrer" download className="text-blue-700 underline">
                         Download instructions
                       </a>
                     )}
@@ -1077,7 +1138,7 @@ export default function MyInspections() {
         <div className="mt-4 mb-8 flex justify-center">
           <Button onClick={goStartNew} variant="outline" className="border-blue-600 text-blue-700 hover:bg-blue-50">
             <Plus className="w-4 h-4 mr-2" />
-            Start another inspection
+            Start new inspection
           </Button>
         </div>
 
