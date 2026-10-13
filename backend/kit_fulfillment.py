@@ -1,6 +1,9 @@
 """
 Kit fulfillment: prepaid label pool, package COCs, Stripe purchase webhook, user downloads.
 Packages: spot_check, extended, full_house
+
+Kit documents (COC + unique prepaid label) stay locked until the customer
+submits an inspection. Purchase emails confirm payment only.
 """
 from __future__ import annotations
 
@@ -225,6 +228,20 @@ def _normalize_label_filename(name: str) -> str:
 def _frontend_dashboard_url() -> str:
     base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
     return f"{base}/Inspection"
+
+
+def _frontend_inspections_url() -> str:
+    base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
+    return f"{base}/MyInspections"
+
+
+def _kit_docs_unlocked(row: Dict[str, Any]) -> bool:
+    """COC/label URLs are public only after the shipping-pack email (status sent)."""
+    if not row:
+        return False
+    if row.get("package_type") in ADDON_TYPES:
+        return True
+    return (row.get("email_status") or "") == "sent"
 
 
 def _extra_samples_buy_url() -> str:
@@ -626,60 +643,14 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                     print(f"⚠️ KIT: could not store email_opened_at ({e2})")
             print(f"⚠️ KIT: email open update failed ({e})")
 
-    def _email_existing_fulfillment(fulfillment: Dict[str, Any]) -> Dict[str, Any]:
-        """Send/resend kit email for an existing fulfillment (does not claim a new label)."""
-        if not fulfillment or not fulfillment.get("id"):
-            return {"success": False, "error": "fulfillment missing"}
-
-        package_type = fulfillment.get("package_type") or ""
+    def _apply_email_result(
+        fulfillment: Dict[str, Any],
+        email_result: Dict[str, Any],
+        ok_status: str = "sent",
+    ) -> Dict[str, Any]:
         to_email = (fulfillment.get("customer_email") or "").strip()
-        if not to_email:
-            return {"success": False, "error": "customer_email missing on fulfillment"}
-
-        pixel_url = _open_pixel_url(fulfillment)
-        email_result = {"success": False, "error": "Email service unavailable"}
-
-        if package_type == "extra_samples":
-            if email_service:
-                inspection_url = _frontend_dashboard_url()
-                email_result = email_service.send_email(
-                    to_email=to_email,
-                    subject="Total Testing - 2 extra samples added",
-                    body=(
-                        f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p>"
-                        "<p>Your $69 add-on for <strong>2 extra lab samples</strong> is confirmed.</p>"
-                        "<p>These samples go on the same inspection and ship in the same box "
-                        "as your original prepaid label. No new shipping label is needed.</p>"
-                        f"<p><a href=\"{inspection_url}\">Open your inspection form</a> and add "
-                        "the two extra sample locations.</p>"
-                    ),
-                    open_pixel_url=pixel_url,
-                )
-        else:
-            attachments = _build_fulfillment_attachments(fulfillment)
-            if not attachments:
-                print(f"⚠️ KIT: fulfillment {fulfillment.get('id')} has no PDF attachments to email")
-
-            if email_service and hasattr(email_service, "send_kit_purchase_email"):
-                email_result = email_service.send_kit_purchase_email(
-                    to_email=to_email,
-                    full_name=fulfillment.get("customer_name") or "Customer",
-                    package_name=PACKAGE_LABELS.get(package_type, package_type),
-                    dashboard_url=_frontend_dashboard_url(),
-                    attachments=attachments,
-                    open_pixel_url=pixel_url,
-                )
-            elif email_service:
-                email_result = email_service.send_email(
-                    to_email=to_email,
-                    subject=f"Total Testing - Your {PACKAGE_LABELS.get(package_type)} Kit Materials",
-                    body=f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p><p>Your kit materials are attached.</p>",
-                    attachments=attachments,
-                    open_pixel_url=pixel_url,
-                )
-
         update = {
-            "email_status": "sent" if email_result.get("success") else "failed",
+            "email_status": ok_status if email_result.get("success") else "failed",
             "email_error": None
             if email_result.get("success")
             else (email_result.get("error") or email_result.get("message")),
@@ -697,6 +668,139 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             "email": email_result,
             "error": None if email_result.get("success") else update["email_error"],
         }
+
+    def _email_extra_samples(fulfillment: Dict[str, Any]) -> Dict[str, Any]:
+        to_email = (fulfillment.get("customer_email") or "").strip()
+        email_result = {"success": False, "error": "Email service unavailable"}
+        if email_service:
+            inspection_url = _frontend_dashboard_url()
+            email_result = email_service.send_email(
+                to_email=to_email,
+                subject="Total Testing - 2 extra samples added",
+                body=(
+                    f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p>"
+                    "<p>Your $69 add-on for <strong>2 extra lab samples</strong> is confirmed.</p>"
+                    "<p>These samples go on the same inspection and ship in the same box "
+                    "as your original prepaid label. No new shipping label is needed.</p>"
+                    f"<p><a href=\"{inspection_url}\">Open your inspection form</a> and add "
+                    "the two extra sample locations.</p>"
+                ),
+                open_pixel_url=_open_pixel_url(fulfillment),
+            )
+        return _apply_email_result(fulfillment, email_result, "sent")
+
+    def _email_purchase_hold(fulfillment: Dict[str, Any]) -> Dict[str, Any]:
+        """Confirm purchase without attaching the unique COC/label."""
+        to_email = (fulfillment.get("customer_email") or "").strip()
+        package_type = fulfillment.get("package_type") or ""
+        email_result = {"success": False, "error": "Email service unavailable"}
+        if email_service and hasattr(email_service, "send_kit_hold_email"):
+            email_result = email_service.send_kit_hold_email(
+                to_email=to_email,
+                full_name=fulfillment.get("customer_name") or "Customer",
+                package_name=PACKAGE_LABELS.get(package_type, package_type),
+                dashboard_url=_frontend_dashboard_url(),
+                open_pixel_url=_open_pixel_url(fulfillment),
+            )
+        elif email_service:
+            dash = _frontend_dashboard_url()
+            email_result = email_service.send_email(
+                to_email=to_email,
+                subject=f"Total Testing - Complete your {PACKAGE_LABELS.get(package_type, package_type)} inspection",
+                body=(
+                    f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p>"
+                    f"<p>Your {PACKAGE_LABELS.get(package_type, package_type)} package is paid.</p>"
+                    "<p>Submit your inspection with the property address and sample locations. "
+                    "After you submit, we email your Chain of Custody (COC) and unique prepaid FedEx label.</p>"
+                    f"<p><a href=\"{dash}\">Create your inspection</a></p>"
+                ),
+                open_pixel_url=_open_pixel_url(fulfillment),
+            )
+        return _apply_email_result(fulfillment, email_result, "awaiting_inspection")
+
+    def _email_shipping_pack(fulfillment: Dict[str, Any]) -> Dict[str, Any]:
+        """Email COC + unique prepaid label after inspection submit (or admin resend)."""
+        to_email = (fulfillment.get("customer_email") or "").strip()
+        package_type = fulfillment.get("package_type") or ""
+        attachments = _build_fulfillment_attachments(fulfillment)
+        if not attachments:
+            print(f"⚠️ KIT: fulfillment {fulfillment.get('id')} has no PDF attachments to email")
+        email_result = {"success": False, "error": "Email service unavailable"}
+        if email_service and hasattr(email_service, "send_kit_purchase_email"):
+            email_result = email_service.send_kit_purchase_email(
+                to_email=to_email,
+                full_name=fulfillment.get("customer_name") or "Customer",
+                package_name=PACKAGE_LABELS.get(package_type, package_type),
+                dashboard_url=_frontend_inspections_url(),
+                attachments=attachments,
+                open_pixel_url=_open_pixel_url(fulfillment),
+            )
+        elif email_service:
+            email_result = email_service.send_email(
+                to_email=to_email,
+                subject=f"Total Testing - Your {PACKAGE_LABELS.get(package_type)} Kit Materials",
+                body=(
+                    f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p>"
+                    "<p>Your Chain of Custody (COC) and prepaid shipping label are attached.</p>"
+                ),
+                attachments=attachments,
+                open_pixel_url=_open_pixel_url(fulfillment),
+            )
+        return _apply_email_result(fulfillment, email_result, "sent")
+
+    def _email_existing_fulfillment(
+        fulfillment: Dict[str, Any],
+        force_docs: bool = False,
+    ) -> Dict[str, Any]:
+        """Send/resend kit email for an existing fulfillment (does not claim a new label)."""
+        if not fulfillment or not fulfillment.get("id"):
+            return {"success": False, "error": "fulfillment missing"}
+        to_email = (fulfillment.get("customer_email") or "").strip()
+        if not to_email:
+            return {"success": False, "error": "customer_email missing on fulfillment"}
+        package_type = fulfillment.get("package_type") or ""
+        if package_type == "extra_samples":
+            return _email_extra_samples(fulfillment)
+        if force_docs or (fulfillment.get("email_status") or "") == "sent":
+            return _email_shipping_pack(fulfillment)
+        return _email_purchase_hold(fulfillment)
+
+    def _release_kit_documents_for_email(
+        email: str,
+        inspection_id: Any = None,
+    ) -> Dict[str, Any]:
+        """Unlock the oldest unpaid-docs kit purchase for this email after inspection submit."""
+        email = (email or "").strip().lower()
+        if not email:
+            return {"success": False, "released": False, "error": "email required"}
+        if not supabase:
+            return {"success": False, "released": False, "error": "Database not configured"}
+        result = (
+            supabase.table("kit_fulfillments")
+            .select("*")
+            .eq("customer_email", email)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        rows = list(result.data or [])
+        pending = [
+            r
+            for r in rows
+            if (r.get("package_type") in PACKAGE_TYPES)
+            and (r.get("email_status") or "") != "sent"
+        ]
+        if not pending:
+            print(f"📦 KIT: no locked documents to release for {email}")
+            return {"success": True, "released": False, "message": "no kit documents waiting"}
+        row = pending[0]
+        print(
+            f"📦 KIT: releasing COC/label fulfillment={row.get('id')} "
+            f"inspection={inspection_id} email={email}"
+        )
+        emailed = _email_shipping_pack(row)
+        emailed["released"] = bool(emailed.get("success"))
+        emailed["inspection_id"] = inspection_id
+        return emailed
 
     def _fulfill_purchase(
         *,
@@ -733,7 +837,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             )
             if existing.data:
                 row = existing.data[0]
-                if row.get("email_status") == "sent":
+                if row.get("email_status") in ("sent", "awaiting_inspection"):
                     return {"success": True, "fulfillment": row, "duplicate": True}
                 print(
                     f"🔁 KIT: retrying email for existing fulfillment {row.get('id')} "
@@ -801,7 +905,10 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 {"assigned_fulfillment_id": fulfillment.get("id")}
             ).eq("id", label["id"]).execute()
 
-        emailed = _email_existing_fulfillment(fulfillment)
+        if is_addon:
+            emailed = _email_existing_fulfillment(fulfillment)
+        else:
+            emailed = _email_purchase_hold(fulfillment)
         emailed["label_id"] = (label or {}).get("id")
         if emailed.get("success") or emailed.get("duplicate"):
             _notify_wp_purchase(
@@ -1214,7 +1321,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             return jsonify({"error": str(e)}), 500
 
     def _send_package_welcome_test(customer_email: str, customer_name: str, package_type: str) -> Dict[str, Any]:
-        """Same kit welcome email + COC, without claiming a prepaid shipping label."""
+        """Same purchase-hold email customers get after checkout (no COC/label, no label claim)."""
         if package_type not in PACKAGE_TYPES:
             return {"success": False, "error": f"test welcome email: unknown package_type: {package_type}"}
         to_email = (customer_email or "").strip().lower()
@@ -1223,21 +1330,15 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if not email_service:
             return {"success": False, "error": "Email service unavailable"}
 
-        packages = {p["package_type"]: p for p in _get_packages()}
-        pkg = packages.get(package_type) or {}
-        fake = {
-            "package_type": package_type,
-            "coc_storage_path": pkg.get("coc_storage_path") or "",
-            "instructions_storage_path": pkg.get("instructions_storage_path") or "",
-        }
-        attachments = _build_fulfillment_attachments(fake)
-        email_result = email_service.send_kit_purchase_email(
-            to_email=to_email,
-            full_name=customer_name or "Customer",
-            package_name=PACKAGE_LABELS.get(package_type, package_type),
-            dashboard_url=_frontend_dashboard_url(),
-            attachments=attachments,
-        )
+        if hasattr(email_service, "send_kit_hold_email"):
+            email_result = email_service.send_kit_hold_email(
+                to_email=to_email,
+                full_name=customer_name or "Customer",
+                package_name=PACKAGE_LABELS.get(package_type, package_type),
+                dashboard_url=_frontend_dashboard_url(),
+            )
+        else:
+            email_result = {"success": False, "error": "hold email method missing"}
         return {
             "success": bool(email_result.get("success")),
             "test_email_only": True,
@@ -1307,8 +1408,13 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 )
                 if existing.data:
                     row = existing.data[0]
-                    if row.get("email_status") == "sent":
-                        skipped.append({"session_id": session_id, "reason": "already_sent"})
+                    if row.get("email_status") in ("sent", "awaiting_inspection"):
+                        skipped.append(
+                            {
+                                "session_id": session_id,
+                                "reason": "already_" + str(row.get("email_status")),
+                            }
+                        )
                         continue
                     # Retry email for existing failed/pending fulfillment
                     full = (
@@ -1444,7 +1550,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             )
             if not existing.data:
                 return jsonify({"error": "Fulfillment not found"}), 404
-            result = _email_existing_fulfillment(existing.data[0])
+            result = _email_existing_fulfillment(existing.data[0], force_docs=True)
             status = 200 if result.get("success") else 400
             return jsonify(result), status
         except Exception as e:
@@ -1503,6 +1609,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         .execute()
                     )
                     label = (lr.data or [None])[0]
+                unlocked = _kit_docs_unlocked(row)
                 items.append(
                     {
                         "id": row.get("id"),
@@ -1512,11 +1619,18 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         "created_at": row.get("created_at"),
                         "email_status": row.get("email_status"),
                         "customer_email": row.get("customer_email"),
-                        "coc_url": _public_url(row.get("coc_storage_path") or ""),
-                        "instructions_url": _public_url(row.get("instructions_storage_path") or ""),
-                        "shipping_label_url": (label or {}).get("public_url")
-                        or _public_url((label or {}).get("storage_path") or ""),
-                        "shipping_label_name": (label or {}).get("file_name"),
+                        "documents_locked": not unlocked,
+                        "coc_url": _public_url(row.get("coc_storage_path") or "") if unlocked else "",
+                        "instructions_url": _public_url(row.get("instructions_storage_path") or "")
+                        if unlocked
+                        else "",
+                        "shipping_label_url": (
+                            (label or {}).get("public_url")
+                            or _public_url((label or {}).get("storage_path") or "")
+                        )
+                        if unlocked
+                        else "",
+                        "shipping_label_name": (label or {}).get("file_name") if unlocked else None,
                     }
                 )
             return jsonify(
@@ -1663,4 +1777,5 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         )
         return jsonify(result), status
 
+    app.kit_release_documents = _release_kit_documents_for_email
     print("✅ KIT: fulfillment endpoints registered")

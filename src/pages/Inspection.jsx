@@ -139,6 +139,7 @@ export default function Inspection() {
   });
   const [newInspection, setNewInspection] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [releasedKitDocs, setReleasedKitDocs] = useState([]);
 
   // Save step to localStorage whenever it changes
   useEffect(() => {
@@ -494,6 +495,16 @@ export default function Inspection() {
             // Don't prevent inspection completion if email fails
             // The inspection was created successfully, email is just a bonus feature
           }
+
+          try {
+            const kitRes = await KitService.myDownloads(currentUser.email);
+            const unlocked = (kitRes.downloads || []).filter(
+              (d) => d.coc_url || d.shipping_label_url
+            );
+            setReleasedKitDocs(unlocked);
+          } catch (kitErr) {
+            console.warn("Could not load kit documents after inspection:", kitErr);
+          }
       } else {
           // This case handles if creation fails to return a valid object with an ID
           console.error("🔍 DEBUG: Invalid inspection response:", newInspection);
@@ -549,7 +560,7 @@ export default function Inspection() {
                     to={createPageUrl("StartNewInspection")}
                     className="font-medium text-blue-700 underline whitespace-nowrap"
                   >
-                    Buy package / new COC
+                    Buy a package
                   </Link>
                 </div>
               </div>
@@ -627,6 +638,34 @@ export default function Inspection() {
               <p className="text-slate-600 text-lg">  
                 Your inspection details have been submitted successfully.
               </p>
+              {releasedKitDocs.length > 0 ? (
+                <div className="mt-6 mx-auto max-w-md rounded-xl border border-green-200 bg-green-50 p-4 text-left">
+                  <p className="text-sm font-medium text-green-900 mb-2">
+                    Your COC and prepaid shipping label are ready. We also emailed them to you.
+                  </p>
+                  <div className="flex flex-col gap-2 text-sm">
+                    {releasedKitDocs.map((d) => (
+                      <div key={d.id} className="flex flex-wrap gap-3">
+                        <span className="font-medium text-slate-800">{d.package_name}</span>
+                        {d.coc_url && (
+                          <a href={d.coc_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                            Download COC
+                          </a>
+                        )}
+                        {d.shipping_label_url && (
+                          <a href={d.shipping_label_url} target="_blank" rel="noreferrer" className="text-blue-700 underline">
+                            Download shipping label
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-500">
+                  If you purchased a kit, check your email and My Inspections for the COC and prepaid label.
+                </p>
+              )}
              
               <Button 
                 onClick={() => {

@@ -495,7 +495,15 @@ export default function KitFulfillmentManager() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant={f.email_status === "sent" ? "default" : "destructive"}>
+                <Badge
+                  variant={
+                    f.email_status === "sent"
+                      ? "default"
+                      : f.email_status === "awaiting_inspection"
+                        ? "outline"
+                        : "destructive"
+                  }
+                >
                   {f.email_status || "unknown"}
                 </Badge>
                 <Badge variant={f.email_opened_at ? "default" : "outline"}>

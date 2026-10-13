@@ -1908,10 +1908,23 @@ def create_inspection():
         
         inspection = result.data[0] if result.data else None
         print(f"🔍 DEBUG: Extracted inspection:", inspection)
+
+        kit_documents = None
+        try:
+            release_email = (inspection or {}).get("email") or inspection_data.get("email")
+            if release_email and hasattr(app, "kit_release_documents"):
+                kit_documents = app.kit_release_documents(
+                    release_email,
+                    (inspection or {}).get("id"),
+                )
+                print(f"📦 KIT: document release after inspection: {kit_documents}")
+        except Exception as kit_err:
+            print(f"⚠️ KIT: document release after inspection failed: {kit_err}")
         
         response_data = {
             "message": "Inspection created successfully",
-            "inspection": inspection
+            "inspection": inspection,
+            "kit_documents": kit_documents,
         }
         print(f"🔍 DEBUG: Returning response:", response_data)
         

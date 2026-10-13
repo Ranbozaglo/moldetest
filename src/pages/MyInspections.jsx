@@ -946,7 +946,9 @@ export default function MyInspections() {
             </div>
             <h3 className="text-xl font-semibold text-slate-900 mb-2">No inspections yet</h3>
             <p className="text-slate-600 mb-4 max-w-md mx-auto">
-              {kitDownloads.length > 0
+              {kitDownloads.some((d) => d.documents_locked)
+                ? "Purchase confirmed. Create the inspection so we can email your COC and unique prepaid shipping label."
+                : kitDownloads.length > 0
                 ? "Your kit is ready. Create the inspection so we have your property and sample details."
                 : "Create your inspection to submit property and sample details. If you still need a COC and shipping label, use New inspection to purchase a package."}
             </p>
@@ -1094,6 +1096,7 @@ export default function MyInspections() {
               </CardTitle>
               <p className="text-sm text-slate-600 font-normal">
                 Newest purchases appear first. Linked to {currentUser?.email || user?.email}.
+                Submit the inspection to unlock the COC and prepaid label.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1107,11 +1110,26 @@ export default function MyInspections() {
                     {index === 0 && (
                       <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Newest</Badge>
                     )}
+                    {d.documents_locked && d.package_type !== "extra_samples" && (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Awaiting inspection</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mb-2">
                     Purchased {formatPurchaseDate(d.created_at)}
                     {d.shipping_label_name ? ` · Label file: ${d.shipping_label_name}` : ""}
                   </p>
+                  {d.documents_locked && d.package_type !== "extra_samples" ? (
+                    <div className="text-sm text-slate-700">
+                      <p className="mb-2">Submit your inspection to receive the COC and prepaid FedEx label.</p>
+                      <Button
+                        size="sm"
+                        onClick={() => navigate(createPageUrl("Inspection"))}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Create inspection
+                      </Button>
+                    </div>
+                  ) : (
                   <div className="flex flex-wrap gap-3 text-sm">
                     {d.coc_url && (
                       <a href={d.coc_url} target="_blank" rel="noreferrer" download className="text-blue-700 underline">
@@ -1128,7 +1146,11 @@ export default function MyInspections() {
                         Download instructions
                       </a>
                     )}
+                    {d.package_type === "extra_samples" && (
+                      <span className="text-slate-600">Added to your sample allowance. No extra shipping label.</span>
+                    )}
                   </div>
+                  )}
                 </div>
               ))}
             </CardContent>
@@ -1146,8 +1168,8 @@ export default function MyInspections() {
           <h3 className="font-semibold text-amber-900 mb-3">Need Help?</h3>
           <ul className="text-amber-800 text-sm space-y-2">
             <li>
-              • <strong>New COC / shipping label:</strong> Use <strong>New inspection</strong> in the menu to purchase a
-                package — not from submitting the form alone.
+              • <strong>COC / shipping label:</strong> Buy a package first, then submit the inspection. We email the
+                unique prepaid label after you submit — not at checkout.
             </li>
             <li>• <strong>Sample Collection:</strong> Use a new swab for each sample location and place it in a Ziploc bag</li>
             <li>

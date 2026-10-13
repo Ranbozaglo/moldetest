@@ -133,7 +133,7 @@ export default function StartNewInspection() {
       if (found) {
         setNewPurchase(found);
         setWaitingForPurchase(false);
-        setMessage("New COC and shipping label are ready.");
+        setMessage("Purchase confirmed. Submit your inspection to get the COC and prepaid shipping label.");
         stopPolling();
         setCheckoutExpanded(false);
         setEmbeddedSession(null);
@@ -200,7 +200,7 @@ export default function StartNewInspection() {
     if (!checkoutStartedAtRef.current) {
       checkoutStartedAtRef.current = new Date().toISOString();
     }
-    setMessage("Payment received — preparing your new COC and shipping label…");
+    setMessage("Payment received. Confirming your purchase…");
     startPolling();
     const next = new URLSearchParams(searchParams);
     next.delete("checkout");
@@ -366,7 +366,7 @@ export default function StartNewInspection() {
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Start new inspection</h1>
           <p className="text-slate-600 mt-2 text-sm sm:text-base">
-            Buy a package to get a new COC and unique prepaid shipping label, then submit the inspection form for this job.
+            Buy a package, then submit the inspection form. After you submit, we email your COC and unique prepaid shipping label.
           </p>
         </div>
 
@@ -516,55 +516,23 @@ export default function StartNewInspection() {
                   2
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900">Get your new COC &amp; shipping label</h3>
+                  <h3 className="font-semibold text-slate-900">Confirm your purchase</h3>
                   <p className="text-sm text-slate-600 mt-1">
-                    Previous purchases stay on My Inspections. This step only shows a label from the purchase you just made.
+                    The unique prepaid label is reserved at checkout. You receive the COC and label after you submit the inspection.
                   </p>
 
                   {hasNewPurchase ? (
                     <div className="mt-3 rounded-lg border border-green-200 bg-white p-3">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="font-medium text-slate-900">{newPurchase.package_name}</span>
-                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">New for this job</Badge>
+                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Paid</Badge>
                       </div>
                       <p className="text-xs text-slate-500 mb-2">
                         Purchased {formatPurchaseDate(newPurchase.created_at)}
-                        {newPurchase.shipping_label_name
-                          ? ` · Label file: ${newPurchase.shipping_label_name}`
-                          : ""}
                       </p>
-                      <div className="flex flex-wrap gap-3 text-sm">
-                        {newPurchase.coc_url && (
-                          <a
-                            href={newPurchase.coc_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-700 underline"
-                          >
-                            Download COC
-                          </a>
-                        )}
-                        {newPurchase.shipping_label_url && (
-                          <a
-                            href={newPurchase.shipping_label_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-700 underline"
-                          >
-                            Download shipping label
-                          </a>
-                        )}
-                        {newPurchase.instructions_url && (
-                          <a
-                            href={newPurchase.instructions_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-700 underline"
-                          >
-                            Download instructions
-                          </a>
-                        )}
-                      </div>
+                      <p className="text-sm text-slate-700">
+                        Submit the inspection form in step 3. We then email your COC and unique prepaid FedEx label.
+                      </p>
                     </div>
                   ) : waitingForPurchase ? (
                     <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
@@ -573,8 +541,7 @@ export default function StartNewInspection() {
                         Waiting for your {selectedPackageName || "package"} checkout to finish…
                       </div>
                       <p className="mt-1 text-blue-800">
-                        Complete payment in the checkout section above. This box updates automatically when the new
-                        COC and label are ready.
+                        Complete payment in the checkout section above. This box updates when the purchase is confirmed.
                       </p>
                       <Button
                         type="button"
@@ -608,8 +575,7 @@ export default function StartNewInspection() {
                 <div className="flex-1">
                   <h3 className="font-semibold text-slate-900">Submit the inspection form</h3>
                   <p className="text-sm text-slate-600 mt-1 mb-3">
-                    Enter property and sample details for this job. Submitting the form does not create a new COC/label —
-                    purchase does.
+                    Enter property and sample details. After you submit, we email the COC and unique prepaid shipping label.
                   </p>
                   <Button
                     onClick={() => navigate(createPageUrl("Inspection"))}
@@ -621,7 +587,7 @@ export default function StartNewInspection() {
                   </Button>
                   {!hasNewPurchase && (
                     <p className="text-xs text-slate-500 mt-2">
-                      Available after your new COC and shipping label appear in step 2.
+                      Available after your purchase is confirmed in step 2.
                     </p>
                   )}
                 </div>

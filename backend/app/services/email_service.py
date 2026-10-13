@@ -153,7 +153,7 @@ class EmailService:
                 <tr>
                   <td align="center" bgcolor="#004aac" style="border-radius:8px;">
                     <a href="{dashboard_url}" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
-                      Create your inspection
+                      View My Inspections
                     </a>
                   </td>
                 </tr>
@@ -555,6 +555,42 @@ class EmailService:
             subject=subject,
             body=body,
             attachments=attachments or [],
+            open_pixel_url=open_pixel_url,
+        )
+
+    def send_kit_hold_email(
+        self,
+        to_email: str,
+        full_name: str,
+        package_name: str,
+        dashboard_url: str,
+        open_pixel_url: str = "",
+    ) -> Dict[str, Any]:
+        """Purchase confirmed: no COC/label until the inspection is submitted."""
+        base = self.frontend_base_url()
+        logo_url = os.getenv('EMAIL_LOGO_URL') or f"{base}/logos.png"
+        dash = dashboard_url or f"{base}/Inspection"
+        content = f"""
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name or 'Customer'},</p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Thank you for choosing Total Testing. Your {package_name} package is paid.
+              </p>
+              <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Next, submit your inspection with the property address and each sample location.
+                After you submit, we email your Chain of Custody (COC) and unique prepaid FedEx label.
+              </p>
+"""
+        body = _branded_email(
+            eyebrow="Purchase confirmed",
+            title=f"Your {package_name} is paid",
+            content_html=content,
+            cta_href=dash,
+            cta_label="Create your inspection",
+        ).replace("{logo_url}", logo_url)
+        return self.send_email(
+            to_email=to_email,
+            subject=f"Total Testing - Complete your {package_name} inspection",
+            body=body,
             open_pixel_url=open_pixel_url,
         )
     
