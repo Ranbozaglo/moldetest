@@ -148,12 +148,17 @@ export default function SamplingGuideStep({
   const extraCount = extraSamplesOffer?.count || 2;
   const [samples, setSamples] = useState(() => [emptySample(), emptySample()]);
 
-  // Sync samples with formData when component mounts
+  // Sync samples with formData, but never keep more rows than paid slots.
   useEffect(() => {
-    if (formData.samples) {
-      setSamples(formData.samples);
-    }
-  }, [formData.samples]);
+    const incoming = Array.isArray(formData.samples) ? formData.samples : null;
+    setSamples((prev) => {
+      const source = incoming && incoming.length ? incoming : prev;
+      if (source.length > paidSlots) {
+        return source.slice(0, paidSlots);
+      }
+      return source.length ? source : prev;
+    });
+  }, [formData.samples, paidSlots]);
   const [sampleImages] = useState([
     {
       sample_image: "https://opjgytjlebfnhjzarvyy.supabase.co/storage/v1/object/public/sample//Samples9.jpeg",
@@ -497,7 +502,8 @@ export default function SamplingGuideStep({
         <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Sample Collection Form</h2>
           <p className="text-slate-600 mb-2 text-sm sm:text-base">
-            Document each swab you will send. Your package covers {paidSlots} sample{paidSlots === 1 ? "" : "s"}.
+            Document each swab you will send. This job covers {paidSlots} sample{paidSlots === 1 ? "" : "s"}
+            {sampleAllowance > 0 ? "" : " until a package is found for this email"}.
             Extra swabs are not analyzed unless you add them for ${extraPrice}.
           </p>
           {sampleAllowance === 0 && (

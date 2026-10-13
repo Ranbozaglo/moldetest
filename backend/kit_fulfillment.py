@@ -248,12 +248,44 @@ def _extra_samples_buy_url() -> str:
     return (os.getenv("STRIPE_BUY_URL_EXTRA_SAMPLES") or EXTRA_SAMPLES_BUY_URL_DEFAULT).strip().rstrip("/")
 
 
-def _sample_allowance_from_rows(rows: List[Dict[str, Any]]) -> int:
-    total = 0
+def _pending_kits(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    pending = [
+        r
+        for r in (rows or [])
+        if r.get("package_type") in PACKAGE_TYPES
+        and (r.get("email_status") or "") != "sent"
+    ]
+    pending.sort(key=lambda r: str(r.get("created_at") or ""))
+    return pending
+
+
+def _current_job_sample_allowance(rows: List[Dict[str, Any]]) -> int:
+    """Slots for the inspection being filled now: one unused kit + extras bought after it.
+
+    Do not sum every historical purchase for the email (that let test accounts add 20+ samples).
+    """
+    pending = _pending_kits(rows)
+    if not pending:
+        return 0
+    current = pending[0]
+    base = int(PACKAGE_SAMPLE_COUNTS.get(current.get("package_type"), 0) or 0)
+    kit_when = str(current.get("created_at") or "")
+    extra_n = 0
     for row in rows or []:
-        pkg = row.get("package_type") or ""
-        total += int(PACKAGE_SAMPLE_COUNTS.get(pkg, 0) or 0)
-    return total
+        if row.get("package_type") not in ADDON_TYPES:
+            continue
+        if str(row.get("created_at") or "") >= kit_when:
+            extra_n += int(PACKAGE_SAMPLE_COUNTS.get(row.get("package_type"), 0) or 0)
+    return base + extra_n
+
+
+def _sample_allowance_from_rows(rows: List[Dict[str, Any]]) -> int:
+    return _current_job_sample_allowance(rows)
+
+
+def _active_kit_row(rows: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    pending = _pending_kits(rows)
+    return pending[0] if pending else None
 
 
 def _api_public_base() -> str:
@@ -1567,36 +1599,43 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             _record_email_open(raw)
         return _pixel_response()
 
+    def _fulfillments_for_email(email: str) -> List[Dict[str, Any]]:
+        email = (email or "").strip().lower()
+        if not email or not supabase:
+            return []
+        result = (
+            supabase.table("kit_fulfillments")
+            .select("*")
+            .eq("customer_email", email)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        rows = list(result.data or [])
+        if rows:
+            return rows
+        all_rows = (
+            supabase.table("kit_fulfillments")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(500)
+            .execute()
+        )
+        return [
+            r
+            for r in (all_rows.data or [])
+            if str(r.get("customer_email") or "").strip().lower() == email
+        ]
+
+    def _sample_allowance_for_email(email: str) -> int:
+        return _current_job_sample_allowance(_fulfillments_for_email(email))
+
     @app.route("/api/kit/my-downloads", methods=["GET"])
     def kit_my_downloads():
         email = (request.args.get("email") or "").strip().lower()
         if not email:
             return jsonify({"error": "email required"}), 400
         try:
-            # All purchases for this email (any package) land on the same account list.
-            # Prefer exact lowercase match; also include legacy mixed-case rows.
-            result = (
-                supabase.table("kit_fulfillments")
-                .select("*")
-                .eq("customer_email", email)
-                .order("created_at", desc=True)
-                .execute()
-            )
-            rows = list(result.data or [])
-            if not rows:
-                # Case-insensitive fallback for older rows
-                all_rows = (
-                    supabase.table("kit_fulfillments")
-                    .select("*")
-                    .order("created_at", desc=True)
-                    .limit(500)
-                    .execute()
-                )
-                rows = [
-                    r
-                    for r in (all_rows.data or [])
-                    if str(r.get("customer_email") or "").strip().lower() == email
-                ]
+            rows = _fulfillments_for_email(email)
             items = []
             for row in rows:
                 label = None
@@ -1633,10 +1672,15 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         "shipping_label_name": (label or {}).get("file_name") if unlocked else None,
                     }
                 )
+            active = _active_kit_row(rows)
             return jsonify(
                 {
                     "downloads": items,
-                    "sample_allowance": _sample_allowance_from_rows(rows),
+                    "sample_allowance": _current_job_sample_allowance(rows),
+                    "active_package_type": (active or {}).get("package_type"),
+                    "active_package_name": PACKAGE_LABELS.get((active or {}).get("package_type"), "")
+                    if active
+                    else "",
                     "extra_samples": {
                         "url": _extra_samples_buy_url(),
                         "count": PACKAGE_SAMPLE_COUNTS["extra_samples"],
@@ -1778,4 +1822,5 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         return jsonify(result), status
 
     app.kit_release_documents = _release_kit_documents_for_email
+    app.kit_sample_allowance = _sample_allowance_for_email
     print("✅ KIT: fulfillment endpoints registered")

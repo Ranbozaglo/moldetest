@@ -2126,8 +2126,33 @@ def create_sample():
     data = request.get_json()
     
     try:
+        inspection_id = data.get('inspection_id')
+        if inspection_id is not None and hasattr(app, "kit_sample_allowance"):
+            insp = (
+                supabase.table("inspection")
+                .select("id,email")
+                .eq("id", inspection_id)
+                .limit(1)
+                .execute()
+            )
+            insp_email = ((insp.data or [{}])[0].get("email") or "") if insp.data else ""
+            allowance = int(app.kit_sample_allowance(insp_email) or 0)
+            cap = allowance if allowance > 0 else 2
+            existing = (
+                supabase.table("samples")
+                .select("id")
+                .eq("inspection_id", inspection_id)
+                .execute()
+            )
+            if len(existing.data or []) >= cap:
+                return jsonify(
+                    {
+                        "error": f"This inspection is limited to {cap} paid sample{'s' if cap != 1 else ''}.",
+                    }
+                ), 400
+
         result = supabase.table('samples').insert({
-            'inspection_id': data.get('inspection_id'),
+            'inspection_id': inspection_id,
             'location': data.get('location'),
             'description': data.get('sample_type') or data.get('notes'),
             'sample_image': data.get('sample_image')

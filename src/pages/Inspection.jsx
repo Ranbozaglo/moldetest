@@ -395,9 +395,10 @@ export default function Inspection() {
       const filledSampleCount = (formData.samples || []).filter(
         (sample) => sample.location && sample.location.trim() !== ""
       ).length;
-      if (sampleAllowance > 0 && filledSampleCount > sampleAllowance) {
+      const paidCap = sampleAllowance > 0 ? sampleAllowance : 2;
+      if (filledSampleCount > paidCap) {
         alert(
-          `Your package covers ${sampleAllowance} samples. Remove extra locations or add 2 more samples for $69 before submitting.`
+          `Your package covers ${paidCap} samples. Remove extra locations or add 2 more samples for $69 before submitting.`
         );
         setIsSubmitting(false);
         return;

@@ -526,8 +526,9 @@ export const Sample = {
   
   bulkCreate: async (dataArray) => {
     const token = getAuthToken();
-    const promises = dataArray.map(data => 
-      apiCall('/samples', {
+    const results = [];
+    for (const data of dataArray) {
+      const created = await apiCall('/samples', {
         method: 'POST',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -539,10 +540,9 @@ export const Sample = {
           description: data.description || data.sample_type,
           sample_image: data.sample_image
         })
-      })
-    );
-    
-    const results = await Promise.all(promises);
+      });
+      results.push(created);
+    }
     return results;
   }
 };
