@@ -1213,18 +1213,58 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    def _send_package_welcome_test(customer_email: str, customer_name: str, package_type: str) -> Dict[str, Any]:
+        """Same kit welcome email + COC, without claiming a prepaid shipping label."""
+        if package_type not in PACKAGE_TYPES:
+            return {"success": False, "error": f"Unknown package_type: {package_type}"}
+        to_email = (customer_email or "").strip().lower()
+        if not to_email:
+            return {"success": False, "error": "customer_email required"}
+        if not email_service:
+            return {"success": False, "error": "Email service unavailable"}
+
+        packages = {p["package_type"]: p for p in _get_packages()}
+        pkg = packages.get(package_type) or {}
+        fake = {
+            "package_type": package_type,
+            "coc_storage_path": pkg.get("coc_storage_path") or "",
+            "instructions_storage_path": pkg.get("instructions_storage_path") or "",
+        }
+        attachments = _build_fulfillment_attachments(fake)
+        email_result = email_service.send_kit_purchase_email(
+            to_email=to_email,
+            full_name=customer_name or "Customer",
+            package_name=PACKAGE_LABELS.get(package_type, package_type),
+            dashboard_url=_frontend_dashboard_url(),
+            attachments=attachments,
+        )
+        return {
+            "success": bool(email_result.get("success")),
+            "test_email_only": True,
+            "package_type": package_type,
+            "email": email_result,
+            "error": None if email_result.get("success") else (email_result.get("error") or email_result.get("message")),
+        }
+
     @app.route("/api/kit/fulfillments/manual", methods=["POST"])
     def kit_manual_fulfill():
         """Admin manual send (for testing or missed webhooks)."""
         if not _require_admin():
             return jsonify({"error": "Unauthorized"}), 401
         data = request.get_json() or {}
-        result = _fulfill_purchase(
-            customer_email=data.get("customer_email") or "",
-            customer_name=data.get("customer_name") or "",
-            package_type=data.get("package_type") or "",
-            stripe_session_id=data.get("stripe_session_id") or f"manual-{uuid.uuid4().hex}",
-        )
+        if data.get("test_email_only"):
+            result = _send_package_welcome_test(
+                customer_email=data.get("customer_email") or "",
+                customer_name=data.get("customer_name") or "",
+                package_type=data.get("package_type") or "",
+            )
+        else:
+            result = _fulfill_purchase(
+                customer_email=data.get("customer_email") or "",
+                customer_name=data.get("customer_name") or "",
+                package_type=data.get("package_type") or "",
+                stripe_session_id=data.get("stripe_session_id") or f"manual-{uuid.uuid4().hex}",
+            )
         status = 200 if result.get("success") or result.get("duplicate") else 400
         return jsonify(result), status
 
