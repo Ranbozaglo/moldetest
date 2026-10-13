@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { MoldInspection, EmailService } from "@/api/entities";
+import { MoldInspection, EmailService, KitService } from "@/api/entities";
 import { Sample } from "@/api/entities";
 import { User } from "@/api/entities";
 import { useAuth } from "@/contexts/AuthContext";
@@ -130,6 +130,13 @@ export default function Inspection() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [hasExistingInspections, setHasExistingInspections] = useState(false);
+  const [sampleAllowance, setSampleAllowance] = useState(0);
+  const [extraSamplesOffer, setExtraSamplesOffer] = useState({
+    url: "https://buy.stripe.com/cNiaEXdAP70Vc1D0lsabK03",
+    count: 2,
+    price: 69,
+    name: "2 Extra Samples",
+  });
   const [newInspection, setNewInspection] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -195,6 +202,21 @@ export default function Inspection() {
           } catch (error) {
             console.log("🔍 DEBUG: No existing inspections or error checking:", error);
           }
+
+          try {
+            const kitRes = await KitService.myDownloads(currentUser.email);
+            setSampleAllowance(Number(kitRes.sample_allowance) || 0);
+            if (kitRes.extra_samples?.url) {
+              setExtraSamplesOffer({
+                url: kitRes.extra_samples.url,
+                count: kitRes.extra_samples.count || 2,
+                price: kitRes.extra_samples.price || 69,
+                name: kitRes.extra_samples.name || "2 Extra Samples",
+              });
+            }
+          } catch (error) {
+            console.log("🔍 DEBUG: Could not load sample allowance:", error);
+          }
         } else {
           console.log("🔍 DEBUG: No authenticated user found");
           navigate(createPageUrl('SignIn'));
@@ -210,6 +232,31 @@ export default function Inspection() {
 
     checkUserAndPreloadData();
   }, [navigate, currentUser]); // Added currentUser to dependency array
+
+  useEffect(() => {
+    if (!currentUser?.email) return undefined;
+    const refreshAllowance = async () => {
+      try {
+        const kitRes = await KitService.myDownloads(currentUser.email);
+        setSampleAllowance(Number(kitRes.sample_allowance) || 0);
+        if (kitRes.extra_samples?.url) {
+          setExtraSamplesOffer({
+            url: kitRes.extra_samples.url,
+            count: kitRes.extra_samples.count || 2,
+            price: kitRes.extra_samples.price || 69,
+            name: kitRes.extra_samples.name || "2 Extra Samples",
+          });
+        }
+      } catch {
+        /* keep last known allowance */
+      }
+    };
+    const onFocus = () => {
+      refreshAllowance();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [currentUser?.email]);
 
   const updateFormData = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -343,6 +390,17 @@ export default function Inspection() {
         throw new Error('Authentication required. Please log in to submit inspection.');
       }
       submissionData.created_by = currentUser.email;
+
+      const filledSampleCount = (formData.samples || []).filter(
+        (sample) => sample.location && sample.location.trim() !== ""
+      ).length;
+      if (sampleAllowance > 0 && filledSampleCount > sampleAllowance) {
+        alert(
+          `Your package covers ${sampleAllowance} samples. Remove extra locations or add 2 more samples for $69 before submitting.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
 
       // Now log the true final data
       console.log("🔍 DEBUG: Final submission data:", submissionData);
@@ -559,6 +617,8 @@ export default function Inspection() {
               onSubmit={handleSubmit}
               isSubmitting={isSubmitting}
               user={currentUser}
+              sampleAllowance={sampleAllowance}
+              extraSamplesOffer={extraSamplesOffer}
             />
           ) : (
             <div className="text-center py-10">

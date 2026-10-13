@@ -926,7 +926,8 @@ export class PasswordResetService {
     try {
       const response = await apiCall('/auth/request-password-reset', {
         method: 'POST',
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email }),
+        skipAuthRedirect: true
       });
       
       return {
@@ -952,7 +953,8 @@ export class PasswordResetService {
     try {
       const response = await apiCall('/auth/confirm-password-reset', {
         method: 'POST',
-        body: JSON.stringify({ token, password })
+        body: JSON.stringify({ token, password }),
+        skipAuthRedirect: true
       });
       
       return {

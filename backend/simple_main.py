@@ -43,6 +43,38 @@ except Exception as _kit_import_err:
 
 app = Flask(__name__)
 
+def _normalize_email(value) -> str:
+    return (value or '').strip().lower()
+
+def _escape_ilike(value: str) -> str:
+    return value.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+def _find_user_by_email(email: str):
+    """Match user_profiles.email exactly, then case-insensitively."""
+    if not email:
+        return None
+    try:
+        exact = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        if exact.data:
+            return exact.data[0]
+        lowered = email.lower()
+        if lowered != email:
+            exact_lower = supabase.table('user_profiles').select('*').eq('email', lowered).execute()
+            if exact_lower.data:
+                return exact_lower.data[0]
+        fuzzy = (
+            supabase.table('user_profiles')
+            .select('*')
+            .ilike('email', _escape_ilike(lowered))
+            .limit(1)
+            .execute()
+        )
+        if fuzzy.data:
+            return fuzzy.data[0]
+    except Exception as e:
+        print(f"User lookup error: {e}")
+    return None
+
 def _normalize_origin(url: str) -> str:
     u = (url or '').strip().rstrip('/')
     if not u:
@@ -1278,7 +1310,7 @@ def login():
     data = request.get_json()
     print(f"🔍 DEBUG: Request data: {data}")
     
-    email = data.get('email')
+    email = (data.get('email') or '').strip()
     password = data.get('password')
     
     print(f"🔍 DEBUG: Email: {email}, Password provided: {bool(password)}")
@@ -1288,15 +1320,13 @@ def login():
         return jsonify({"error": "Email and password required"}), 400
     
     try:
-        # Query user_profiles table for the given email using .single() to ensure only one result
-        result = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        user_data = _find_user_by_email(email)
         
         # Check if user exists - use consistent error message for security
-        if not result.data:
+        if not user_data:
             print(f"🔍 DEBUG: User not found for email: {email}")
             return jsonify({"error": "Invalid credentials"}), 401
         
-        user_data = result.data[0]
         print(f"🔍 DEBUG: User found: {user_data.get('email')}")
         
         # Check if password_hash exists
@@ -1372,7 +1402,7 @@ def validate_token():
 def register():
     """User registration endpoint - now stores password hash"""
     data = request.get_json()
-    email = data.get('email')
+    email = _normalize_email(data.get('email'))
     password = data.get('password')
     
     if not email or not password:
@@ -1380,8 +1410,7 @@ def register():
     
     try:
         # Check if user already exists in user_profiles table
-        existing_user = supabase.table('user_profiles').select('*').eq('email', email).execute()
-        if existing_user.data:
+        if _find_user_by_email(email):
             return jsonify({"error": "Email already exists"}), 400
         
         # Hash the password
@@ -2847,27 +2876,26 @@ def request_password_reset():
         if not data or 'email' not in data:
             return jsonify({'error': 'Email is required'}), 400
             
-        email = data['email'].strip().lower()
+        email = _normalize_email(data.get('email'))
         if not email:
             return jsonify({'error': 'Email is required'}), 400
             
-        # Find user in user_profiles table
-        user_query = supabase.table('user_profiles').select('*').eq('email', email).execute()
+        generic = {
+            'success': True,
+            'message': 'If an account with that email exists, you will receive a password reset link.'
+        }
+
+        # Find user in user_profiles table (case-insensitive)
+        user_data = _find_user_by_email(email)
         
-        if not user_query.data:
+        if not user_data:
             # Return success even if user doesn't exist (security best practice)
-            return jsonify({
-                'success': True,
-                'message': 'If an account with that email exists, you will receive a password reset link.'
-            }), 200
+            return jsonify(generic), 200
             
-        user_data = user_query.data[0]
         user_id = str(user_data['id'])  # Ensure UUID is handled as string
         
         # Generate secure token
-        import uuid
-        import secrets
-        reset_token = str(uuid.uuid4())
+        reset_token = secrets.token_urlsafe(32)
         
         # Insert token into password_reset_tokens table
         token_data = {
@@ -2879,7 +2907,8 @@ def request_password_reset():
         token_result = supabase.table('password_reset_tokens').insert(token_data).execute()
         
         if not token_result.data:
-            return jsonify({'error': 'Failed to create reset token'}), 500
+            print(f"❌ Failed to create reset token for {email}")
+            return jsonify(generic), 200
             
         # Send reset email
         frontend_base = _normalize_origin(
@@ -2899,16 +2928,16 @@ def request_password_reset():
         email_sent = email_service.send_password_reset_email(reset_data)
         
         if not email_sent:
-            return jsonify({'error': 'Failed to send reset email'}), 500
+            print(f"❌ Password reset email failed for {email}")
             
+        return jsonify(generic), 200
+        
+    except Exception as e:
+        print(f"❌ Password reset request error: {e}")
         return jsonify({
             'success': True,
             'message': 'If an account with that email exists, you will receive a password reset link.'
         }), 200
-        
-    except Exception as e:
-        print(f"❌ Password reset request error: {e}")
-        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/auth/confirm-password-reset', methods=['POST'])
 def confirm_password_reset():

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { ArrowLeft, Eye, EyeOff, Shield, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,14 +95,8 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+    <div className="flex items-center justify-center p-4 py-12 md:py-16">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
               {resetComplete ? (
@@ -124,11 +117,7 @@ export default function ResetPassword() {
           </div>
 
           {resetComplete ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-4"
-            >
+            <div className="text-center space-y-4">
               <p className="text-slate-600 mb-6">
                 {message}
               </p>
@@ -138,7 +127,7 @@ export default function ResetPassword() {
               >
                 Go to Sign In
               </Button>
-            </motion.div>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
@@ -195,23 +184,15 @@ export default function ResetPassword() {
               </div>
 
               {error && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-red-50 border border-red-200 rounded-lg"
-                >
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-600 text-sm">{error}</p>
-                </motion.div>
+                </div>
               )}
 
               {message && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-3 bg-green-50 border border-green-200 rounded-lg"
-                >
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-green-600 text-sm">{message}</p>
-                </motion.div>
+                </div>
               )}
 
               <Button
@@ -233,8 +214,7 @@ export default function ResetPassword() {
               Back to Sign In
             </Link>
           </div>
-        </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

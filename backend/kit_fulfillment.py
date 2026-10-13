@@ -15,18 +15,31 @@ from flask import Response, jsonify, request
 KIT_BUCKET = os.getenv("KIT_STORAGE_BUCKET", "kit-fulfillment")
 
 PACKAGE_TYPES = ("spot_check", "extended", "full_house")
+ADDON_TYPES = ("extra_samples",)
+KNOWN_PACKAGE_TYPES = PACKAGE_TYPES + ADDON_TYPES
 
 PACKAGE_LABELS = {
     "spot_check": "Spot Check",
     "extended": "Extended",
     "full_house": "Full House",
+    "extra_samples": "2 Extra Samples",
 }
 
 PACKAGE_PRICES_CENTS = {
     "spot_check": 18900,
     "extended": 21500,
     "full_house": 27000,
+    "extra_samples": 6900,
 }
+
+PACKAGE_SAMPLE_COUNTS = {
+    "spot_check": 2,
+    "extended": 4,
+    "full_house": 6,
+    "extra_samples": 2,
+}
+
+EXTRA_SAMPLES_BUY_URL_DEFAULT = "https://buy.stripe.com/cNiaEXdAP70Vc1D0lsabK03"
 
 LABEL_STATUSES = ("available", "assigned", "void")
 
@@ -212,6 +225,18 @@ def _normalize_label_filename(name: str) -> str:
 def _frontend_dashboard_url() -> str:
     base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
     return f"{base}/Inspection"
+
+
+def _extra_samples_buy_url() -> str:
+    return (os.getenv("STRIPE_BUY_URL_EXTRA_SAMPLES") or EXTRA_SAMPLES_BUY_URL_DEFAULT).strip().rstrip("/")
+
+
+def _sample_allowance_from_rows(rows: List[Dict[str, Any]]) -> int:
+    total = 0
+    for row in rows or []:
+        pkg = row.get("package_type") or ""
+        total += int(PACKAGE_SAMPLE_COUNTS.get(pkg, 0) or 0)
+    return total
 
 
 def _api_public_base() -> str:
@@ -431,6 +456,16 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             if plink and buy and plink in buy:
                 return row.get("package_type")
 
+        extra_url = _extra_samples_buy_url()
+        extra_slug = _extract_buy_slug(extra_url)
+        extra_plink = (os.getenv("STRIPE_PLINK_EXTRA_SAMPLES") or "").strip()
+        if extra_plink and plink and plink == extra_plink:
+            return "extra_samples"
+        if extra_slug and url_slug and extra_slug == url_slug:
+            return "extra_samples"
+        if extra_url and url and extra_url.rstrip("/") == url.rstrip("/"):
+            return "extra_samples"
+
         return None
 
     def _claim_next_label(package_type: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -601,29 +636,47 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         if not to_email:
             return {"success": False, "error": "customer_email missing on fulfillment"}
 
-        attachments = _build_fulfillment_attachments(fulfillment)
-        if not attachments:
-            print(f"⚠️ KIT: fulfillment {fulfillment.get('id')} has no PDF attachments to email")
-
         pixel_url = _open_pixel_url(fulfillment)
         email_result = {"success": False, "error": "Email service unavailable"}
-        if email_service and hasattr(email_service, "send_kit_purchase_email"):
-            email_result = email_service.send_kit_purchase_email(
-                to_email=to_email,
-                full_name=fulfillment.get("customer_name") or "Customer",
-                package_name=PACKAGE_LABELS.get(package_type, package_type),
-                dashboard_url=_frontend_dashboard_url(),
-                attachments=attachments,
-                open_pixel_url=pixel_url,
-            )
-        elif email_service:
-            email_result = email_service.send_email(
-                to_email=to_email,
-                subject=f"Total Testing - Your {PACKAGE_LABELS.get(package_type)} Kit Materials",
-                body=f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p><p>Your kit materials are attached.</p>",
-                attachments=attachments,
-                open_pixel_url=pixel_url,
-            )
+
+        if package_type == "extra_samples":
+            if email_service:
+                inspection_url = _frontend_dashboard_url()
+                email_result = email_service.send_email(
+                    to_email=to_email,
+                    subject="Total Testing - 2 extra samples added",
+                    body=(
+                        f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p>"
+                        "<p>Your $69 add-on for <strong>2 extra lab samples</strong> is confirmed.</p>"
+                        "<p>These samples go on the same inspection and ship in the same box "
+                        "as your original prepaid label. No new shipping label is needed.</p>"
+                        f"<p><a href=\"{inspection_url}\">Open your inspection form</a> and add "
+                        "the two extra sample locations.</p>"
+                    ),
+                    open_pixel_url=pixel_url,
+                )
+        else:
+            attachments = _build_fulfillment_attachments(fulfillment)
+            if not attachments:
+                print(f"⚠️ KIT: fulfillment {fulfillment.get('id')} has no PDF attachments to email")
+
+            if email_service and hasattr(email_service, "send_kit_purchase_email"):
+                email_result = email_service.send_kit_purchase_email(
+                    to_email=to_email,
+                    full_name=fulfillment.get("customer_name") or "Customer",
+                    package_name=PACKAGE_LABELS.get(package_type, package_type),
+                    dashboard_url=_frontend_dashboard_url(),
+                    attachments=attachments,
+                    open_pixel_url=pixel_url,
+                )
+            elif email_service:
+                email_result = email_service.send_email(
+                    to_email=to_email,
+                    subject=f"Total Testing - Your {PACKAGE_LABELS.get(package_type)} Kit Materials",
+                    body=f"<p>Hi {fulfillment.get('customer_name') or 'Customer'},</p><p>Your kit materials are attached.</p>",
+                    attachments=attachments,
+                    open_pixel_url=pixel_url,
+                )
 
         update = {
             "email_status": "sent" if email_result.get("success") else "failed",
@@ -662,7 +715,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         first_source: str = "",
         last_source: str = "",
     ) -> Dict[str, Any]:
-        if package_type not in PACKAGE_TYPES:
+        if package_type not in KNOWN_PACKAGE_TYPES:
             return {"success": False, "error": f"Unknown package_type: {package_type}"}
         if not customer_email:
             return {"success": False, "error": "customer_email required"}
@@ -692,20 +745,23 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
 
         packages = {p["package_type"]: p for p in _get_packages()}
         pkg = packages.get(package_type) or {}
-        coc_path = pkg.get("coc_storage_path") or ""
-        instructions_path = pkg.get("instructions_storage_path") or ""
-        if not coc_path:
+        is_addon = package_type in ADDON_TYPES
+        coc_path = "" if is_addon else (pkg.get("coc_storage_path") or "")
+        instructions_path = "" if is_addon else (pkg.get("instructions_storage_path") or "")
+        if not is_addon and not coc_path:
             return {
                 "success": False,
                 "error": f"COC not uploaded for {PACKAGE_LABELS.get(package_type)}. Upload it in Admin → Kit Fulfillment.",
             }
 
-        label = _claim_next_label(package_type)
-        if not label:
-            return {
-                "success": False,
-                "error": "No available prepaid shipping labels in stock. Upload more labels in Admin.",
-            }
+        label = None
+        if not is_addon:
+            label = _claim_next_label(package_type)
+            if not label:
+                return {
+                    "success": False,
+                    "error": "No available prepaid shipping labels in stock. Upload more labels in Admin.",
+                }
 
         fulfillment_row = {
             "stripe_session_id": stripe_session_id or None,
@@ -714,12 +770,14 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             "customer_email": customer_email.strip().lower(),
             "customer_name": customer_name or "",
             "package_type": package_type,
-            "shipping_label_id": label["id"],
-            "coc_storage_path": coc_path,
+            "shipping_label_id": (label or {}).get("id"),
+            "coc_storage_path": coc_path or None,
             "instructions_storage_path": instructions_path or None,
             "email_status": "pending",
             "created_at": _utcnow(),
         }
+        if not fulfillment_row.get("shipping_label_id"):
+            fulfillment_row.pop("shipping_label_id", None)
         analytics_fields = {
             "analytics_sid": (analytics_sid or "")[:64] or None,
             "amount_cents": int(amount_cents) if amount_cents is not None else PACKAGE_PRICES_CENTS.get(package_type),
@@ -738,12 +796,13 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
             inserted = supabase.table("kit_fulfillments").insert(fulfillment_row).execute()
         fulfillment = (inserted.data or [fulfillment_row])[0]
 
-        supabase.table("shipping_labels").update(
-            {"assigned_fulfillment_id": fulfillment.get("id")}
-        ).eq("id", label["id"]).execute()
+        if label and label.get("id"):
+            supabase.table("shipping_labels").update(
+                {"assigned_fulfillment_id": fulfillment.get("id")}
+            ).eq("id", label["id"]).execute()
 
         emailed = _email_existing_fulfillment(fulfillment)
-        emailed["label_id"] = label.get("id")
+        emailed["label_id"] = (label or {}).get("id")
         if emailed.get("success") or emailed.get("duplicate"):
             _notify_wp_purchase(
                 {
@@ -1262,6 +1321,12 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                     if isinstance(meta, dict):
                         package_type = meta.get("package_type") or meta.get("package")
                 if not package_type:
+                    try:
+                        if int(getattr(session, "amount_total", 0) or 0) == PACKAGE_PRICES_CENTS["extra_samples"]:
+                            package_type = "extra_samples"
+                    except (TypeError, ValueError):
+                        pass
+                if not package_type:
                     failed.append(
                         {
                             "session_id": session_id,
@@ -1403,6 +1468,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         "id": row.get("id"),
                         "package_type": row.get("package_type"),
                         "package_name": PACKAGE_LABELS.get(row.get("package_type"), row.get("package_type")),
+                        "sample_count": PACKAGE_SAMPLE_COUNTS.get(row.get("package_type"), 0),
                         "created_at": row.get("created_at"),
                         "email_status": row.get("email_status"),
                         "customer_email": row.get("customer_email"),
@@ -1413,7 +1479,18 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                         "shipping_label_name": (label or {}).get("file_name"),
                     }
                 )
-            return jsonify({"downloads": items})
+            return jsonify(
+                {
+                    "downloads": items,
+                    "sample_allowance": _sample_allowance_from_rows(rows),
+                    "extra_samples": {
+                        "url": _extra_samples_buy_url(),
+                        "count": PACKAGE_SAMPLE_COUNTS["extra_samples"],
+                        "price": PACKAGE_PRICES_CENTS["extra_samples"] // 100,
+                        "name": PACKAGE_LABELS["extra_samples"],
+                    },
+                }
+            )
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -1511,6 +1588,8 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         )
         if not package_type:
             package_type = meta.get("package_type") or meta.get("package")
+        if not package_type and amount_cents == PACKAGE_PRICES_CENTS["extra_samples"]:
+            package_type = "extra_samples"
         if not package_type:
             print(
                 f"❌ KIT: could not resolve package for payment_link={payment_link} "

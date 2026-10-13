@@ -43,3 +43,7 @@ Admin Dashboard → **Kit Fulfillment**
 ## 6. Customer experience
 After purchase, email includes COC + unique label.  
 Same files appear under **Your kit downloads** on My Inspections.
+
+## Extra samples ($69 / 2)
+Payment Link: `https://buy.stripe.com/cNiaEXdAP70Vc1D0lsabK03`  
+This add-on does **not** assign a second prepaid label or COC. It adds 2 sample slots to the buyer’s inspection allowance. Run `backend/sql/kit_extra_samples.sql` so `kit_fulfillments.package_type` can store `extra_samples`. Set the Stripe After-payment URL to `https://total-testing-diy.com/Inspection`.

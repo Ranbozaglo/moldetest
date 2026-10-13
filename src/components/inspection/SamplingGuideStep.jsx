@@ -127,12 +127,26 @@ const SampleRow = React.memo(({ index, sample, updateSample, removeSample }) => 
 
 SampleRow.displayName = 'SampleRow';
 
-export default function SamplingGuideStep({ formData, updateFormData, onNext, onPrev }) {
+const EXTRA_SAMPLES_BUY_URL = "https://buy.stripe.com/cNiaEXdAP70Vc1D0lsabK03";
+
+function emptySample() {
+  return { location: "", description: "", sample_image: "" };
+}
+
+export default function SamplingGuideStep({
+  formData,
+  updateFormData,
+  onNext,
+  onPrev,
+  sampleAllowance = 0,
+  extraSamplesOffer,
+}) {
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
-  const [samples, setSamples] = useState([
-    { location: "", description: "", sample_image: "" },
-    { location: "", description: "", sample_image: "" }
-  ]);
+  const paidSlots = sampleAllowance > 0 ? sampleAllowance : 2;
+  const extraUrl = extraSamplesOffer?.url || EXTRA_SAMPLES_BUY_URL;
+  const extraPrice = extraSamplesOffer?.price || 69;
+  const extraCount = extraSamplesOffer?.count || 2;
+  const [samples, setSamples] = useState(() => [emptySample(), emptySample()]);
 
   // Sync samples with formData when component mounts
   useEffect(() => {
@@ -186,8 +200,11 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
   }, []);
 
   const addSample = useCallback(() => {
-    setSamples(prevSamples => [...prevSamples, { location: "", description: "", sample_image: "" }]);
-  }, []);
+    setSamples((prevSamples) => {
+      if (prevSamples.length >= paidSlots) return prevSamples;
+      return [...prevSamples, emptySample()];
+    });
+  }, [paidSlots]);
 
   const removeSample = useCallback((index) => {
     // Prevent removing Sample #1 (index 0) as it's required
@@ -202,6 +219,12 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
     // Validate that Sample #1 has a location (required field)
     if (!samples[0] || !samples[0].location || samples[0].location.trim() === '') {
       alert('Please fill in the location for Sample #1 before continuing. This is a required field.');
+      return;
+    }
+
+    const filledCount = samples.filter((sample) => sample.location && sample.location.trim() !== '').length;
+    if (filledCount > paidSlots) {
+      alert(`Your package covers ${paidSlots} samples. Remove extra locations or add ${extraCount} more samples for $${extraPrice}.`);
       return;
     }
 
@@ -474,10 +497,20 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
         <div className="glass-effect p-4 sm:p-8 rounded-2xl mb-8">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4 sm:mb-6">Sample Collection Form</h2>
           <p className="text-slate-600 mb-2 text-sm sm:text-base">
-            Document your sample collection details below. Add as many samples as needed for each location where you collected swab samples.
+            Document each swab you will send. Your package covers {paidSlots} sample{paidSlots === 1 ? "" : "s"}.
+            Extra swabs are not analyzed unless you add them for ${extraPrice}.
           </p>
+          {sampleAllowance === 0 && (
+            <p className="text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 text-sm">
+              We did not find a package on this email. Use the same email as your order, or add {extraCount} extra samples for ${extraPrice} if you need more than two spots.
+            </p>
+          )}
+          {sampleAllowance > 0 && (
+            <p className="text-blue-800 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4 text-sm">
+              Paid sample slots: {samples.length} of {paidSlots} in use.
+            </p>
+          )}
 
-          
           <div className="space-y-6">
             {samples.map((sample, index) => (
               <SampleRow
@@ -490,16 +523,38 @@ export default function SamplingGuideStep({ formData, updateFormData, onNext, on
             ))}
           </div>
           
-          <div className="mt-6">
-            <Button
-              type="button"
-              onClick={addSample}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Another Sample
-            </Button>
+          <div className="mt-6 space-y-3">
+            {samples.length < paidSlots ? (
+              <Button
+                type="button"
+                onClick={addSample}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Another Sample
+              </Button>
+            ) : (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-slate-800 font-medium mb-1">
+                  You have used all {paidSlots} paid sample slots.
+                </p>
+                <p className="text-slate-600 text-sm mb-3">
+                  Need more spots? Add {extraCount} extra lab samples for ${extraPrice}. They ship in the same box — no new FedEx label.
+                </p>
+                <a
+                  href={`${extraUrl}${extraUrl.includes("?") ? "&" : "?"}prefilled_email=${encodeURIComponent(formData?.email || "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 text-sm"
+                >
+                  Add {extraCount} extra samples — ${extraPrice}
+                </a>
+                <p className="text-xs text-slate-500 mt-2">
+                  After checkout, come back to this page and the extra slots will unlock.
+                </p>
+              </div>
+            )}
           </div>
         </div>
         

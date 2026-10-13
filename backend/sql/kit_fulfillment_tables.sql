@@ -46,7 +46,7 @@ create table if not exists kit_fulfillments (
   customer_email text not null,
   customer_name text,
   package_type text not null
-    check (package_type in ('spot_check', 'extended', 'full_house')),
+    check (package_type in ('spot_check', 'extended', 'full_house', 'extra_samples')),
   shipping_label_id uuid references shipping_labels(id),
   coc_storage_path text,
   instructions_storage_path text,

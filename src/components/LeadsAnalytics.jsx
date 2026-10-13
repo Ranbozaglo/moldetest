@@ -51,8 +51,8 @@ const DATE_PRESETS = [
   { value: "custom", label: "Custom" },
 ];
 
-const PACKAGE_PRICES = { spot_check: 189, extended: 215, full_house: 270 };
-const PACKAGE_LABELS = { spot_check: "Spot Check", extended: "Extended", full_house: "Full House" };
+const PACKAGE_PRICES = { spot_check: 189, extended: 215, full_house: 270, extra_samples: 69 };
+const PACKAGE_LABELS = { spot_check: "Spot Check", extended: "Extended", full_house: "Full House", extra_samples: "2 Extra Samples" };
 
 const toZ = (iso) => String(iso || "").replace(/\+00:00$/, "Z");
 

@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { createPageUrl } from '@/utils';
 
 export default function SignIn() {
@@ -90,13 +89,8 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
-      >
+    <div className="flex items-center justify-center p-4 py-12 md:py-16">
+      <div className="w-full max-w-md">
         <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
           <CardHeader className="text-center pb-6">
             <div className="mx-auto mb-4 flex justify-center">
@@ -118,7 +112,15 @@ export default function SignIn() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>
+                    {error}{' '}
+                    <Link
+                      to={createPageUrl('ForgotPassword', email.trim() ? { email: email.trim() } : undefined)}
+                      className="underline font-medium"
+                    >
+                      Reset your password
+                    </Link>
+                  </AlertDescription>
                 </Alert>
               )}
               
@@ -141,9 +143,17 @@ export default function SignIn() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-700 font-medium">
-                  Password
-                </Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="password" className="text-slate-700 font-medium">
+                    Password
+                  </Label>
+                  <Link
+                    to={createPageUrl('ForgotPassword', email.trim() ? { email: email.trim() } : undefined)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <Input
@@ -163,15 +173,6 @@ export default function SignIn() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <Link
-                  to={createPageUrl('ForgotPassword')}
-                  className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  Forgot your password?
-                </Link>
               </div>
               
               <Button
@@ -197,7 +198,7 @@ export default function SignIn() {
             
           </CardContent>
         </Card>
-      </motion.div>
+      </div>
     </div>
   );
 } 
