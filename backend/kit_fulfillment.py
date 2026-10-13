@@ -1216,7 +1216,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
     def _send_package_welcome_test(customer_email: str, customer_name: str, package_type: str) -> Dict[str, Any]:
         """Same kit welcome email + COC, without claiming a prepaid shipping label."""
         if package_type not in PACKAGE_TYPES:
-            return {"success": False, "error": f"Unknown package_type: {package_type}"}
+            return {"success": False, "error": f"test welcome email: unknown package_type: {package_type}"}
         to_email = (customer_email or "").strip().lower()
         if not to_email:
             return {"success": False, "error": "customer_email required"}
