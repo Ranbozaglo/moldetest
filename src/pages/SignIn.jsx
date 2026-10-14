@@ -39,11 +39,8 @@ export default function SignIn() {
         
         // Small delay to ensure state is updated properly
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Clear any existing inspection data to prevent session mixing
-        localStorage.removeItem('inspection_current_step');
-        localStorage.removeItem('inspection_form_data');
-        console.log('🔍 DEBUG: Cleared inspection data on signin');
+
+        // Keep in-progress inspection answers so extra-sample checkout can return to step 6.
         
         // Redirect based on user role with direct paths
         if (result.user.is_admin || result.user.role === 'admin') {

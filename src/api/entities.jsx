@@ -142,9 +142,12 @@ export const MoldInspection = {
     });
     
     // Extract the inspection data from the response
-    // Backend returns: {"message": "...", "inspection": {...}}
-    // Frontend expects: {...} (just the inspection data)
-    return response.inspection || response;
+    // Backend returns: {"message": "...", "inspection": {...}, "kit_documents": {...}}
+    const inspection = response.inspection || response;
+    if (inspection && response.kit_documents) {
+      inspection.kit_documents = response.kit_documents;
+    }
+    return inspection;
   },
   
   findMany: async (filters = {}) => {

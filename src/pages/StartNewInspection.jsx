@@ -366,7 +366,7 @@ export default function StartNewInspection() {
           </Link>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Start new inspection</h1>
           <p className="text-slate-600 mt-2 text-sm sm:text-base">
-            Buy a package, then submit the inspection form. After you submit, we email your COC and unique prepaid shipping label.
+            Buy a package, then submit the inspection form. After you submit, we email your COC, prepaid shipping label, and how-to instructions. A second inspection needs another package.
           </p>
         </div>
 

@@ -197,28 +197,50 @@ export default function SamplingGuideStep({
 
   // Sample management functions
   const updateSample = useCallback((index, field, value) => {
-    setSamples(prevSamples => {
+    setSamples((prevSamples) => {
       const newSamples = [...prevSamples];
       newSamples[index] = { ...newSamples[index], [field]: value };
+      updateFormData({ samples: newSamples });
       return newSamples;
     });
-  }, []);
+  }, [updateFormData]);
 
   const addSample = useCallback(() => {
     setSamples((prevSamples) => {
       if (prevSamples.length >= paidSlots) return prevSamples;
-      return [...prevSamples, emptySample()];
+      const next = [...prevSamples, emptySample()];
+      updateFormData({ samples: next });
+      return next;
     });
-  }, [paidSlots]);
+  }, [paidSlots, updateFormData]);
 
   const removeSample = useCallback((index) => {
-    // Prevent removing Sample #1 (index 0) as it's required
     if (index === 0) {
       alert('Sample #1 cannot be removed as it is required. You must provide at least one sample location.');
       return;
     }
-    setSamples(prevSamples => prevSamples.filter((_, i) => i !== index));
-  }, []);
+    setSamples((prevSamples) => {
+      const next = prevSamples.filter((_, i) => i !== index);
+      updateFormData({ samples: next });
+      return next;
+    });
+  }, [updateFormData]);
+
+  const goBuyExtras = (event) => {
+    event.preventDefault();
+    const merged = { ...formData, samples };
+    try {
+      localStorage.setItem("inspection_form_data", JSON.stringify(merged));
+      localStorage.setItem("inspection_current_step", "6");
+    } catch {
+      /* ignore */
+    }
+    updateFormData({ samples });
+    const join = extraUrl.includes("?") ? "&" : "?";
+    window.location.assign(
+      `${extraUrl}${join}prefilled_email=${encodeURIComponent(formData?.email || "")}`
+    );
+  };
 
   const handleNext = () => {
     // Validate that Sample #1 has a location (required field)
@@ -550,14 +572,13 @@ export default function SamplingGuideStep({
                 </p>
                 <a
                   href={`${extraUrl}${extraUrl.includes("?") ? "&" : "?"}prefilled_email=${encodeURIComponent(formData?.email || "")}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  onClick={goBuyExtras}
                   className="inline-flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 text-sm"
                 >
                   Add {extraCount} extra samples — ${extraPrice}
                 </a>
                 <p className="text-xs text-slate-500 mt-2">
-                  After checkout, come back to this page and the extra slots will unlock.
+                  After payment you return to this sampling step with your answers saved. The 2 extra slots unlock here.
                 </p>
               </div>
             )}

@@ -1095,8 +1095,7 @@ export default function MyInspections() {
                 Your COC &amp; shipping labels
               </CardTitle>
               <p className="text-sm text-slate-600 font-normal">
-                Newest purchases appear first. Linked to {currentUser?.email || user?.email}.
-                Submit the inspection to unlock the COC and prepaid label.
+                Newest purchases appear first. After you submit an inspection, download the COC and prepaid label here.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">

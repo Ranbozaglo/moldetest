@@ -103,7 +103,7 @@ class EmailService:
         # Default templates
         self.default_templates = {
             "kit_purchase": {
-                "subject": "Total Testing - Your {package_name} Kit Materials",
+                "subject": "Total Testing - We received your inspection (COC & shipping label)",
                 "body": """<!DOCTYPE html>
 <html>
 <head>
@@ -124,11 +124,11 @@ class EmailService:
           </tr>
           <tr>
             <td style="padding:32px;">
-              <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">Purchase confirmed</p>
-              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0b2e59;">Your {package_name} kit is ready</h1>
+              <p style="margin:0 0 8px 0;font-size:14px;color:#64748b;">Inspection received</p>
+              <h1 style="margin:0 0 20px 0;font-size:24px;line-height:1.3;color:#0b2e59;">We got your inspection</h1>
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name},</p>
               <p style="margin:0 0 20px 0;font-size:16px;line-height:1.6;color:#334155;">
-                Thank you for choosing Total Testing. Your kit documents are attached to this email and also available in your dashboard.
+                Thank you. Your {package_name} inspection is on file. Your Chain of Custody (COC), unique prepaid FedEx label, and sampling instructions are attached — and also in your dashboard.
               </p>
 
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 24px 0;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;">
@@ -136,16 +136,17 @@ class EmailService:
                   <td style="padding:18px 20px;">
                     <p style="margin:0 0 10px 0;font-size:14px;font-weight:bold;color:#0b2e59;">Attached files</p>
                     <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Chain of Custody (COC) for {package_name}</p>
-                    <p style="margin:0;font-size:15px;color:#334155;">&#10003; Your unique prepaid return shipping label</p>
+                    <p style="margin:0 0 6px 0;font-size:15px;color:#334155;">&#10003; Your unique prepaid return shipping label</p>
+                    <p style="margin:0;font-size:15px;color:#334155;">&#10003; How to collect, pack, and ship your samples</p>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0b2e59;">Next steps</p>
+              <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#0b2e59;">How to use these documents</p>
               <ol style="margin:0 0 28px 0;padding-left:22px;font-size:15px;line-height:1.7;color:#334155;">
-                <li>Collect your samples using the sampling guide</li>
-                <li>Complete and sign the attached COC form</li>
-                <li>Pack samples + COC, then apply the prepaid shipping label</li>
+                <li>Collect each sample with a new swab and seal it in its bag</li>
+                <li>Write the same location names on the bags and on the COC, then sign the COC</li>
+                <li>Pack samples + COC, then stick the prepaid FedEx label on the envelope</li>
                 <li>Drop the package at any FedEx location</li>
               </ol>
 
@@ -522,16 +523,7 @@ class EmailService:
         open_pixel_url: str = "",
     ) -> Dict[str, Any]:
         """Send post-purchase kit email with COC + prepaid label attachments."""
-        templates = self.get_templates() if hasattr(self, 'get_templates') else self.default_templates
-        # get_templates may return wrapped structure
-        if isinstance(templates, dict) and 'templates' in templates:
-            templates = templates.get('templates') or {}
-        # Always prefer the current branded default for kit purchase layout
-        # (admin JSON may still hold an older plain template without logo).
         template = self.default_templates.get('kit_purchase')
-        saved = (templates or {}).get('kit_purchase')
-        if saved and '{logo_url}' in str(saved.get('body') or ''):
-            template = saved
         if not template:
             return {"success": False, "error": "kit_purchase template missing"}
 
@@ -540,14 +532,14 @@ class EmailService:
         vars_map = {
             'full_name': full_name or 'Customer',
             'package_name': package_name or 'Mold Testing',
-            'dashboard_url': dashboard_url or f"{base}/Inspection",
+            'dashboard_url': dashboard_url or f"{base}/MyInspections",
             'logo_url': logo_url,
         }
         try:
             subject = template['subject'].format(**vars_map)
             body = template['body'].format(**vars_map)
         except Exception:
-            subject = f"Total Testing - Your {vars_map['package_name']} Kit Materials"
+            subject = f"Total Testing - We received your inspection (COC & shipping label)"
             body = self.default_templates['kit_purchase']['body'].format(**vars_map)
 
         return self.send_email(
@@ -564,20 +556,26 @@ class EmailService:
         full_name: str,
         package_name: str,
         dashboard_url: str,
+        sample_count: int = 2,
         open_pixel_url: str = "",
     ) -> Dict[str, Any]:
         """Purchase confirmed: no COC/label until the inspection is submitted."""
         base = self.frontend_base_url()
         logo_url = os.getenv('EMAIL_LOGO_URL') or f"{base}/logos.png"
-        dash = dashboard_url or f"{base}/Inspection"
+        dash = dashboard_url or f"{base}/SignUp?next=/Inspection"
+        slots = int(sample_count or 2)
         content = f"""
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">Hi {full_name or 'Customer'},</p>
               <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
-                Thank you for choosing Total Testing. Your {package_name} package is paid.
+                Thank you for choosing Total Testing. Your {package_name} package is paid ({slots} lab samples included).
+              </p>
+              <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#334155;">
+                Create your account with this same email, then start your inspection. Enter the property address and each sample location.
+                Need more than {slots} spots? You can add 2 extra samples for $69 on the sampling step.
               </p>
               <p style="margin:0 0 8px 0;font-size:16px;line-height:1.6;color:#334155;">
-                Next, submit your inspection with the property address and each sample location.
-                After you submit, we email your Chain of Custody (COC) and unique prepaid FedEx label.
+                After you submit, we email your Chain of Custody (COC), unique prepaid FedEx label, and instructions.
+                You can also download them from your dashboard.
               </p>
 """
         body = _branded_email(
@@ -585,11 +583,11 @@ class EmailService:
             title=f"Your {package_name} is paid",
             content_html=content,
             cta_href=dash,
-            cta_label="Create your inspection",
+            cta_label="Create account & start inspection",
         ).replace("{logo_url}", logo_url)
         return self.send_email(
             to_email=to_email,
-            subject=f"Total Testing - Complete your {package_name} inspection",
+            subject=f"Total Testing - Create your account and start your {package_name} inspection",
             body=body,
             open_pixel_url=open_pixel_url,
         )

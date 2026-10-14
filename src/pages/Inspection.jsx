@@ -15,7 +15,7 @@ console.log("🔍 DEBUG: MoldInspection import check:", {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, CheckCircle } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { getDisplayNumber, validateInspection, getNextInspectionNumber } from "@/utils/inspectionUtils";
@@ -39,6 +39,48 @@ const steps = [
   { id: 7, title: "Review & Submit", component: ReviewStep }
 ];
 
+const EMPTY_FORM = {
+  full_name: "",
+  email: "",
+  client_type: "",
+  property_type: "",
+  street_address: "",
+  unit_number: "",
+  city: "",
+  state: "",
+  zip_code: "",
+  square_footage: "",
+  background_info: "",
+  has_visible_mold: false,
+  visible_mold_details: [],
+  has_water_damage: false,
+  water_damage_details: [],
+  thermostat_image: "",
+  temperature: "",
+  humidity: "",
+  environmental_data_method: "manual",
+};
+
+function loadSavedInspectionForm() {
+  try {
+    const raw = localStorage.getItem("inspection_form_data");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function draftHasProgress(draft) {
+  if (!draft) return false;
+  if (String(draft.street_address || "").trim()) return true;
+  if (Array.isArray(draft.samples) && draft.samples.some((s) => String(s?.location || "").trim())) {
+    return true;
+  }
+  return false;
+}
+
 export default function Inspection() {
   // Debug: Check for any global variables that might interfere
   if (typeof window !== 'undefined') {
@@ -49,7 +91,9 @@ export default function Inspection() {
   }
   
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
+  const resumeExtras = searchParams.get("extras") === "1" || searchParams.get("resume") === "samples";
   
   // Load saved step from localStorage or default to 1
   const getSavedStep = () => {
@@ -89,30 +133,14 @@ export default function Inspection() {
     }
   };
   
-  const [currentStep, setCurrentStep] = useState(getSavedStep);
+  const [currentStep, setCurrentStep] = useState(() => (resumeExtras ? 6 : getSavedStep()));
   
   // Debug: Log the initial step to help identify issues
-  const [formData, setFormData] = useState({
-    full_name: "",
-    email: "",
-    client_type: "",
-    property_type: "",
-    street_address: "",
-    unit_number: "",
-    city: "",
-    state: "",
-    zip_code: "",
-    square_footage: "",
-    background_info: "",
-    has_visible_mold: false,
-    visible_mold_details: [],
-    has_water_damage: false,
-    water_damage_details: [],
-    thermostat_image: "",
-    temperature: "",
-    humidity: "",
-    environmental_data_method: "manual"
-  });
+  const [formData, setFormData] = useState(() => ({
+    ...EMPTY_FORM,
+    ...(loadSavedInspectionForm() || {}),
+  }));
+  const [needsNewPackage, setNeedsNewPackage] = useState(false);
 
   useEffect(() => {
     console.log('🔍 DEBUG: Initial step loaded:', currentStep);
@@ -124,7 +152,6 @@ export default function Inspection() {
     if (currentStep === 7 && formData && (!formData.full_name || !formData.email)) {
       console.log('🔍 DEBUG: Auto-resetting to step 1 - user on step 7 without proper data');
       setCurrentStep(1);
-      clearSavedInspectionData();
     }
   }, [currentStep, formData]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -188,12 +215,13 @@ export default function Inspection() {
           setFormData(prev => ({
             ...prev,
             email: currentUser.email,
-            full_name: currentUser.name || currentUser.email.split('@')[0]
+            full_name: prev.full_name || currentUser.name || currentUser.email.split('@')[0]
           }));
           
           // Check for existing inspections (returning clients can still create another)
+          let existingInspections = [];
           try {
-            const existingInspections = await MoldInspection.findMany({
+            existingInspections = await MoldInspection.findMany({
               email: currentUser.email,
             });
             if (existingInspections && existingInspections.length > 0) {
@@ -206,7 +234,8 @@ export default function Inspection() {
 
           try {
             const kitRes = await KitService.myDownloads(currentUser.email);
-            setSampleAllowance(Number(kitRes.sample_allowance) || 0);
+            const allowance = Number(kitRes.sample_allowance) || 0;
+            setSampleAllowance(allowance);
             if (kitRes.extra_samples?.url) {
               setExtraSamplesOffer({
                 url: kitRes.extra_samples.url,
@@ -214,6 +243,17 @@ export default function Inspection() {
                 price: kitRes.extra_samples.price || 69,
                 name: kitRes.extra_samples.name || "2 Extra Samples",
               });
+            }
+            const hasPendingKit = Boolean(kitRes.active_package_type);
+            const existingCount = Array.isArray(existingInspections) ? existingInspections.length : 0;
+            if (
+              existingCount > 0 &&
+              !hasPendingKit &&
+              allowance === 0 &&
+              !resumeExtras &&
+              !draftHasProgress(loadSavedInspectionForm())
+            ) {
+              setNeedsNewPackage(true);
             }
           } catch (error) {
             console.log("🔍 DEBUG: Could not load sample allowance:", error);
@@ -256,8 +296,18 @@ export default function Inspection() {
       refreshAllowance();
     };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [currentUser?.email]);
+    let poll;
+    if (resumeExtras) {
+      setCurrentStep(6);
+      refreshAllowance();
+      poll = setInterval(refreshAllowance, 4000);
+      setTimeout(() => poll && clearInterval(poll), 60000);
+    }
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      if (poll) clearInterval(poll);
+    };
+  }, [currentUser?.email, resumeExtras]);
 
   const updateFormData = (data) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -480,21 +530,14 @@ export default function Inspection() {
           // Clear saved inspection data after successful submission
           clearSavedInspectionData();
           
-          // Send welcome email to user about their new inspection
-          try {
-            const displayNumber = newInspection.inspection_number || `INS-${String(newInspection.id).padStart(4, '0')}`;
-            console.log("🔍 DEBUG: Sending inspection created email for:", {
-              inspectionId: newInspection.id,
-              displayNumber: displayNumber,
-              userEmail: currentUser.email
-            });
-            
-            await EmailService.sendInspectionCreatedEmail(newInspection.id);
-            console.log("✅ Successfully sent inspection creation email");
-          } catch (emailError) {
-            console.error("❌ Failed to send inspection creation email:", emailError);
-            // Don't prevent inspection completion if email fails
-            // The inspection was created successfully, email is just a bonus feature
+          // Pack email (COC + label) is sent by the API when a kit is released.
+          // Only send the generic "inspection created" note when there was no kit pack.
+          if (!newInspection.kit_documents?.released) {
+            try {
+              await EmailService.sendInspectionCreatedEmail(newInspection.id);
+            } catch (emailError) {
+              console.error("❌ Failed to send inspection creation email:", emailError);
+            }
           }
 
           try {
@@ -523,6 +566,25 @@ export default function Inspection() {
     return (
       <div className="max-w-2xl mx-auto text-center py-20 px-6">
         <div className="text-lg text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (needsNewPackage && !isSubmitted) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20 px-6">
+        <h1 className="text-2xl font-bold text-slate-900 mb-3">Buy a package for a new inspection</h1>
+        <p className="text-slate-600 mb-6">
+          You already submitted an inspection. Purchase another package to get a new COC and prepaid shipping label, then fill in the next job.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Button onClick={() => navigate(createPageUrl("StartNewInspection"))} className="bg-blue-600 hover:bg-blue-700 text-white">
+            Buy a package
+          </Button>
+          <Button variant="outline" onClick={() => navigate(createPageUrl("MyInspections"))}>
+            View My Inspections
+          </Button>
+        </div>
       </div>
     );
   }

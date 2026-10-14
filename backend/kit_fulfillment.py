@@ -230,6 +230,16 @@ def _frontend_dashboard_url() -> str:
     return f"{base}/Inspection"
 
 
+def _frontend_welcome_url() -> str:
+    base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
+    return f"{base}/SignUp?next=/Inspection"
+
+
+def _frontend_resume_inspection_url() -> str:
+    base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
+    return f"{base}/Inspection?extras=1"
+
+
 def _frontend_inspections_url() -> str:
     base = (os.getenv("FRONTEND_URL") or "https://total-testing-diy.com").rstrip("/")
     return f"{base}/MyInspections"
@@ -705,7 +715,7 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
         to_email = (fulfillment.get("customer_email") or "").strip()
         email_result = {"success": False, "error": "Email service unavailable"}
         if email_service:
-            inspection_url = _frontend_dashboard_url()
+            inspection_url = _frontend_resume_inspection_url()
             email_result = email_service.send_email(
                 to_email=to_email,
                 subject="Total Testing - 2 extra samples added",
@@ -714,8 +724,8 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                     "<p>Your $69 add-on for <strong>2 extra lab samples</strong> is confirmed.</p>"
                     "<p>These samples go on the same inspection and ship in the same box "
                     "as your original prepaid label. No new shipping label is needed.</p>"
-                    f"<p><a href=\"{inspection_url}\">Open your inspection form</a> and add "
-                    "the two extra sample locations.</p>"
+                    f"<p><a href=\"{inspection_url}\">Return to your inspection</a> — "
+                    "your answers are saved. Add the two extra sample locations and continue.</p>"
                 ),
                 open_pixel_url=_open_pixel_url(fulfillment),
             )
@@ -731,11 +741,12 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 to_email=to_email,
                 full_name=fulfillment.get("customer_name") or "Customer",
                 package_name=PACKAGE_LABELS.get(package_type, package_type),
-                dashboard_url=_frontend_dashboard_url(),
+                dashboard_url=_frontend_welcome_url(),
+                sample_count=PACKAGE_SAMPLE_COUNTS.get(package_type, 2),
                 open_pixel_url=_open_pixel_url(fulfillment),
             )
         elif email_service:
-            dash = _frontend_dashboard_url()
+            dash = _frontend_welcome_url()
             email_result = email_service.send_email(
                 to_email=to_email,
                 subject=f"Total Testing - Complete your {PACKAGE_LABELS.get(package_type, package_type)} inspection",
@@ -1367,7 +1378,8 @@ def register_kit_fulfillment_endpoints(app, supabase, email_service=None):
                 to_email=to_email,
                 full_name=customer_name or "Customer",
                 package_name=PACKAGE_LABELS.get(package_type, package_type),
-                dashboard_url=_frontend_dashboard_url(),
+                dashboard_url=_frontend_welcome_url(),
+                sample_count=PACKAGE_SAMPLE_COUNTS.get(package_type, 2),
             )
         else:
             email_result = {"success": False, "error": "hold email method missing"}
